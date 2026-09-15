@@ -11,6 +11,8 @@ import { customerById, seatById } from '@/store/selectors'
 import { botById, senderName } from '@/store/policy'
 import { Avatar, SeatAvatar, TitleChip } from '@/ui/display'
 import { FileCard, ImageThumb } from '@/ui/media'
+import { MessageText } from '@/ui/MessageText'
+import { MessageReceipt } from '@/ui/MessageReceipt'
 import { Button, Input } from '@/ui/primitives'
 import { toast } from '@/ui/overlay'
 import { customerPreview } from './ChatScreen.shared'
@@ -31,7 +33,7 @@ function MediaBody({ m, mine, replyTo, onMenu }: { m: Message; mine: boolean; re
   if (!m.media) return null
   return (
     <div className={clsx('inline-flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
-      {m.replyToId && <QuoteBar m={replyTo} mine={false} />}
+      {m.replyToId && replyTo && !replyTo.recalledAt && !replyTo.deletedAt && <QuoteBar m={replyTo} mine={false} />}
       {m.kind === 'image' ? <ImageThumb media={m.media} maxWidth={200} className="shadow-sm" /> : <FileCard media={m.media} className="shadow-sm" />}
       {m.text && <div className={clsx('max-w-[200px] text-[12px] leading-relaxed whitespace-pre-wrap text-zinc-700', mine ? 'text-right' : 'text-left')}>{m.text}</div>}
       <button type="button" onClick={onMenu} className="px-1 text-[11px] leading-none text-zinc-400 active:text-zinc-600" aria-label="消息菜单">
@@ -55,12 +57,12 @@ function SenderAvatar({ m }: { m: Message }) {
 }
 
 /** 一条消息；系统消息灰色居中；点击弹出引用 / 撤回小菜单 */
-export function Bubble({ m, mine, inGroup, canRecall, onReply, onRecall }: { m: Message; mine: boolean; inGroup: boolean; canRecall: boolean; onReply: () => void; onRecall: () => void }) {
+export function Bubble({ m, mine, inGroup, canRecall, onReply, onRecall, onEdit, customerId }: { customerId: string; m: Message; mine: boolean; inGroup: boolean; canRecall: boolean; onEdit?: () => void; onReply: () => void; onRecall: () => void }) {
   const s = useStore()
   const [menu, setMenu] = useState(false)
   if (m.senderKind === 'system') {
     return (
-      <div id={`pm-${m.id}`} className="my-2 text-center">
+      <div id={`pm-${m.id}`} data-message-id={m.id} className="my-2 text-center">
         <span className="rounded-full bg-zinc-200/70 px-2 py-0.5 text-[10px] text-zinc-500">{m.text}</span>
       </div>
     )
@@ -71,7 +73,7 @@ export function Bubble({ m, mine, inGroup, canRecall, onReply, onRecall }: { m: 
   const replyTo = m.replyToId ? s.messages.find((x) => x.id === m.replyToId) : undefined
   const isMedia = !gone && (m.kind === 'image' || m.kind === 'file') && !!m.media
   return (
-    <div id={`pm-${m.id}`} className={clsx('mb-2.5 flex gap-2', mine && 'flex-row-reverse')}>
+    <div id={`pm-${m.id}`} data-message-id={m.id} className={clsx('mb-2.5 flex gap-2', mine && 'flex-row-reverse')}>
       {!mine && <SenderAvatar m={m} />}
       <div className={clsx('relative max-w-[75%]', mine && 'text-right')}>
         {inGroup && !mine && (
@@ -84,20 +86,20 @@ export function Bubble({ m, mine, inGroup, canRecall, onReply, onRecall }: { m: 
         {isMedia ? (
           <MediaBody m={m} mine={mine} replyTo={replyTo} onMenu={() => setMenu((v) => !v)} />
         ) : (
-          <button
-            type="button"
+          <div
+            role="group"
             onClick={() => !gone && setMenu((v) => !v)}
             className={clsx(
               'inline-block rounded-2xl px-3 py-2 text-left text-[13px] leading-relaxed whitespace-pre-wrap',
               gone ? 'bg-zinc-100 text-zinc-400 italic' : mine ? 'rounded-tr-sm bg-brand-700 text-white' : 'rounded-tl-sm bg-white text-zinc-800 shadow-sm',
             )}
           >
-            {m.replyToId && !gone && <QuoteBar m={replyTo} mine={mine} />}
-            {m.mentionAll && !gone && <span className="mr-1 text-brand-200">@所有人</span>}
-            {customerPreview(m)}
-          </button>
+            {m.replyToId && !gone && replyTo && !replyTo.recalledAt && !replyTo.deletedAt && <QuoteBar m={replyTo} mine={mine} />}
+            {gone ? customerPreview(m) : <MessageText m={m} viewerCustomerId={customerId} />}
+          </div>
         )}
-        <div className="mt-0.5 text-[9px] text-zinc-400">{fmtTime(m.at)}</div>
+        {!gone && !isMedia && <button type="button" aria-label="消息菜单" className="ml-1 px-1 text-xs text-zinc-400" onClick={() => setMenu((v) => !v)}>···</button>}
+        <div className="mt-1 flex items-center gap-1 text-[11px] text-zinc-400">{fmtTime(m.at)}{m.editedAt && !gone && <span>已编辑</span>}{mine && <MessageReceipt m={m} />}</div>
         {menu && (
           <div className={clsx('absolute z-10 flex overflow-hidden rounded-md border border-zinc-200 bg-white text-[11px] shadow-md', mine ? 'right-0' : 'left-0', '-bottom-6')}>
             <button
@@ -110,6 +112,7 @@ export function Bubble({ m, mine, inGroup, canRecall, onReply, onRecall }: { m: 
             >
               引用
             </button>
+            {mine && onEdit && <button type="button" className="border-l border-zinc-100 px-2 py-1 text-zinc-700" onClick={() => { setMenu(false); onEdit() }}>编辑</button>}
             {mine && canRecall && (
               <button
                 type="button"

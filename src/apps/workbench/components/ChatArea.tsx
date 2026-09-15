@@ -14,6 +14,7 @@ import { useWorkbench } from '../useWorkbench'
 import { AiPanel, ChatHeader, ForwardModal, MessageSearchBar, PinModal, PinnedBar } from './ChatArea.parts'
 import { sendBlockReason } from './ChatArea.shared'
 import { ChatInput } from './ChatInput'
+import { useMessageRead } from '@/ui/useMessageRead'
 import { MessageItem } from './MessageItem'
 import { jumpToMessage } from './group/groupRules'
 
@@ -44,6 +45,8 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
   const group = !isDm ? s.chatGroups.find((g) => g.id === row.conv.chatGroupId) : undefined
   const canPin = !!group && seatGroupPerm(s, group, seat.id, staff?.id ?? null, 'can_pin_messages')
   const disabledReason = sendBlockReason(s, row, seat, staff?.id ?? null)
+
+  useMessageRead(row.conv.id, seat.id, 'seat', msgs.map((m) => m.id).join(','), 'wb-msg-list')
 
   // 切会话时由父级 key 重挂载（输入、引用、搜索自然清空）；新消息滚到底
   useEffect(() => {
@@ -77,7 +80,7 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
 
   // AI 推荐：策略允许才有入口；自动弹出要求私聊、客户在等、员工偏好开着
   const canAi = seatCan(s, seat.id, 'ai.suggest') && s.license.modules.some((m) => m.key === 'ai' && m.enabled)
-  const lastCustomerMsg = [...msgs].reverse().find((m) => m.senderKind === 'customer')
+  const lastCustomerMsg = [...msgs].reverse().find((m) => m.senderKind === 'customer' && !m.recalledAt && !m.deletedAt)
   const aiAuto = canAi && isDm && !!customer && !!row.waitingSince && !!lastCustomerMsg && !!staff?.prefs?.aiSuggest && dismissedFor !== lastCustomerMsg.id
   const autoDrafts = aiAuto && customer && lastCustomerMsg ? draftsFor({ lastCustomerText: lastCustomerMsg.text, customer, seat, knowledge: s.knowledge }) : []
   const aiContext = JSON.stringify([msgs.at(-1)?.id, s.knowledge])
@@ -96,9 +99,9 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
     if (lastCustomerMsg) setDismissedFor(lastCustomerMsg.id)
   }
 
-  const send = (body: string, mentionAll: boolean) => {
+  const send = (body: string, mentionAll: boolean, selected: { mentionSeatIds: string[]; mentionCustomerIds: string[] }) => {
     if (!staff || disabledReason) return
-    s.seatSendRich({ convId: row.conv.id, seatId: seat.id, operatorId: staff.id, text: body, replyToId: replyTo?.id, mentionAll: mentionAll || undefined, aiDraftUsed: draftFrom === 'ai' || undefined })
+    s.seatSendRich({ convId: row.conv.id, seatId: seat.id, operatorId: staff.id, text: body, selectedMentions: selected, replyToId: replyTo?.id, mentionAll: mentionAll || undefined, aiDraftUsed: draftFrom === 'ai' || undefined })
     if (draftFrom === 'ai') s.recordAi(staff.id, row.conv.id, 'edited')
     setText('')
     setDraftFrom(null)

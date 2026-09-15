@@ -77,6 +77,7 @@ export const AUDIT_LABEL: Record<AuditType, string> = {
   'group.restrict': '禁言封禁',
   'group.invite_link': '群邀请链接',
   'group.create': '建群',
+  'message.edit': '编辑消息',
   'message.recall': '撤回消息',
   'customer.block': '拉黑客户',
   'customer.mute': '禁言客户',

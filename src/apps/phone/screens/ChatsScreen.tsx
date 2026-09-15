@@ -1,6 +1,7 @@
 /**
  * 消息页：会话列表 + 右上角「+」菜单（项随策略出现与消失，全关时不显示「+」）。
  */
+import { customerVisibleMessage } from '@/domain/messageRules'
 import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useStore } from '@/store/store'
@@ -55,8 +56,9 @@ export function ChatsScreen({ customerId, onOpen }: { customerId: string; onOpen
       <div className="thin-scroll flex-1 overflow-y-auto">
         {rows.map((r) => {
           const last = r.last
+          const mentioned = messagesOf(s, r.conv.id).some((m) => customerVisibleMessage(m) && !m.recalledAt && !m.deletedAt && m.senderId !== customerId && (m.mentionAll || m.mentionCustomerIds?.includes(customerId)) && m.at > (r.conv.readAtByCustomer?.[customerId] ?? ''))
           const prefix = !last || last.senderKind === 'system' ? '' : last.senderKind === 'customer' && last.senderId === customerId ? '我：' : r.conv.kind === 'dm' ? '' : `${senderName(s, last)}：`
-          const unread = messagesOf(s, r.conv.id).filter((m) => m.senderKind === 'seat' && new Date(m.at).getTime() > Date.now() - 3600000).length
+          const unread = messagesOf(s, r.conv.id).filter((m) => customerVisibleMessage(m) && !m.recalledAt && !m.deletedAt && m.senderKind !== 'system' && m.senderId !== customerId && m.at > (r.conv.readAtByCustomer?.[customerId] ?? '')).length
           return (
             <button key={r.conv.id} type="button" onClick={() => onOpen(r.conv.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left active:bg-zinc-50">
               {r.seat ? <SeatAvatar seat={r.seat} size={44} /> : r.group ? <GroupAvatar g={r.group} size={44} /> : null}
@@ -70,10 +72,10 @@ export function ChatsScreen({ customerId, onOpen }: { customerId: string; onOpen
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="truncate text-xs text-zinc-500">
-                    {prefix}
+                    {mentioned && <span className="mr-1 text-amber-600">[有人@我]</span>}{prefix}
                     {last ? customerPreview(last) : ''}
                   </span>
-                  {unread > 0 && r.conv.kind === 'dm' && <span className="ml-2 shrink-0 rounded-full bg-red-500 px-1.5 text-[10px] leading-4 text-white">{unread}</span>}
+                  {unread > 0 && <span className="ml-2 shrink-0 rounded-full bg-red-500 px-1.5 text-[10px] leading-4 text-white">{unread > 99 ? '99+' : unread}</span>}
                 </div>
               </div>
             </button>

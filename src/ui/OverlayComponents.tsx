@@ -10,10 +10,14 @@ export function Modal({ open, onClose, title, children, footer, width = 520 }: {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
+  useEffect(() => {
+    window.dispatchEvent(new Event('yolink:dialog-change'))
+    return () => { window.dispatchEvent(new Event('yolink:dialog-change')) }
+  }, [open])
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4" onMouseDown={onClose}>
-      <div className="flex max-h-[90vh] w-full flex-col rounded-lg bg-white shadow-xl" style={{ maxWidth: width }} onMouseDown={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined} className="flex max-h-[90vh] w-full flex-col rounded-lg bg-white shadow-xl" style={{ maxWidth: width }} onMouseDown={(e) => e.stopPropagation()}>
         <header className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
           <h2 className="text-sm font-semibold text-zinc-900">{title}</h2>
           <button type="button" onClick={onClose} className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" aria-label="关闭">

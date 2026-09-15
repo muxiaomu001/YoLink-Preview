@@ -430,6 +430,8 @@ export interface Conversation {
   mutedBySeatIds?: string[]
   /** 坐席最近一次读到的时间；缺省按"最后一条坐席消息之后"算未读 */
   readAtBySeat?: Record<string, ISODate>
+  /** 客户在演示会话里实际看到的最后一条消息时间 */
+  readAtByCustomer?: Record<string, ISODate>
   /** 坐席手动标为未读 */
   unreadMarkBySeatIds?: string[]
 }
@@ -465,6 +467,10 @@ export interface Message {
   media?: MessageMedia
   at: ISODate
   mentionSeatIds?: string[]
+  mentionCustomerIds?: string[]
+  /** 群回执按发送时的成员范围统计，不把之后加入的人算未读。 */
+  receiptMemberSeatIds?: string[]
+  receiptMemberCustomerIds?: string[]
   mentionAll?: boolean
   aiDraftUsed?: boolean
   isWelcome?: boolean
@@ -472,6 +478,9 @@ export interface Message {
   deletedAt?: ISODate
   /** 发送者自己撤回：所有端不再显示内容，审计仍可查 */
   recalledAt?: ISODate
+  editedAt?: ISODate
+  /** 编辑前的正文留在本地审计数据中 */
+  editHistory?: { text: string; at: ISODate; operatorId: string }[]
   /** 引用回复 */
   replyToId?: string
   /** 转发来源 */
@@ -560,6 +569,7 @@ export type AuditType =
   | 'group.invite_link'
   | 'group.create'
   | 'message.recall'
+  | 'message.edit'
   | 'customer.block'
   | 'customer.mute'
   | 'customer.reset_password'
@@ -790,8 +800,12 @@ export interface PolicyPreset {
 
 export interface PolicyNumbers {
   recallSeconds: number
-  /** P1 */
+  /** 旧版本统一时限仅保留兼容数据，新演示按身份设置。 */
   editSeconds: number
+  seatRecallSeconds?: number
+  seatEditSeconds?: number
+  customerRecallSeconds?: number
+  customerEditSeconds?: number
   groupMaxMembers: number
   slowModeSeconds: number
   retentionDays: number

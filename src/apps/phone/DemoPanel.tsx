@@ -8,9 +8,9 @@ import { customerSnapshot, resolveCap } from '@/store/policy'
 import { Button, Select } from '@/ui/primitives'
 import { PHONE_SOURCE_LABEL } from './shared'
 
-export function DemoPanel({ onSwitch }: { onSwitch: () => void }) {
+export function DemoPanel({ onSwitch, customerId }: { customerId?: string; onSwitch: () => void }) {
   const s = useStore()
-  const customer = customerById(s, s.session.phoneCustomerId)
+  const customer = customerById(s, customerId ?? s.session.phoneCustomerId)
   const snapshot = customer ? customerSnapshot(s, customer.id) : null
   const off = snapshot
     ? s.policyItems

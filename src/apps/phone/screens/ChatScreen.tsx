@@ -4,12 +4,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BadgeCheck, Info } from 'lucide-react'
 import type { Message } from '@/domain/types'
+import { customerVisibleMessage, messageLimitSeconds } from '@/domain/messageRules'
+import { useMessageRead } from '@/ui/useMessageRead'
 import { iso } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { customerById, messagesOf, seatById } from '@/store/selectors'
 import { customerCan, customerCanSpeakIn } from '@/store/policy'
 import { SeatAvatar } from '@/ui/display'
-import { toast } from '@/ui/overlay'
+import { Button, Textarea } from '@/ui/primitives'
+import { Modal, toast } from '@/ui/overlay'
 import { GroupAvatar, ScreenHeader } from '../parts'
 import { groupKindLabel } from '../shared'
 import { AnnouncementLayer, Bubble, InputBar, PinnedBar } from './ChatScreen.parts'
@@ -19,7 +22,8 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
   const s = useStore()
   const conv = s.conversations.find((c) => c.id === convId)
   const customer = customerById(s, customerId)
-  const msgs = useMemo(() => messagesOf(s, convId), [s, convId])
+  const msgs = useMemo(() => messagesOf(s, convId).filter(customerVisibleMessage), [s, convId])
+  const [editing, setEditing] = useState<Message | null>(null)
   const [replyTo, setReplyTo] = useState<Message | undefined>()
   const [showInfo, setShowInfo] = useState(false)
   // 本次会话看过的公告（按公告时间记，公告更新会再弹）
@@ -30,10 +34,14 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
   useEffect(() => {
     ref.current?.scrollTo({ top: ref.current.scrollHeight })
   }, [msgs.length])
-  if (!conv || !customer) return null
+  const group = conv?.kind !== 'dm' ? s.chatGroups.find((g) => g.id === conv?.chatGroupId) : undefined
+  const announcement = group?.announcement
+  const showAnnouncement = !!announcement && seenAnnouncementAt !== announcement.at
+  useMessageRead(convId, customerId, 'customer', msgs.map((m) => m.id).join(','), 'phone-msg-list', !showInfo && !showAnnouncement)
+  if (!conv || !customer) return <div className="p-6 text-sm">会话不存在或已不可用<button className="ml-2 text-brand-700" onClick={onBack}>返回</button></div>
+  if (conv.kind === 'dm' ? conv.customerId !== customerId : !s.chatGroups.some((g) => g.id === conv.chatGroupId && g.memberCustomerIds.includes(customerId))) return <div className="p-6 text-sm">当前客户不能查看此会话<button className="ml-2 text-brand-700" onClick={onBack}>返回</button></div>
 
   const seat = conv.kind === 'dm' ? seatById(s, conv.seatId) : undefined
-  const group = conv.kind !== 'dm' ? s.chatGroups.find((g) => g.id === conv.chatGroupId) : undefined
   const gid = group?.id ?? null
 
   if (group && showInfo) return <GroupInfoScreen g={group} customerId={customerId} onBack={() => setShowInfo(false)} onLeft={onBack} />
@@ -43,7 +51,7 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
   const canMedia = group ? customerCan(s, customerId, 'group.send_media', gid) : customerCan(s, customerId, 'dm.send_media')
   const canMentionAll = !!group && group.kind !== 'channel' && customerCan(s, customerId, 'group.mention_all', gid)
   const canRecallPolicy = customerCan(s, customerId, 'dm.recall', gid)
-  const recallWindowMs = s.policyNumbers.recallSeconds * 1000
+  const recallWindowMs = messageLimitSeconds(s, 'customer', 'recall') * 1000
 
   const send = (text: string) => {
     const r = s.customerSendIn(convId, customerId, text, replyTo?.id)
@@ -56,13 +64,11 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
     return true
   }
   const recall = (m: Message) => {
-    if (s.customerRecall(m.id)) toast('已撤回')
-    else toast(`超过撤回时限（${s.policyNumbers.recallSeconds} 秒）`, 'warn')
+    if (s.customerRecall(m.id, customerId)) toast('已撤回')
+    else toast('撤回失败：权限或时限已变更', 'warn')
   }
 
-  const pinned = group?.pinnedMessageIds[0] ? s.messages.find((m) => m.id === group.pinnedMessageIds[0]) : undefined
-  const announcement = group?.announcement
-  const showAnnouncement = !!announcement && seenAnnouncementAt !== announcement.at
+  const pinned = group?.pinnedMessageIds[0] ? s.messages.find((m) => m.id === group.pinnedMessageIds[0] && !m.recalledAt && !m.deletedAt) : undefined
   const memberCount = group ? group.memberCustomerIds.length + group.memberSeatIds.length + group.memberBotIds.length : 0
 
   return (
@@ -82,11 +88,11 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
         right={seat ? <BadgeCheck size={16} className="mr-2 text-brand-600" /> : group ? <Info size={16} className="mr-2 text-zinc-400" /> : null}
       />
       {pinned && <PinnedBar m={pinned} />}
-      <div ref={ref} className="thin-scroll flex-1 overflow-y-auto px-3 py-3">
+      <div id="phone-msg-list" ref={ref} className="thin-scroll flex-1 overflow-y-auto px-3 py-3">
         {msgs.map((m) => {
           const mine = m.senderKind === 'customer' && m.senderId === customerId
-          const withinWindow = nowMs - new Date(m.at).getTime() <= recallWindowMs
-          return <Bubble key={m.id} m={m} mine={mine} inGroup={!!group} canRecall={canRecallPolicy && withinWindow} onReply={() => setReplyTo(m)} onRecall={() => recall(m)} />
+          const withinWindow = recallWindowMs === 0 || nowMs - new Date(m.at).getTime() <= recallWindowMs
+          return <Bubble customerId={customerId} key={m.id} m={m} mine={mine} inGroup={!!group} canRecall={canRecallPolicy && withinWindow} onReply={() => setReplyTo(m)} onRecall={() => recall(m)} onEdit={mine && !m.recalledAt && !m.deletedAt && customerCan(s, customerId, 'dm.edit', gid) ? () => setEditing(m) : undefined} />
         })}
       </div>
       <InputBar
@@ -98,7 +104,25 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
         onCancelReply={() => setReplyTo(undefined)}
         onSend={send}
       />
+      {editing && <CustomerEditMessage message={editing} customerId={customerId} onClose={() => setEditing(null)} />}
       {showAnnouncement && announcement && <AnnouncementLayer title={announcement.title} content={announcement.content} onClose={() => setSeenAnnouncementAt(announcement.at)} />}
     </div>
   )
+}
+
+
+function CustomerEditMessage({ message, customerId, onClose }: { message: Message; customerId: string; onClose: () => void }) {
+  const s = useStore()
+  const [original] = useState(message.text)
+  const [text, setText] = useState(message.text)
+  const [error, setError] = useState('')
+  const save = () => {
+    const result = s.customerEditMessage(message.id, text, customerId, original)
+    if (result) return setError(result)
+    onClose()
+  }
+  return <Modal open onClose={onClose} title="编辑消息" width={420} footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" onClick={save} disabled={(!text.trim() && !message.media) || text.trim() === original}>保存修改</Button></>}>
+    <Textarea aria-label="修改消息内容" autoFocus rows={4} maxLength={message.media ? 1024 : 4096} value={text} onChange={(e) => setText(e.target.value)} />
+    {error && <p role="alert" className="mt-2 text-xs text-red-600">{error}</p>}
+  </Modal>
 }

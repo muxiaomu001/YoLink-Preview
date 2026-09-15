@@ -4,14 +4,19 @@
  */
 import { useState } from 'react'
 import { clsx } from 'clsx'
-import { Link } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { ExternalLink, FlaskConical, X } from 'lucide-react'
 import { seatsOfStaff } from '@/store/selectors'
 import { toast } from '@/ui/overlay'
 import { useWorkbench } from '../../useWorkbench'
 
 export function DemoBar() {
-  const { s, staff } = useWorkbench()
+  const { s, staff, seat } = useWorkbench()
+  const { convId } = useParams()
+  const conv = s.conversations.find((c) => c.id === convId)
+  const group = s.chatGroups.find((g) => g.id === conv?.chatGroupId)
+  const customerId = conv?.customerId ?? group?.memberCustomerIds[0]
+  const phoneUrl = customerId && convId ? `/phone?customer=${customerId}&conversation=${convId}` : '/phone'
   const [open, setOpen] = useState(false)
   const candidates = s.staff.filter((x) => x.status === 'active' && x.roleId !== 'role_admin')
 
@@ -53,9 +58,14 @@ export function DemoBar() {
                 </li>
               ))}
             </ul>
+            {conv && seat && staff && <div className="mt-3 border-t border-zinc-100 pt-2 text-xs text-zinc-600">
+              <div className="mb-1 font-medium">体验消息操作</div>
+              <button type="button" className="text-brand-700 hover:underline" onClick={() => { s.seatSendRich({ convId: conv.id, seatId: seat.id, operatorId: staff.id, text: '您好，明天下午三点我们再沟通。' }); setOpen(false) }}>发送一条演示消息</button>
+              <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">点击消息旁的 ··· 试编辑、引用或撤回。打开下方客户手机屏查看已读和双方变化。</p>
+            </div>}
             <div className="mt-2 flex flex-col gap-1">
-              <Link to="/phone" target="_blank" className="inline-flex items-center gap-1 text-[12px] text-brand-700 hover:underline">
-                <ExternalLink size={12} /> 打开客户手机屏
+              <Link to={phoneUrl} target="_blank" className="inline-flex items-center gap-1 text-[12px] text-brand-700 hover:underline">
+                <ExternalLink size={12} /> 打开当前会话的客户手机屏
               </Link>
               <Link to="/admin" target="_blank" className="inline-flex items-center gap-1 text-[12px] text-brand-700 hover:underline">
                 <ExternalLink size={12} /> 打开管理后台

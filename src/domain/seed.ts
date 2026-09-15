@@ -946,6 +946,15 @@ export function buildSeed(): DemoState {
   const g = buildGroupMessages(c.customers, chatGroups)
   const conversations = [...c.conversations, ...g.conversations]
   const messages = [...c.messages, ...g.messages].sort((a, b) => a.at.localeCompare(b.at))
+  // 种子消息自带成员快照，之后加群的人不进入这些旧消息的未读名单。
+  for (const message of messages) {
+    const conv = conversations.find((x) => x.id === message.convId)
+    const group = chatGroups.find((x) => x.id === conv?.chatGroupId)
+    if (group) {
+      message.receiptMemberSeatIds = [...group.memberSeatIds]
+      message.receiptMemberCustomerIds = [...group.memberCustomerIds]
+    }
+  }
   return {
     enterprise: ENTERPRISE,
     roles: ROLES,

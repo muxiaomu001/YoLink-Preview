@@ -69,6 +69,14 @@ export function MessageContextModal({ messageId, onClose }: { messageId: string;
                 {m.senderKind === 'system' && <Pill>系统</Pill>}
                 {isTarget && <Pill tone="amber">目标消息</Pill>}
               </div>
+              {m.editedAt && <Pill tone="blue">已编辑</Pill>}
+              {!!m.editHistory?.length && <details className="my-2 rounded border border-zinc-200 bg-white p-2 text-xs">
+                <summary className="cursor-pointer text-brand-700">查看 {m.editHistory.length} 次修改记录</summary>
+                {m.editHistory.map((version, i) => <div key={`${version.at}-${i}`} className="mt-2 border-t border-zinc-100 pt-2">
+                  <div className="text-zinc-500">{fmtDateTimeSec(version.at)} · 修改人：{staffById(s, version.operatorId)?.name ?? customerById(s, version.operatorId)?.nickname ?? version.operatorId}</div>
+                  <div className="mt-1 whitespace-pre-wrap text-zinc-800">修改前：{version.text}</div>
+                </div>)}
+              </details>}
               {m.media && !m.deletedAt && !m.recalledAt && (m.kind === 'image' || m.kind === 'file') ? (
                 <div className="mt-1 space-y-1">
                   {m.kind === 'image' ? <ImageThumb media={m.media} maxWidth={200} /> : <FileCard media={m.media} />}

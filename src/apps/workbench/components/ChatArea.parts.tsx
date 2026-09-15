@@ -6,6 +6,7 @@ import { clsx } from 'clsx'
 import { ChevronDown, ChevronUp, PanelRightClose, PanelRightOpen, Pin, Search, Sparkles, X } from 'lucide-react'
 import type { AiDraft } from '@/domain/ai'
 import type { ChatGroup, Message, Seat } from '@/domain/types'
+import { seatMessageSendAllowed } from '@/domain/messageRules'
 import { fmtAgo } from '@/domain/time'
 import { senderName, visibleText } from '@/store/policy'
 import { conversationsForSeat, type ConvRow } from '@/store/selectors'
@@ -85,7 +86,7 @@ export function ChatHeader({
 export function PinnedBar({ group, canPin }: { group: ChatGroup; canPin: boolean }) {
   const { s, staff, seat } = useWorkbench()
   const [open, setOpen] = useState(false)
-  const list = group.pinnedMessageIds.map((id) => s.messages.find((m) => m.id === id)).filter((m) => !!m)
+  const list = group.pinnedMessageIds.map((id) => s.messages.find((m) => m.id === id)).filter((m): m is Message => !!m && !m.recalledAt && !m.deletedAt)
   if (!list.length) return null
   const shown = open ? list : list.slice(0, 1)
   const jump = (id: string) => !jumpToMessage(id) && toast('该消息不在当前视图', 'info')
@@ -134,7 +135,7 @@ export function ForwardModal({ message, seat, onClose }: { message: Message; sea
   const rows = conversationsForSeat(s, seat.id).filter((r) => r.conv.id !== message.convId && (!q.trim() || r.title.includes(q.trim())))
   const submit = () => {
     if (!target || !staff) return
-    s.forwardMessage(message.id, target, seat.id, staff.id)
+    if (!s.forwardMessage(message.id, target, seat.id, staff.id)) return toast('转发失败：原消息已不可用，或目标会话不允许发送', 'warn')
     toast(`已转发到「${rows.find((r) => r.conv.id === target)?.title}」`)
     onClose()
   }
@@ -146,8 +147,8 @@ export function ForwardModal({ message, seat, onClose }: { message: Message; sea
         {!rows.length && <li className="py-6 text-center text-[12px] text-zinc-400">没有其他会话</li>}
         {rows.map((r) => (
           <li key={r.conv.id}>
-            <button type="button" onClick={() => setTarget(r.conv.id)} className={clsx('flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[12px]', target === r.conv.id ? 'bg-brand-50' : 'hover:bg-zinc-50')}>
-              <Avatar text={r.title} size={22} />
+            <button type="button" disabled={!staff || !seatMessageSendAllowed(s, r.conv.id, seat.id, staff.id, !!message.media)} title={!staff || !seatMessageSendAllowed(s, r.conv.id, seat.id, staff.id, !!message.media) ? '当前不能向此会话发送' : undefined} onClick={() => setTarget(r.conv.id)} className={clsx('flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[12px] disabled:cursor-not-allowed disabled:opacity-40', target === r.conv.id ? 'bg-brand-50' : 'hover:bg-zinc-50')}>
+              <Avatar text={r.title} size={22} portrait={r.conv.kind === 'dm'} />
               <span className="min-w-0 flex-1 truncate">{r.title}</span>
               <span className="text-[11px] text-zinc-400">{r.conv.kind === 'dm' ? '私聊' : r.conv.kind === 'channel' ? '频道' : '群'}</span>
             </button>

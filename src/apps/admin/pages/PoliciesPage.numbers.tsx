@@ -4,7 +4,7 @@
 import { useState } from 'react'
 import type { PolicyNumbers } from '@/domain/types'
 import { useStore } from '@/store/store'
-import { Button, Field, Input } from '@/ui/primitives'
+import { Button, Field, Input, Select } from '@/ui/primitives'
 import { Card, Note, Pill } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 
@@ -19,8 +19,10 @@ interface NumberField {
 
 /** 顺序与 PRD 05 数值型策略表一致 */
 const FIELDS: NumberField[] = [
-  { key: 'recallSeconds', label: '消息撤回时限', unit: '秒', defaultValue: 120 },
-  { key: 'editSeconds', label: '消息编辑时限', unit: '秒', defaultValue: 900, level: 'P1' },
+  { key: 'seatRecallSeconds', label: '坐席撤回时限', unit: '秒', defaultValue: 0 },
+  { key: 'seatEditSeconds', label: '坐席编辑时限', unit: '秒', defaultValue: 0 },
+  { key: 'customerRecallSeconds', label: '客户撤回时限', unit: '秒', defaultValue: 0 },
+  { key: 'customerEditSeconds', label: '客户编辑时限', unit: '秒', defaultValue: 0 },
   { key: 'groupMaxMembers', label: '单群上限', unit: '人', defaultValue: 10000 },
   { key: 'slowModeSeconds', label: '发言限流默认间隔', unit: '秒', defaultValue: 0, hint: '0 为关闭；策略键 group.slow_mode_seconds。群设置里的六档下拉 P2' },
   { key: 'retentionDays', label: '消息保留天数', unit: '天', defaultValue: 0, hint: '0 为永久' },
@@ -34,24 +36,25 @@ const FIELDS: NumberField[] = [
 type Draft = Record<keyof PolicyNumbers, string>
 
 function toDraft(n: PolicyNumbers): Draft {
-  return Object.fromEntries(FIELDS.map((f) => [f.key, String(n[f.key])])) as Draft
+  return Object.fromEntries(FIELDS.map((f) => [f.key, String(n[f.key] ?? 0)])) as Draft
 }
 
 export function NumbersTab() {
   const s = useStore()
   const admin = s.session.adminStaffId!
   const [draft, setDraft] = useState<Draft>(() => toDraft(s.policyNumbers))
+  const [units, setUnits] = useState<Record<string, number>>(() => Object.fromEntries(['seatRecallSeconds', 'seatEditSeconds', 'customerRecallSeconds', 'customerEditSeconds'].map((key) => { const value = s.policyNumbers[key as keyof PolicyNumbers] ?? 0; return [key, value > 0 && value % 86400 === 0 ? 86400 : value > 0 && value % 3600 === 0 ? 3600 : value > 0 && value % 60 !== 0 ? 1 : 60] })))
 
   const invalid = FIELDS.filter((f) => {
     const v = Number(draft[f.key])
     return draft[f.key].trim() === '' || !Number.isInteger(v) || v < 0
   })
-  const changed = FIELDS.filter((f) => Number(draft[f.key]) !== s.policyNumbers[f.key])
+  const changed = FIELDS.filter((f) => Number(draft[f.key]) !== (s.policyNumbers[f.key] ?? 0))
   const save = () => {
     if (invalid.length || !changed.length) return
     const patch = Object.fromEntries(changed.map((f) => [f.key, Number(draft[f.key])])) as Partial<PolicyNumbers>
     s.setPolicyNumbers(patch, admin)
-    toast(`已保存 ${changed.length} 项数值型策略，在线用户收到策略更新推送`)
+    toast(`已保存 ${changed.length} 项数值型策略，演示中的消息操作按新值判断`)
   }
   const reset = () => setDraft(toDraft(s.policyNumbers))
 
@@ -71,16 +74,20 @@ export function NumbersTab() {
     >
       <div className="grid grid-cols-2 gap-x-6 gap-y-3">
         {FIELDS.map((f) => {
-          const dirty = Number(draft[f.key]) !== s.policyNumbers[f.key]
+          const timeLimit = /^(seat|customer)(Recall|Edit)Seconds$/.test(f.key)
+          const unit = timeLimit ? units[f.key] : 1
+          const dirty = Number(draft[f.key]) !== (s.policyNumbers[f.key] ?? 0)
           const bad = invalid.includes(f)
           return (
             <Field
               key={f.key}
-              label={`${f.label}（${f.unit}）${f.level ? ` ${f.level}` : ''}`}
-              hint={`默认 ${f.defaultValue}${dirty ? ` · 当前 ${s.policyNumbers[f.key]}` : ''}`}
+              label={timeLimit ? f.label : `${f.label}（${f.unit}）${f.level ? ` ${f.level}` : ''}`}
+              hint={timeLimit ? '私聊与群聊共用；演示初值不限时间，正式默认值待确认' : `默认 ${f.defaultValue}${dirty ? ` · 当前 ${s.policyNumbers[f.key]}` : ''}`}
             >
               <div className="flex items-center gap-2">
-                <Input type="number" min={0} value={draft[f.key]} className={bad ? 'border-red-400' : dirty ? 'border-brand-400' : ''} onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))} />
+                {timeLimit && <Select aria-label={`${f.label}方式`} className="w-32" value={draft[f.key] !== '' && Number(draft[f.key]) === 0 ? 'unlimited' : 'limited'} onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value === 'unlimited' ? '0' : String(unit) }))}><option value="unlimited">不限时间</option><option value="limited">限制时长</option></Select>}
+                {(!timeLimit || draft[f.key] === '' || Number(draft[f.key]) !== 0) && <Input type="number" min={0} aria-label={f.label} value={draft[f.key] === '' ? '' : Number(draft[f.key]) / unit} className={bad ? 'border-red-400' : dirty ? 'border-brand-400' : ''} onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value === '' ? '' : String(Number(e.target.value) * unit) }))} />}
+                {timeLimit && (draft[f.key] === '' || Number(draft[f.key]) !== 0) && <Select aria-label={`${f.label}单位`} className="w-24" value={unit} onChange={(e) => { const next = Number(e.target.value); setUnits((v) => ({ ...v, [f.key]: next })); setDraft((d) => ({ ...d, [f.key]: d[f.key] === '' ? '' : String(Number(d[f.key]) / unit * next) })) }}><option value={1}>秒</option><option value={60}>分钟</option><option value={3600}>小时</option><option value={86400}>天</option></Select>}
                 {f.level && <Pill>{f.level}</Pill>}
               </div>
               {f.hint && <p className="mt-1 text-[11px] text-zinc-400">{f.hint}</p>}

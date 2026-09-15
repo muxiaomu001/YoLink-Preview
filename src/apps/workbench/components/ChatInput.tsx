@@ -31,7 +31,7 @@ const AUTO_WORD_MAX = 12
 
 type PopKind = 'mention' | 'quick' | 'auto'
 type Pop = { kind: PopKind; query: string; start: number }
-type Candidate = CandidateBase & { insert: string; qr?: QuickReply }
+type Candidate = CandidateBase & { insert: string; qr?: QuickReply; mentionKind?: 'seat' | 'customer' }
 
 const POP_TITLE: Record<PopKind, string> = {
   mention: '@ 提及成员 · ↑↓ 选择，Enter 插入',
@@ -73,7 +73,7 @@ export function ChatInput({
   replyTo?: Message
   onClearReply: () => void
   disabledReason?: string
-  onSend: (text: string, mentionAll: boolean) => void
+  onSend: (text: string, mentionAll: boolean, selected: { mentionSeatIds: string[]; mentionCustomerIds: string[] }) => void
   /** 图片 / 文件消息：工具栏选本机文件、话术里选到图片 / 文件时直接发出 */
   onSendMedia: (kind: 'image' | 'file', media: MessageMedia, text: string) => void
   /** 不传则不显示「AI 推荐」按钮（策略不允许） */
@@ -86,6 +86,8 @@ export function ChatInput({
   const imageInput = useRef<HTMLInputElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const [pop, setPopRaw] = useState<Pop | null>(null)
+  const [selectedMembers, setSelectedMembers] = useState<Candidate[]>([])
+  const [emojiOpen, setEmojiOpen] = useState(false)
   const [idx, setIdx] = useState(0)
   /** 自动匹配被 Esc 关掉的词：同一个词不再弹，词变了才重新弹 */
   const [dismissedWord, setDismissedWord] = useState<string | null>(null)
@@ -130,13 +132,13 @@ export function ChatInput({
     if (canMentionAll && (!q || MENTION_ALL.includes(q))) list.push({ id: 'all', label: `@${MENTION_ALL}`, insert: `@${MENTION_ALL} `, sub: '通知群里每个人' })
     if (isGroup) {
       group.memberSeatIds.map((id) => seatById(s, id)).filter((x) => !!x).forEach((x) => {
-        if (!q || x.displayName.toLowerCase().includes(q)) list.push({ id: x.id, label: x.displayName, insert: `@${x.displayName} `, icon: <SeatAvatar seat={x} size={18} />, sub: '坐席' })
+        if (!q || x.displayName.toLowerCase().includes(q)) list.push({ id: x.id, mentionKind: 'seat', label: x.displayName, insert: `@${x.displayName} `, icon: <SeatAvatar seat={x} size={18} />, sub: '坐席' })
       })
       group.memberCustomerIds.map((id) => customerById(s, id)).filter((x) => !!x && !x.deletedAt).forEach((x) => {
-        if (list.length < MAX_CANDIDATES && (!q || x!.nickname.toLowerCase().includes(q))) list.push({ id: x!.id, label: x!.nickname, insert: `@${x!.nickname} `, icon: <Avatar text={x!.nickname} size={18} />, sub: '客户' })
+        if (list.length < MAX_CANDIDATES && (!q || x!.nickname.toLowerCase().includes(q))) list.push({ id: x!.id, mentionKind: 'customer', label: x!.nickname, insert: `@${x!.nickname} `, icon: <Avatar text={x!.nickname} size={18} />, sub: `客户 · ${x!.accountId}` })
       })
     } else if (customer) {
-      list.push({ id: customer.id, label: customer.nickname, insert: `@${customer.nickname} `, icon: <Avatar text={customer.nickname} size={18} />, sub: '客户' })
+      list.push({ id: customer.id, mentionKind: 'customer', label: customer.nickname, insert: `@${customer.nickname} `, icon: <Avatar text={customer.nickname} size={18} />, sub: `客户 · ${customer.accountId}` })
     }
     return list.slice(0, MAX_CANDIDATES)
   }, [pop, s, staff?.id, canMentionAll, isGroup, group, customer])
@@ -156,6 +158,7 @@ export function ChatInput({
   const renderVars = (t: string) => renderQuickReplyVars(t, { customer: customer?.nickname, staff: seat.displayName, company: s.enterprise.name })
 
   const pick = (c: Candidate) => {
+    if (c.mentionKind) setSelectedMembers((items) => [...items.filter((x) => x.id !== c.id), c])
     const caret = ref.current?.selectionStart ?? text.length
     const q = c.qr
     if (q) s.touchQuickReply(q.id)
@@ -200,12 +203,15 @@ export function ChatInput({
     if (!raw || disabled) return
     const mentionAll = raw.includes(`@${MENTION_ALL}`)
     if (mentionAll && !canMentionAll) return toast('策略不允许本坐席 @所有人', 'warn')
-    onSend(renderVars(raw), mentionAll)
+    const kept = selectedMembers.filter((x) => raw.includes(x.insert.trim()))
+    onSend(renderVars(raw), mentionAll, { mentionSeatIds: kept.filter((x) => x.mentionKind === 'seat').map((x) => x.id), mentionCustomerIds: kept.filter((x) => x.mentionKind === 'customer').map((x) => x.id) })
+    setSelectedMembers([])
     setPop(null)
     setDismissedWord(null)
   }
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.nativeEvent.isComposing) return
     if (pop && candidates.length) {
       const auto = pop.kind === 'auto'
       if (e.key === 'ArrowDown') { e.preventDefault(); return setIdx((i) => (i + 1) % candidates.length) }
@@ -224,7 +230,7 @@ export function ChatInput({
     }
   }
 
-  const mediaHint = `上限：图片 ${s.policyNumbers.imageMaxMb}MB · 视频 ${s.policyNumbers.videoMaxMb}MB · 语音 ${s.policyNumbers.voiceMaxSeconds} 秒`
+  const mediaHint = '本机附件演示上限 500KB，产品上限另由后台策略控制'
 
   return (
     <div className="border-t border-zinc-200 bg-white">
@@ -238,7 +244,7 @@ export function ChatInput({
 
       {/* 工具栏 */}
       <div className="flex items-center gap-0.5 px-2 pt-1.5">
-        <Tool label="表情" onClick={() => toast('演示不含表情面板', 'info')} disabled={disabled}><Smile size={16} /></Tool>
+        <Tool label="表情" onClick={() => setEmojiOpen((v) => !v)} disabled={disabled}><Smile size={16} /></Tool>
         {canMedia && (
           <>
             <input ref={imageInput} type="file" accept="image/*" className="hidden" onChange={(e) => void pickFile('image', e)} />
@@ -253,10 +259,12 @@ export function ChatInput({
         {group?.kind === 'channel' && !disabledReason && <span className="ml-auto text-[11px] text-zinc-400">以坐席身份发布，客户只读</span>}
       </div>
 
+      {emojiOpen && <div className="mx-3 mt-1 flex flex-wrap gap-1 rounded-md border border-zinc-200 p-2" aria-label="表情选择器">{['😊', '👍', '🙏', '🌹', '🎉', '👌', '🤝', '☀️', '❤️', '✅', '👋', '💪'].map((emoji) => <button type="button" key={emoji} aria-label={`插入表情 ${emoji}`} className="rounded p-1 text-xl hover:bg-zinc-100" onClick={() => { setText(text + emoji); setEmojiOpen(false); ref.current?.focus() }}>{emoji}</button>)}</div>}
       <div id="wb-chat-input" className="relative px-3 pb-2" ref={wrapRef}>
         {pop && candidates.length > 0 && <CandidatePopover title={POP_TITLE[pop.kind]} items={candidates} idx={idx} onPick={pick} onHover={setIdx} />}
         <textarea
           rows={3}
+          maxLength={4096}
           value={text}
           disabled={disabled}
           onChange={(e) => {
@@ -282,7 +290,7 @@ export function ChatInput({
 
 function Tool({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
   return (
-    <button type="button" title={label} disabled={disabled} onClick={onClick} className="flex h-6 w-6 items-center justify-center rounded text-zinc-500 hover:bg-zinc-100 hover:text-brand-700 disabled:text-zinc-300 disabled:hover:bg-transparent">
+    <button type="button" aria-label={label} title={label} disabled={disabled} onClick={onClick} className="flex h-6 w-6 items-center justify-center rounded text-zinc-500 hover:bg-zinc-100 hover:text-brand-700 disabled:text-zinc-300 disabled:hover:bg-transparent">
       {children}
     </button>
   )

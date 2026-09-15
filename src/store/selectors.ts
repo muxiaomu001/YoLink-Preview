@@ -3,6 +3,7 @@
  * 全部是纯函数，输入是 DemoState，方便页面和测试复用。
  */
 import type { Conversation, Customer, DemoState, Message, QuickReply, QuickReplyCategory, Seat, Staff } from '@/domain/types'
+import { customerVisibleMessage } from '@/domain/messageRules'
 import { daysSince } from '@/domain/time'
 import { senderName } from './policy'
 
@@ -55,8 +56,10 @@ export function unreadForSeat(s: DemoState, conv: Conversation, seatId?: string)
   for (let i = list.length - 1; i >= 0; i -= 1) {
     const m = list[i]
     if (readAt && m.at <= readAt) break
+    if (m.recalledAt || m.deletedAt) continue
     if (m.senderKind === 'customer' || m.senderKind === 'bot') n += 1
-    else if (m.senderKind === 'seat') break
+    else if (!readAt && m.senderKind === 'seat' && (!seatId || m.seatId === seatId)) break
+    else if (m.senderKind === 'seat' && m.seatId !== seatId) n += 1
   }
   if (seatId && conv.unreadMarkBySeatIds?.includes(seatId)) return Math.max(1, n)
   return n
@@ -90,7 +93,7 @@ export function conversationsForSeat(s: DemoState, seatId: string): ConvRow[] {
         return {
           conv,
           title: customer?.nickname ?? '未知客户',
-          subtitle: last?.text ?? '',
+          subtitle: last?.recalledAt ? '[已撤回]' : last?.deletedAt ? '[已删除]' : last?.text ?? '',
           customer,
           last,
           unread: unreadForSeat(s, conv, seatId),
@@ -103,7 +106,7 @@ export function conversationsForSeat(s: DemoState, seatId: string): ConvRow[] {
       }
       const g = s.chatGroups.find((x) => x.id === conv.chatGroupId)
       const list = messagesOf(s, conv.id)
-      const mentioned = list.some((m) => m.mentionSeatIds?.includes(seatId) && !list.some((r) => r.seatId === seatId && r.at > m.at))
+      const mentioned = list.some((m) => !m.recalledAt && !m.deletedAt && (m.mentionSeatIds?.includes(seatId) || m.mentionAll) && m.senderId !== seatId && m.at > (conv.readAtBySeat?.[seatId] ?? ''))
       return {
         conv,
         title: g?.name ?? '群',
@@ -177,7 +180,7 @@ export function conversationsForCustomer(s: DemoState, customerId: string) {
   return s.conversations
     .filter((conv) => (conv.kind === 'dm' ? conv.customerId === customerId : groupIds.includes(conv.chatGroupId!)))
     .map((conv) => {
-      const last = lastMessage(s, conv.id)
+      const last = messagesOf(s, conv.id).filter(customerVisibleMessage).at(-1)
       if (conv.kind === 'dm') {
         const seat = seatById(s, conv.seatId)!
         return { conv, title: seat.displayName, seat, group: undefined, last, official: true, order: order.get(seat.id) ?? 99 }

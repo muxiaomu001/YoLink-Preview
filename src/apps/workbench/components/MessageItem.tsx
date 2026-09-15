@@ -2,36 +2,23 @@
  * 单条消息：系统消息灰色居中；文本 URL 自动成链接；图片消息显示缩略图（点开大图）、文件消息显示文件卡，说明文字在下方；
  * 引用条可跳转；撤回 / 删除用占位；机器人、群发、转发、AI 草稿、欢迎语小标；悬停操作按权限显示（引用、撤回、删除、转发、复制、置顶）。
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { clsx } from 'clsx'
-import { Bot, Copy, Forward, Pin, Reply, Trash2, Undo2 } from 'lucide-react'
+import { Bot, Copy, Forward, MoreHorizontal, Pencil, Pin, Reply, Trash2, Undo2 } from 'lucide-react'
 import type { ChatGroup, Message, Seat } from '@/domain/types'
+import { messageLimitSeconds, timeLimitLabel } from '@/domain/messageRules'
 import { fmtDateTime, fmtTime } from '@/domain/time'
-import { botById, seatCan, seatGroupPerm, senderName, visibleText } from '@/store/policy'
+import { botById, seatCan, seatGroupPerm, senderName } from '@/store/policy'
 import { customerById, seatById, staffById } from '@/store/selectors'
 import { Avatar, Pill, SeatAvatar, TitleChip } from '@/ui/display'
 import { FileCard, ImageThumb } from '@/ui/media'
-import { toast } from '@/ui/overlay'
+import { MessageText } from '@/ui/MessageText'
+import { MessageReceipt } from '@/ui/MessageReceipt'
+import { Button, Textarea } from '@/ui/primitives'
+import { Modal, toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { useWorkbench } from '../useWorkbench'
 import { copyText, jumpToMessage } from './group/groupRules'
-
-const URL_RE = /(https?:\/\/[^\s]+)/g
-
-/** 文本渲染：URL 变链接，搜索命中高亮 */
-function renderText(text: string, highlight?: string) {
-  const parts = text.split(URL_RE)
-  return parts.map((p, i) => {
-    if (URL_RE.test(p)) {
-      URL_RE.lastIndex = 0
-      return <a key={i} href={p} target="_blank" rel="noreferrer" className="underline underline-offset-2 break-all opacity-90 hover:opacity-100">{p}</a>
-    }
-    URL_RE.lastIndex = 0
-    if (!highlight) return <span key={i}>{p}</span>
-    const segs = p.split(new RegExp(`(${highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'))
-    return <span key={i}>{segs.map((sg, j) => (sg.toLowerCase() === highlight.toLowerCase() ? <mark key={j} className="rounded-sm bg-amber-200 text-amber-950">{sg}</mark> : sg))}</span>
-  })
-}
 
 export function MessageItem({
   m,
@@ -55,6 +42,18 @@ export function MessageItem({
   onPin: (m: Message) => void
 }) {
   const { s, staff, can } = useWorkbench()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [menuPosition, setMenuPosition] = useState({ left: 0, top: 0 })
+  useEffect(() => {
+    if (!menuOpen) return
+    const close = (e: MouseEvent) => { if (!(e.target as Element).closest(`[data-message-id="${m.id}"]`)) setMenuOpen(false) }
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
+    window.addEventListener('mousedown', close)
+    window.addEventListener('keydown', key)
+    return () => { window.removeEventListener('mousedown', close); window.removeEventListener('keydown', key) }
+  }, [menuOpen, m.id])
+  const positionMenu = (x: number, y: number) => setMenuPosition({ left: Math.max(8, Math.min(x, window.innerWidth - 240)), top: Math.min(y, window.innerHeight - 48) })
+  const [editing, setEditing] = useState(false)
   const [renderedAt] = useState(Date.now)
   const isGroup = !!group
   const mine = m.senderKind === 'seat' && m.seatId === seat.id
@@ -70,19 +69,19 @@ export function MessageItem({
   const bubbleCls = mine ? 'bg-brand-700 text-white' : otherSeat ? 'bg-brand-50 text-brand-900' : bot ? 'bg-purple-50 text-purple-950' : 'bg-white text-zinc-800 shadow-sm'
 
   // 操作权限
-  const recallLimit = s.policyNumbers.recallSeconds
-  const recallExpired = renderedAt - new Date(m.at).getTime() > recallLimit * 1000
-  const showRecall = mine && !gone
+  const recallLimit = messageLimitSeconds(s, 'seat', 'recall')
+  const recallExpired = recallLimit > 0 && renderedAt - new Date(m.at).getTime() > recallLimit * 1000
+  const showRecall = mine && !gone && seatCan(s, seat.id, 'dm.recall')
   const showDelete = !gone && (isGroup ? !mine && seatGroupPerm(s, group, seat.id, staff?.id ?? null, 'can_delete_messages') : m.senderKind === 'customer' && (can('view_audit') || can('manage_groups')))
   const showForward = !gone && seatCan(s, seat.id, isGroup ? 'group.forward' : 'dm.forward', group?.id)
   const showPin = isGroup && !gone && !pinned && seatGroupPerm(s, group, seat.id, staff?.id ?? null, 'can_pin_messages')
 
   const recall = async () => {
     if (!staff) return
-    if (Date.now() - new Date(m.at).getTime() > recallLimit * 1000) return toast(`超过 ${recallLimit} 秒，不能撤回`, 'warn')
-    const ok = await confirm({ title: '撤回这条消息？', body: `撤回后客户端显示「消息已撤回」，审计仍可查原文。时限 ${recallLimit} 秒。`, okText: '撤回' })
+    if (recallLimit > 0 && Date.now() - new Date(m.at).getTime() > recallLimit * 1000) return toast('已超过后台设置的撤回时限', 'warn')
+    const ok = await confirm({ title: '撤回这条消息？', body: '撤回后这条消息从客户聊天中消失，不显示撤回提示；工作台保留撤回记录，原文仅供审计。', okText: '撤回' })
     if (!ok) return
-    toast(s.recallMessage(m.id, staff.id) ? '已撤回' : `超过 ${recallLimit} 秒，撤回失败`, 'info')
+    toast(s.recallMessage(m.id, staff.id) ? '已撤回' : '撤回失败：权限或时限已变更', 'info')
   }
   const del = async () => {
     if (!staff) return
@@ -95,7 +94,7 @@ export function MessageItem({
 
   if (m.senderKind === 'system') {
     return (
-      <div id={`msg-${m.id}`} className="my-2 rounded-md text-center">
+      <div id={`msg-${m.id}`} data-message-id={m.id} className="my-2 rounded-md text-center">
         {showDate && <div className="mb-2 text-[11px] text-zinc-400">{fmtDateTime(m.at).slice(0, 10)}</div>}
         <span className="inline-block rounded-full bg-zinc-200/70 px-2.5 py-0.5 text-[11px] text-zinc-500">{m.text}{m.mentionAll ? ' · @所有人' : ''}</span>
       </div>
@@ -103,9 +102,9 @@ export function MessageItem({
   }
 
   return (
-    <div id={`msg-${m.id}`} className={clsx('rounded-md transition-shadow', current && 'ring-2 ring-amber-300')}>
+    <div id={`msg-${m.id}`} data-message-id={m.id} className={clsx('rounded-md transition-shadow', current && 'ring-2 ring-amber-300')}>
       {showDate && <div className="my-3 text-center text-[11px] text-zinc-400">{fmtDateTime(m.at).slice(0, 10)}</div>}
-      <div className={clsx('group relative mb-3.5 flex gap-2.5', mine && 'flex-row-reverse')}>
+      <div onContextMenu={(e) => { e.preventDefault(); positionMenu(e.clientX, e.clientY); setMenuOpen(true) }} className={clsx('group relative mb-3.5 flex gap-2.5', mine && 'flex-row-reverse')}>
         {mine ? <SeatAvatar seat={seat} size={30} /> : otherSeat ? <SeatAvatar seat={otherSeat} size={30} /> : bot ? <Avatar text={bot.nickname} size={30} color={bot.avatarColor} /> : <Avatar text={customer?.nickname ?? '?'} size={30} />}
         <div className={clsx('max-w-[70%]', mine && 'items-end text-right')}>
           {!mine && (isGroup || bot) && (
@@ -123,7 +122,7 @@ export function MessageItem({
               className={clsx('mb-0.5 block max-w-full truncate rounded border-l-2 border-brand-400 bg-zinc-100 px-2 py-0.5 text-left text-[11px] text-zinc-500 hover:bg-zinc-200', mine && 'ml-auto')}
               title="点击跳到原消息"
             >
-              {senderName(s, replyTo)}：{visibleText(replyTo, 'staff').slice(0, 40)}
+              {senderName(s, replyTo)}：{replyTo.recalledAt || replyTo.deletedAt ? '原消息已不可用' : replyTo.text.slice(0, 40)}
             </button>
           )}
           {!gone && hasMedia ? (
@@ -131,16 +130,18 @@ export function MessageItem({
             <div className={clsx('inline-flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
               {m.forwardedFrom && <div className="text-[11px] text-zinc-400">转发的消息</div>}
               {m.kind === 'image' ? <ImageThumb media={m.media!} maxWidth={240} className="shadow-sm" /> : <FileCard media={m.media!} />}
-              {m.text && <div className={clsx('rounded-lg px-3 py-1.5 text-left text-[13px] leading-relaxed whitespace-pre-wrap', bubbleCls)}>{renderText(m.text, highlight)}</div>}
+              {m.text && <div className={clsx('rounded-lg px-3 py-1.5 text-left text-[13px] leading-relaxed whitespace-pre-wrap', bubbleCls)}>{<MessageText m={m} highlight={highlight} />}</div>}
             </div>
           ) : (
             <div className={clsx('inline-block rounded-lg px-3 py-2 text-left text-[13px] leading-relaxed whitespace-pre-wrap', gone ? 'bg-zinc-100 text-zinc-400 italic' : bubbleCls)}>
               {m.forwardedFrom && <div className={clsx('mb-0.5 text-[11px]', mine ? 'text-brand-100' : 'text-zinc-400')}>转发的消息</div>}
-              {gone ? visibleText(m, 'staff') : renderText(m.text, highlight)}
+              {gone ? (m.recalledAt ? '消息已撤回' : '消息已被管理员删除') : <MessageText m={m} highlight={highlight} />}
             </div>
           )}
           <div className={clsx('mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400', mine && 'justify-end')}>
             <span className="tabular-nums">{fmtTime(m.at)}</span>
+            {m.editedAt && !gone && <span title={`修改于 ${fmtDateTime(m.editedAt)}`}>已编辑</span>}
+            {(mine || group) && <MessageReceipt m={m} staffSeatId={seat.id} />}
             {pinned && <span className="inline-flex items-center gap-0.5 text-amber-600"><Pin size={10} />已置顶</span>}
             {m.isWelcome && <span className="rounded bg-zinc-100 px-1">欢迎语</span>}
             {m.isBroadcast && <span className="rounded bg-amber-50 px-1 text-amber-700">群发</span>}
@@ -150,24 +151,47 @@ export function MessageItem({
             {bot && m.operatorId && can('view_seat_operator') && <span title="客户看不到这个">手动：{staffById(s, m.operatorId)?.name}</span>}
           </div>
         </div>
-        {/* 悬停操作 */}
-        <div className={clsx('absolute -top-3 hidden items-center gap-0.5 rounded-md border border-zinc-200 bg-white px-1 py-0.5 shadow-sm group-hover:flex', mine ? 'right-10' : 'left-10')}>
+        {!gone && <button type="button" aria-label="更多消息操作" title="更多消息操作（也可右键消息）" className="self-start rounded p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700" onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); positionMenu(rect.left, rect.bottom + 4); setMenuOpen((v) => !v) }}><MoreHorizontal size={16} /></button>}
+        {/* 悬停、键盘焦点、点击更多或右键都能打开操作。 */}
+        <div style={menuOpen ? { position: 'fixed', ...menuPosition, bottom: 'auto', right: 'auto' } : undefined} className={clsx('absolute bottom-full mb-1 z-20 flex items-center gap-0.5 rounded-md border border-zinc-200 bg-white px-1 py-0.5 shadow-sm', menuOpen ? 'opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100', mine ? 'right-10' : 'left-10')}>
           {!gone && <Act icon={Reply} label="引用回复" onClick={() => onReply(m)} />}
-          {showRecall && <Act icon={Undo2} label={recallExpired ? `超过 ${recallLimit} 秒，不能撤回` : `撤回（${recallLimit} 秒内）`} disabled={recallExpired} onClick={() => void recall()} />}
+          {mine && !gone && seatCan(s, seat.id, 'dm.edit') && <Act icon={Pencil} label="编辑消息" onClick={() => { setEditing(true); setMenuOpen(false) }} />}
+          {showRecall && <Act icon={Undo2} label={recallExpired ? '已超过后台设置的撤回时限' : `撤回（${timeLimitLabel(recallLimit)}）`} disabled={recallExpired} onClick={() => void recall()} />}
           {showDelete && <Act icon={Trash2} label={isGroup ? '删除他人消息（群内权限）' : '删除客户消息（员工能力）'} danger onClick={() => void del()} />}
           {showForward && <Act icon={Forward} label="转发到其他会话" onClick={() => onForward(m)} />}
           {!gone && <Act icon={Copy} label="复制文本" onClick={() => void copy()} />}
           {showPin && <Act icon={Pin} label="置顶（群内权限）" onClick={() => onPin(m)} />}
         </div>
       </div>
+      {editing && <EditMessage message={m} onClose={() => setEditing(false)} />}
     </div>
   )
 }
 
 function Act({ icon: Icon, label, onClick, danger, disabled }: { icon: typeof Reply; label: string; onClick: () => void; danger?: boolean; disabled?: boolean }) {
   return (
-    <button type="button" title={label} disabled={disabled} onClick={onClick} className={clsx('rounded p-1 text-zinc-500 hover:bg-zinc-100', disabled ? 'cursor-not-allowed text-zinc-300' : danger ? 'hover:text-red-700' : 'hover:text-brand-700')}>
+    <button type="button" aria-label={label} title={label} disabled={disabled} onClick={onClick} className={clsx('rounded p-1 text-zinc-500 hover:bg-zinc-100', disabled ? 'cursor-not-allowed text-zinc-300' : danger ? 'hover:text-red-700' : 'hover:text-brand-700')}>
       <Icon size={14} />
     </button>
   )
+}
+
+
+function EditMessage({ message, onClose }: { message: Message; onClose: () => void }) {
+  const { s, staff } = useWorkbench()
+  const [original] = useState(message.text)
+  const [text, setText] = useState(message.text)
+  const [error, setError] = useState('')
+  const save = () => {
+    if (!staff) return
+    const result = s.editMessage(message.id, text, staff.id, original)
+    if (result) return setError(result)
+    toast('已保存修改')
+    onClose()
+  }
+  return <Modal open title="编辑消息" width={500} onClose={onClose} footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" onClick={save} disabled={(!text.trim() && !message.media) || text.trim() === original}>保存修改</Button></>}>
+    <Textarea aria-label="修改消息内容" autoFocus rows={5} maxLength={message.media ? 1024 : 4096} value={text} onChange={(e) => setText(e.target.value)} />
+    <p className="mt-2 text-xs text-zinc-500">修改后双方显示新内容与“已编辑”，发送时间不变。</p>
+    {error && <p role="alert" className="mt-2 text-xs text-red-600">{error}</p>}
+  </Modal>
 }

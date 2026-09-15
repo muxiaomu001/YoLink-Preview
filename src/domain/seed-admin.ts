@@ -91,7 +91,7 @@ export const POLICY_ITEMS: PolicyItem[] = [
   { key: 'dm.create_with_stranger', label: '与非好友发起私聊', group: '私聊', desc: '不加好友直接私聊', level: 'P0' },
   { key: 'dm.send_media', label: '私聊发送媒体', group: '私聊', desc: '图片、视频、语音', level: 'P0' },
   { key: 'dm.recall', label: '撤回自己的消息', group: '私聊', desc: '时限见数值型策略', level: 'P0' },
-  { key: 'dm.edit', label: '编辑自己的消息', group: '私聊', desc: '时限见数值型策略', level: 'P1' },
+  { key: 'dm.edit', label: '编辑自己的消息', group: '私聊', desc: '时限见数值型策略', level: 'P0' },
   { key: 'dm.forward', label: '转发私聊消息', group: '私聊', desc: '转发到其他会话', level: 'P0' },
   // 群与频道
   { key: 'group.create', label: '创建群', group: '群与频道', desc: '自己建群并成为群主', level: 'P0' },
@@ -178,6 +178,10 @@ export const POLICY_PRESETS: PolicyPreset[] = [
 ]
 
 export const POLICY_NUMBERS: PolicyNumbers = {
+  seatRecallSeconds: 0,
+  seatEditSeconds: 0,
+  customerRecallSeconds: 0,
+  customerEditSeconds: 0,
   recallSeconds: 120,
   editSeconds: 900,
   groupMaxMembers: 10000,

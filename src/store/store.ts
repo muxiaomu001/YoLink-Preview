@@ -542,6 +542,16 @@ export const useStore = create<DemoStore>()(
     }),
     {
       name: STORAGE_KEY,
+      // 补齐本轮新增的配置，并更新产品分层标记；保留已有客户、会话和设置。
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<DemoStore>
+        return {
+          ...current,
+          ...saved,
+          policyNumbers: { ...current.policyNumbers, ...saved.policyNumbers },
+          policyItems: (saved.policyItems ?? current.policyItems).map((item) => item.key === 'dm.edit' ? { ...item, level: 'P0' as const } : item),
+        }
+      },
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => {
         // 只持久化数据，不持久化函数

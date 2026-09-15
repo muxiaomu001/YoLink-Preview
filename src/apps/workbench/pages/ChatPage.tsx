@@ -64,12 +64,6 @@ export function ChatPage() {
     if (!convId && visible[0]) nav(`/workbench/chat/${visible[0].conv.id}`, { replace: true })
   }, [convId, visible, nav])
 
-  // 打开会话即标已读
-  useEffect(() => {
-    if (convId && seat) s.markRead(convId, seat.id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [convId, seat?.id])
-
   // 快捷键：⌘⌥↑/↓ 切会话，⌘⇧F 聚焦列表搜索，⌘⌥R 标记已读
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

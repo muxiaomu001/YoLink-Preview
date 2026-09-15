@@ -3,6 +3,7 @@
  * 所有"能不能"都由 customerCan / customerCanSpeakIn 决定，管理后台改了策略这里立刻变。
  */
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { Contact, MessageCircle, UserRound } from 'lucide-react'
 import { useStore } from '@/store/store'
@@ -24,13 +25,15 @@ const TABS: { key: Tab; label: string; Icon: typeof MessageCircle }[] = [
 
 export function PhoneApp() {
   const s = useStore()
-  const customer = customerById(s, s.session.phoneCustomerId)
+  const [params, setParams] = useSearchParams()
+  const customer = customerById(s, params.get('customer') ?? s.session.phoneCustomerId)
   const loggedIn = !!customer && !customer.deletedAt
   const [tab, setTab] = useState<Tab>('chats')
-  const [openConv, setOpenConv] = useState<string | null>(null)
+  const [openConv, setOpenConv] = useState<string | null>(() => params.get('conversation'))
   const [justAdded, setJustAdded] = useState<JustAdded | null>(null)
 
   const reset = () => {
+    setParams({}, { replace: true })
     setOpenConv(null)
     setTab('chats')
   }
@@ -73,7 +76,7 @@ export function PhoneApp() {
           </div>
         </div>
 
-        <DemoPanel onSwitch={reset} />
+        <DemoPanel customerId={customer?.id} onSwitch={reset} />
       </div>
     </div>
   )
