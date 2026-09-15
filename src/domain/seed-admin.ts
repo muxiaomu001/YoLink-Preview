@@ -78,23 +78,71 @@ export const SEAT_GROUPS: SeatGroup[] = [{ id: 'sg_advisors', name: '投资顾�
 
 // ---------- 策略 ----------
 
+/** 能力目录：03 文档全量。desc 给矩阵页做说明列；module 为模块能力键。 */
 export const POLICY_ITEMS: PolicyItem[] = [
-  { key: 'friend.add', label: '主动添加好友', group: '关系链' },
-  { key: 'friend.search_user', label: '搜索用户', group: '关系链' },
-  { key: 'dm.create_with_stranger', label: '与非好友发起私聊', group: '关系链' },
-  { key: 'profile.view_stranger', label: '查看陌生人资料', group: '关系链' },
-  { key: 'group.create', label: '创建群', group: '群与频道' },
-  { key: 'group.invite', label: '拉人入群', group: '群与频道' },
-  { key: 'group.view_members', label: '查看群成员列表', group: '群与频道' },
-  { key: 'group.forward', label: '转发群消息', group: '群与频道' },
-  { key: 'group.leave', label: '退出官方群', group: '群与频道' },
-  { key: 'message.recall', label: '撤回消息', group: '消息' },
-  { key: 'message.edit', label: '编辑已发消息', group: '消息' },
-  { key: 'message.forward', label: '转发消息', group: '消息' },
-  { key: 'media.send_image', label: '发送图片', group: '消息' },
-  { key: 'media.send_video', label: '发送视频', group: '消息' },
-  { key: 'media.send_voice', label: '发送语音', group: '消息' },
-  { key: 'tag.create', label: '员工在工作台新建内部标签', group: '工作台' },
+  // 关系链
+  { key: 'friend.add', label: '主动添加好友', group: '关系链', desc: '主动发起好友申请', level: 'P0' },
+  { key: 'friend.accept', label: '接受好友申请', group: '关系链', desc: '收到申请后能否同意', level: 'P0' },
+  { key: 'friend.search_user', label: '搜索用户', group: '关系链', desc: '按昵称或账号 ID 搜其他用户', level: 'P0' },
+  { key: 'friend.view_profile', label: '查看非好友资料', group: '关系链', desc: '点开陌生人的资料页', level: 'P0' },
+  { key: 'friend.block', label: '拉黑', group: '关系链', desc: '把某个用户或坐席拉黑', level: 'P0' },
+  // 私聊
+  { key: 'dm.create_with_friend', label: '与好友发起私聊', group: '私聊', desc: '客服预设下客户的好友只有官方坐席', level: 'P0' },
+  { key: 'dm.create_with_stranger', label: '与非好友发起私聊', group: '私聊', desc: '不加好友直接私聊', level: 'P0' },
+  { key: 'dm.send_media', label: '私聊发送媒体', group: '私聊', desc: '图片、视频、语音', level: 'P0' },
+  { key: 'dm.recall', label: '撤回自己的消息', group: '私聊', desc: '时限见数值型策略', level: 'P0' },
+  { key: 'dm.edit', label: '编辑自己的消息', group: '私聊', desc: '时限见数值型策略', level: 'P1' },
+  { key: 'dm.forward', label: '转发私聊消息', group: '私聊', desc: '转发到其他会话', level: 'P0' },
+  // 群与频道
+  { key: 'group.create', label: '创建群', group: '群与频道', desc: '自己建群并成为群主', level: 'P0' },
+  { key: 'channel.create', label: '创建频道', group: '群与频道', desc: '自己建频道并成为频道主', level: 'P0' },
+  { key: 'group.join_by_link', label: '通过链接入群', group: '群与频道', desc: '点群邀请链接加入', level: 'P0' },
+  { key: 'group.invite', label: '拉人入群', group: '群与频道', desc: '把自己的好友拉进群', level: 'P0' },
+  { key: 'group.view_members', label: '查看群成员列表', group: '群与频道', desc: '关闭后客户看不到群里有谁', level: 'P0' },
+  { key: 'group.view_member_profile', label: '点看群成员资料', group: '群与频道', desc: '点群里的人看资料', level: 'P0' },
+  { key: 'group.send', label: '群内发言', group: '群与频道', desc: '发文本；全员禁言时另算', level: 'P0' },
+  { key: 'group.send_media', label: '群内发送媒体', group: '群与频道', desc: '图片、视频、语音', level: 'P0' },
+  { key: 'group.mention_all', label: '@ 所有人', group: '群与频道', desc: '一次提醒全群', level: 'P0' },
+  { key: 'group.leave', label: '主动退群', group: '群与频道', desc: '官方群会强制关闭这一项', level: 'P0' },
+  { key: 'group.forward', label: '转发群消息', group: '群与频道', desc: '把群消息转到别处', level: 'P0' },
+  { key: 'channel.join_by_link', label: '通过链接加入频道', group: '群与频道', desc: '点频道链接订阅', level: 'P0' },
+  { key: 'channel.leave', label: '退出频道', group: '群与频道', desc: '取消订阅频道', level: 'P0' },
+  // 账号与设备
+  { key: 'account.edit_profile', label: '修改昵称与头像', group: '账号与设备', desc: '头衔不在此列，客户改不了', level: 'P0' },
+  { key: 'account.delete', label: '注销账号', group: '账号与设备', desc: '客户自助注销', level: 'P1' },
+  // 工作台
+  { key: 'tag.create', label: '工作台新建内部标签', group: '工作台', desc: '员工在资料卡直接新建标签', level: 'P0', staffOnly: true },
+  // 模块能力键：模块停用或未授权时整体不生效
+  { key: 'wallet.view', label: '查看钱包', group: '模块 · 钱包', desc: '客户 App 显示钱包入口', level: 'P2', module: 'wallet' },
+  { key: 'wallet.withdraw', label: '申请提现', group: '模块 · 钱包', desc: '发起提现申请', level: 'P2', module: 'wallet' },
+  { key: 'wallet.bind_account', label: '绑定收款账户', group: '模块 · 钱包', desc: '填写收款信息', level: 'P2', module: 'wallet' },
+  { key: 'checkin.sign', label: '每日签到', group: '模块 · 签到', desc: '客户 App 显示签到入口', level: 'P2', module: 'checkin' },
+  { key: 'referral.invite', label: '邀请好友得奖励', group: '模块 · 推荐', desc: '客户 App 显示邀请入口', level: 'P2', module: 'referral' },
+  { key: 'appearance.change_theme', label: '切换主题', group: '模块 · 外观', desc: '在企业允许的主题里选', level: 'P0' },
+  { key: 'appearance.dark_mode', label: '暗色模式', group: '模块 · 外观', desc: '明暗切换', level: 'P0' },
+  { key: 'ai.suggest', label: 'AI 回复推荐', group: '模块 · AI', desc: '工作台输入框上方的草稿', level: 'P0', staffOnly: true },
+  { key: 'ai.knowledge', label: 'AI 知识库', group: '模块 · AI', desc: '草稿引用企业知识库', level: 'P0', staffOnly: true },
+  { key: 'ai.copywriting', label: 'AI 写文案', group: '模块 · AI', desc: '群发与横幅编辑器里的按钮', level: 'P0', staffOnly: true },
+  { key: 'ai.group_warmup', label: '群活跃助手', group: '模块 · AI', desc: '机器人按剧本或 AI 在群里发言', level: 'P0', staffOnly: true },
+]
+
+/** 客服预设下客户关闭的键：其余默认开 */
+const CS_CUSTOMER_OFF = [
+  'friend.add',
+  'friend.accept',
+  'friend.search_user',
+  'friend.view_profile',
+  'dm.create_with_stranger',
+  'dm.forward',
+  'group.create',
+  'channel.create',
+  'group.invite',
+  'group.view_members',
+  'group.view_member_profile',
+  'group.mention_all',
+  'group.forward',
+  'account.delete',
+  'tag.create',
 ]
 
 export const POLICY_COLS: { key: PolicyCol; label: string }[] = [
@@ -108,7 +156,7 @@ export const POLICY_COLS: { key: PolicyCol; label: string }[] = [
 function matrixFrom(customerAllowed: Record<string, boolean>): PolicyMatrix {
   const m: PolicyMatrix = {}
   POLICY_ITEMS.forEach((p) => {
-    const c = customerAllowed[p.key] ?? true
+    const c = p.staffOnly ? false : (customerAllowed[p.key] ?? true)
     m[p.key] = { customer_mobile: c, customer_desktop: c, staff_mobile: true, staff_desktop: true }
   })
   return m
@@ -118,21 +166,9 @@ export const POLICY_PRESETS: PolicyPreset[] = [
   {
     id: 'preset_cs',
     name: '客服预设',
-    desc: '客户不能加好友、不能搜索、不能互聊、看不到群成员、不能退官方群；只与官方坐席往来。坐席全部开放。',
+    desc: '客户不能加好友、不能搜索、不能互聊、看不到群成员、不能建群建频道、不能 @ 所有人；只与官方坐席往来。坐席全部开放。',
     builtin: true,
-    matrix: matrixFrom({
-      'friend.add': false,
-      'friend.search_user': false,
-      'dm.create_with_stranger': false,
-      'profile.view_stranger': false,
-      'group.create': false,
-      'group.invite': false,
-      'group.view_members': false,
-      'group.forward': false,
-      'group.leave': false,
-      'message.edit': false,
-      'tag.create': false,
-    }),
+    matrix: matrixFrom(Object.fromEntries(CS_CUSTOMER_OFF.map((k) => [k, false]))),
   },
   {
     id: 'preset_social',
@@ -152,12 +188,14 @@ export const POLICY_NUMBERS: PolicyNumbers = {
   imageMaxMb: 10,
   videoMaxMb: 100,
   voiceMaxSeconds: 60,
+  maxDevices: 2,
+  idleDays: 14,
 }
 
 export const POLICY_CHANGES: PolicyChange[] = [
   { id: 'pc_0001', at: ago(90), byStaffId: 'st_admin', kind: 'preset', detail: '应用预设「客服预设」' },
   { id: 'pc_0002', at: ago(60), byStaffId: 'st_admin', kind: 'number', detail: '消息撤回时限 60 → 120 秒' },
-  { id: 'pc_0003', at: ago(21), byStaffId: 'st_admin', kind: 'cap', detail: 'media.send_video 客户 · 手机：关 → 开' },
+  { id: 'pc_0003', at: ago(21), byStaffId: 'st_admin', kind: 'cap', detail: 'group.send_media 客户 · 手机：关 → 开' },
   { id: 'pc_0004', at: ago(3), byStaffId: 'st_admin', kind: 'preset', detail: '应用预设「客服预设」' },
 ]
 
@@ -426,10 +464,11 @@ export function buildAdminSeed(ctx: AdminSeedContext) {
   const community = conversations.find((c) => c.kind === 'group' && c.chatGroupId === 'cg_community')
   const communityMsgs = messages.filter((m) => m.convId === community?.id && m.senderKind === 'customer')
 
-  // 用户级覆盖（P1）：一个客户放开建群，一个坐席收紧转发
+  // 群级 / 用户级覆盖（P1）：私享会员群里客户可看成员、可拉人；一个客户放开建群；通知型坐席收紧转发
   const policyOverrides: PolicyOverride[] = [
+    { id: aid('po'), targetKind: 'group', targetId: 'cg_vip', caps: { 'group.view_members': true, 'group.invite': true, 'group.view_member_profile': true }, byStaffId: 'st_admin', createdAt: ago(40) },
     { id: aid('po'), targetKind: 'customer', targetId: funded[0]?.id ?? customers[0].id, caps: { 'group.create': true, 'group.invite': true }, byStaffId: 'st_admin', createdAt: ago(12) },
-    { id: aid('po'), targetKind: 'seat', targetId: 'seat_notice', caps: { 'message.forward': false }, byStaffId: 'st_admin', createdAt: ago(25) },
+    { id: aid('po'), targetKind: 'seat', targetId: 'seat_notice', caps: { 'dm.forward': false, 'group.forward': false }, byStaffId: 'st_admin', createdAt: ago(25) },
   ]
 
   // 举报（P1）

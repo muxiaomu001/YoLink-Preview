@@ -1,5 +1,5 @@
 /**
- * 企业设置：七个分页，字段与 PRD 05「企业设置」表格一一对应。
+ * 企业设置：八个分页，字段与 PRD 05「企业设置」表格一一对应（群发频控来自 04 文档）。
  * 本文件放分页壳 + 基本信息 / 外观 / 注册方式；其余分页在 SettingsPage.parts.tsx 与 SettingsPage.webtabs.tsx。
  */
 import { useState } from 'react'
@@ -9,10 +9,10 @@ import { useStore } from '@/store/store'
 import { Button, Checkbox, Field, Input, Select, Switch } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, Tabs } from '@/ui/display'
 import { toast } from '@/ui/overlay'
-import { PushPane, SmsPane, StoragePane } from './SettingsPage.parts'
+import { BroadcastPane, PushPane, SmsPane, StoragePane } from './SettingsPage.parts'
 import { WebTabsPane } from './SettingsPage.webtabs'
 
-type TabKey = 'basic' | 'appearance' | 'register' | 'sms' | 'push' | 'storage' | 'webtabs'
+type TabKey = 'basic' | 'appearance' | 'register' | 'sms' | 'push' | 'storage' | 'webtabs' | 'broadcast'
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'basic', label: '基本信息' },
@@ -22,6 +22,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'push', label: '推送配置' },
   { key: 'storage', label: '对象存储' },
   { key: 'webtabs', label: '网站栏目' },
+  { key: 'broadcast', label: '群发频控' },
 ]
 
 const THEMES: ThemeKey[] = ['classic', 'dark', 'ocean', 'warm']
@@ -41,6 +42,7 @@ export function SettingsPage() {
       {tab === 'push' && <PushPane />}
       {tab === 'storage' && <StoragePane />}
       {tab === 'webtabs' && <WebTabsPane />}
+      {tab === 'broadcast' && <BroadcastPane />}
     </div>
   )
 }

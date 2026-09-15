@@ -1,5 +1,5 @@
 /**
- * 企业设置分页：短信与邮件服务商（P2 只读）、推送配置、对象存储。
+ * 企业设置分页：短信与邮件服务商（P2 只读）、推送配置、对象存储、群发频控。
  * SecretField 是「只写不读」密钥的统一呈现：已配置时显示掩码 + 更换按钮。
  */
 import { useState } from 'react'
@@ -223,6 +223,53 @@ export function StoragePane() {
           测试连接
         </Button>
         {error ? <span className="text-[11px] text-red-600">{error}</span> : <span className="text-[11px] text-zinc-400">测试会先保存当前配置，再上传一个测试文件验证读写</span>}
+      </div>
+    </Card>
+  )
+}
+
+/** 群发频控（04 文档）：每个实操员工每天任务数、每客户每天收到的条数 */
+const LIMIT_MIN = 1
+const LIMIT_MAX = 50
+
+export function BroadcastPane() {
+  const s = useStore()
+  const admin = s.session.adminStaffId!
+  const e = s.enterprise
+  const [perStaff, setPerStaff] = useState(String(e.broadcastPerStaffPerDay))
+  const [perCustomer, setPerCustomer] = useState(String(e.broadcastPerCustomerPerDay))
+  const parse = (v: string) => {
+    const n = Number(v)
+    return Number.isInteger(n) && n >= LIMIT_MIN && n <= LIMIT_MAX ? n : null
+  }
+  const a = parse(perStaff)
+  const b = parse(perCustomer)
+  const error = a == null || b == null ? `两项都要是 ${LIMIT_MIN} 到 ${LIMIT_MAX} 的整数` : ''
+  const dirty = a !== e.broadcastPerStaffPerDay || b !== e.broadcastPerCustomerPerDay
+  return (
+    <Card title="群发频控（P0）">
+      <Note>两个维度独立生效：员工维度超限时工作台「发送」按钮禁用；客户维度超限的客户本次跳过，计入「跳过」。改动立即对下一次群发生效。</Note>
+      <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3">
+        <Field label="每个实操员工每天群发任务数" required hint="跨其持有的坐席合并计算，默认 3">
+          <Input type="number" min={LIMIT_MIN} max={LIMIT_MAX} value={perStaff} onChange={(ev) => setPerStaff(ev.target.value)} className="w-40" />
+        </Field>
+        <Field label="每客户每天最多收到的群发条数" required hint="跨坐席、跨任务合并计算，默认 2">
+          <Input type="number" min={LIMIT_MIN} max={LIMIT_MAX} value={perCustomer} onChange={(ev) => setPerCustomer(ev.target.value)} className="w-40" />
+        </Field>
+      </div>
+      <div className="mt-4 flex items-center gap-3">
+        <Button
+          variant="primary"
+          disabled={!!error || !dirty}
+          onClick={() => {
+            if (a == null || b == null) return
+            s.updateEnterprise({ broadcastPerStaffPerDay: a, broadcastPerCustomerPerDay: b }, admin)
+            toast(`群发频控已保存：每员工每天 ${a} 个任务，每客户每天 ${b} 条`)
+          }}
+        >
+          保存
+        </Button>
+        {error && <span className="text-[11px] text-red-600">{error}</span>}
       </div>
     </Card>
   )

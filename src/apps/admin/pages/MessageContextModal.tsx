@@ -59,6 +59,12 @@ export function MessageContextModal({ messageId, onClose }: { messageId: string;
                     <span className="ml-1 font-normal text-zinc-400">{customer?.accountId}</span>
                   </span>
                 )}
+                {m.senderKind === 'bot' && (
+                  <span className="font-medium text-zinc-800">
+                    {s.bots.find((b) => b.id === m.senderId)?.nickname ?? '未知机器人'}
+                    <Pill tone="purple" className="ml-1">机器人</Pill>
+                  </span>
+                )}
                 {m.senderKind === 'system' && <Pill>系统</Pill>}
                 {isTarget && <Pill tone="amber">目标消息</Pill>}
               </div>

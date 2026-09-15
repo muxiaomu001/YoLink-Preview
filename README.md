@@ -18,8 +18,8 @@ pnpm dev
 | 入口 | 路径 | 以谁的视角 |
 |---|---|---|
 | 管理后台（完整版） | `/admin` | 管理员 周敏；侧边栏按 PRD 05 章节分组，P1/P2 标记对应正式产品优先级，钱包/签到/推荐等模块由「模块启停」控制显隐 |
-| 客服工作台 | `/workbench` | 顾问 林薇，以「林顾问」身份；右上角可切换登录员工（演示控制） |
-| 客户手机屏 | `/phone` | 未登录时是注册页；右侧演示控制可切到任一已有客户 |
+| 客服工作台 | `/workbench` | 顾问 林薇，以「林顾问」身份；右上角可切换登录员工（演示控制）。导航按员工能力与模块显隐：会话、客户、邀请链接、群发、群活跃助手（`/workbench/bots`）、提现审核（`/workbench/withdrawals`，P2）、设置 |
+| 客户手机屏 | `/phone` | 未登录时是注册页；右侧演示控制可切到任一已有客户。每个按钮按策略渲染，后台切开关立即生效 |
 
 首页 `/` 有两条穿越流程的分步说明，和「重置演示数据」按钮。
 
@@ -36,21 +36,38 @@ src/
   domain/
     types.ts      领域模型，与 docs/prd/00 预留清单一一对应
     seed.ts       种子数据：企业、员工、坐席、邀请组、头衔、客户、对话
-    seed-admin.ts 管理后台完整版的种子：策略矩阵、举报、敏感词、钱包、签到、推荐、横幅、AI、画像同步、日报、插件、系统
+    seed-admin.ts 管理后台完整版的种子：策略矩阵（POLICY_ITEMS 39 项）、举报、敏感词、钱包、签到、推荐、横幅、AI、画像同步、日报、插件、系统
+    seed-groups.ts 群管理字段（管理员、群设置、公告、置顶、限制、群链接、管理员日志）与群活跃助手（机器人、剧本、规则、运行记录）的种子
     labels.ts     枚举的中文文案（审计事件、模块、权限清单、API scope…）
     ai.ts         AI 回复推荐（演示版，按关键词 + 知识库拼草稿）
     time.ts       时间格式
   store/
     store.ts      zustand 仓库：核心动作（注册、交接、挂头衔、群发…）
-    actions/      管理后台各模块的动作：settings / people / policy / content / modules / integrations
+    policy.ts     策略解析与群内角色：resolveCap / customerCan / seatCan / seatGroupPerm / customerCanSpeakIn / senderName / visibleText
+    actions/      各模块的动作：settings / people / policy / content / modules / integrations
+                  groups.ts（群设置、公告、置顶、成员、管理员、限制、群链接）
+                  workbench.ts（消息引用 / 转发 / 撤回 / 删除、会话置顶 / 静音 / 标未读、客户拉黑 / 禁言 / 重置密码、个人偏好与快捷回复、客户端发言判定）
+                  bots.ts（机器人账号、剧本、规则、一键暂停、模拟触发、审核、手动发言）
+                  D-extra.ts（提现审核记审核人与原因 / 凭证）
     selectors.ts  派生数据：会话视图、待回复、未读、按交接反推实操员工
   ui/             通用组件（按钮、表格、弹窗、二次确认、SVG 图表、头衔与内部标签的 chip）
   apps/
     admin/        管理后台 40 余页，nav.ts 是侧边栏与路由清单
-    workbench/    工作台：三栏会话、客户、邀请链接、群发、设置
-    phone/        客户手机屏：注册、消息、联系人、我的、聊天
+    workbench/    工作台：三栏会话（ChatPage）、客户（CustomersPage）、邀请链接、群发、
+                  群活跃助手（BotsPage：机器人账号 / 剧本库 / 规则 / 待审核 / 运行记录）、
+                  提现审核（WithdrawalsPage：筛选、批量通过、标记已打款、导出 CSV）、设置
+    phone/        客户手机屏：注册、消息、联系人、我的、聊天；screens 下每个页面按策略渲染
     landing/      演示首页
 ```
+
+## 策略如何生效（技术团队看这里）
+
+管理后台 → 策略 里切一个开关，客户手机屏对应的按钮立即出现或消失，不需要刷新。链路：
+
+1. 页面动作调 `actions/policy.ts` 的 `setPolicyCap / addPolicyOverride` 改 `policyMatrix` 或 `policyOverrides`，zustand `persist` 写进 localStorage，另一个窗口通过 `storage` 事件同步。
+2. 手机屏、工作台每个按钮都不直接读矩阵，而是问 `store/policy.ts`：客户端 `customerCan(s, customerId, key, groupId?)`，坐席端 `seatCan(s, seatId, key, groupId?)`，群管理权限 `seatGroupPerm(s, g, seatId, staffId, perm)`。
+3. `resolveCap` 的裁决顺序（03 文档）：**模块授权**（`enterprise.modules[item.module]` 关了直接 false）→ **角色硬边界**（官方群 `group.leave` 对客户强制关）→ **策略矩阵**（企业默认，按 `role_platform` 四列）→ **群级覆盖**（只作用于客户在该群里的能力）→ **用户级覆盖**（客户或坐席）。后一层覆盖前一层，返回 `{ allowed, source }`，`source` 说明是哪一层决定的。
+4. 员工角色能力（`Role.caps`，如 `manage_bots / review_withdrawal`）与坐席策略是两套：前者管"这个人能不能进这个页面"，后者管"这个坐席在聊天层能不能做这件事"。工作台入口两个都查。
 
 ## 模型要点（技术团队看这里）
 

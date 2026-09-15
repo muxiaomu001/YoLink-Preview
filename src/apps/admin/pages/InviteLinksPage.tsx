@@ -8,6 +8,7 @@ import { Button, Select } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, Table, type Column } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
+import { AttachedActionsCell } from '@/apps/workbench/pages/InvitesPage.parts'
 import { InviteLinkCreateModal, InviteLinkDetailModal, StatusPill, linkUrl } from './InviteLinksPage.parts'
 
 export function InviteLinksPage() {
@@ -52,6 +53,7 @@ export function InviteLinksPage() {
     },
     { key: 'creator', title: '创建者', render: (l) => staffById(s, l.creatorStaffId)?.name ?? '-' },
     { key: 'group', title: '邀请组', render: (l) => s.inviteGroups.find((g) => g.id === l.inviteGroupId)?.name ?? '-' },
+    { key: 'attach', title: '附带动作', render: (l) => <AttachedActionsCell s={s} link={l} /> },
     { key: 'expires', title: '有效期', render: (l) => <span className="text-zinc-600">{l.expiresAt ? fmtDate(l.expiresAt) : '永久'}</span> },
     { key: 'uses', title: '使用情况', align: 'right', render: (l) => <span className="tabular-nums">{l.uses}/{l.maxUses ?? '不限'}</span> },
     {
@@ -100,7 +102,7 @@ export function InviteLinksPage() {
         }
       />
       <Note>
-        员工在工作台生成的链接也在这里，创建者一列区分。「邀请码必填」当前{s.enterprise.inviteCodeRequired ? '开启：没有码不能注册' : '关闭：没带码的注册走默认组'}，在企业设置里改。
+        员工在工作台生成的链接也在这里，创建者一列区分。「附带动作」是注册即入群的三层叠加：企业默认 → 邀请组 → 本链接，取并集。「邀请码必填」当前{s.enterprise.inviteCodeRequired ? '开启：没有码不能注册' : '关闭：没带码的注册走默认组'}，在企业设置里改。
       </Note>
       <Card
         className="mt-4"

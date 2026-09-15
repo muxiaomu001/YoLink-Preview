@@ -24,6 +24,7 @@ export function convName(s: DemoState, convId: string): string {
 /** 消息在审计表格里的文本：删除的显示占位，媒体显示类型 */
 export function messageText(m: Message): string {
   if (m.deletedAt) return '[已删除]'
+  if (m.recalledAt) return '[已撤回]'
   if (m.kind === 'image') return '[图片]'
   return m.text
 }
@@ -32,6 +33,7 @@ export function messageText(m: Message): string {
 export function senderLabel(s: DemoState, m: Message): string {
   if (m.senderKind === 'seat') return `${seatById(s, m.seatId)?.displayName ?? '未知坐席'}（坐席）`
   if (m.senderKind === 'system') return '系统'
+  if (m.senderKind === 'bot') return `${s.bots.find((b) => b.id === m.senderId)?.nickname ?? '未知机器人'}（机器人）`
   const c = customerById(s, m.senderId)
   return c ? `${c.nickname}（${c.accountId}）` : '未知客户'
 }

@@ -1,19 +1,13 @@
 import { clsx } from 'clsx'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
-import { ChevronDown, ExternalLink, Link2, MessageSquare, Send, Settings, Users } from 'lucide-react'
+import { Bot, ChevronDown, ExternalLink, Link2, MessageSquare, Send, Settings, Users, Wallet } from 'lucide-react'
 import { useStore } from '@/store/store'
-import { conversationsForSeat, seatsOfStaff, staffById } from '@/store/selectors'
+import { conversationsForSeat, seatsOfStaff, staffById, staffHasCap } from '@/store/selectors'
 import { Avatar, SeatAvatar } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 
-const NAV = [
-  { to: '/workbench/chat', label: '会话', icon: MessageSquare },
-  { to: '/workbench/customers', label: '客户', icon: Users },
-  { to: '/workbench/invites', label: '邀请链接', icon: Link2 },
-  { to: '/workbench/broadcast', label: '群发', icon: Send },
-  { to: '/workbench/settings', label: '设置', icon: Settings },
-]
+const TITLE_BASE = 'YoLink 工作台'
 
 export function WorkbenchLayout() {
   const s = useStore()
@@ -22,6 +16,19 @@ export function WorkbenchLayout() {
   const activeSeat = mySeats.find((x) => x.id === s.session.workbenchSeatId) ?? mySeats[0]
   const [open, setOpen] = useState(false)
   const [staffOpen, setStaffOpen] = useState(false)
+  const can = (cap: string) => staffHasCap(s, staff?.id ?? null, cap)
+  const aiLicensed = s.license.modules.some((m) => m.key === 'ai' && m.enabled)
+
+  // 导航按员工能力与模块显隐：没能力的入口不出现
+  const nav = [
+    { to: '/workbench/chat', label: '会话', icon: MessageSquare, show: true },
+    { to: '/workbench/customers', label: '客户', icon: Users, show: true },
+    { to: '/workbench/invites', label: '邀请链接', icon: Link2, show: can('create_invite') },
+    { to: '/workbench/broadcast', label: '群发', icon: Send, show: can('broadcast') && s.enterprise.modules.broadcast },
+    { to: '/workbench/bots', label: '群活跃助手', icon: Bot, show: can('manage_bots') && aiLicensed },
+    { to: '/workbench/withdrawals', label: '提现审核', icon: Wallet, show: s.enterprise.modules.wallet && can('review_withdrawal'), tag: 'P2' },
+    { to: '/workbench/settings', label: '设置', icon: Settings, show: true },
+  ].filter((it) => it.show)
 
   // 当前坐席被交接走了，或没选：自动落到第一个持有的坐席
   useEffect(() => {
@@ -36,6 +43,25 @@ export function WorkbenchLayout() {
     })
     return m
   }, [s, mySeats])
+
+  // 未读汇总（04 文档 P0）：浏览器标签页标题显示当前坐席未读总数
+  const unreadTotal = activeSeat ? conversationsForSeat(s, activeSeat.id).reduce((a, r) => a + r.unread, 0) : 0
+  useEffect(() => {
+    document.title = unreadTotal > 0 ? `(${unreadTotal}) ${TITLE_BASE}` : TITLE_BASE
+    return () => {
+      document.title = TITLE_BASE
+    }
+  }, [unreadTotal])
+
+  // 桌面通知（P0）：演示用 toast 代替浏览器原生通知；未读增加且员工偏好开启时提示
+  const prevUnread = useRef(unreadTotal)
+  const notifyOn = staff?.prefs?.desktopNotify ?? true
+  const seatName = activeSeat?.displayName ?? ''
+  useEffect(() => {
+    const prev = prevUnread.current
+    prevUnread.current = unreadTotal
+    if (unreadTotal > prev && notifyOn) toast(`桌面通知：「${seatName}」有 ${unreadTotal - prev} 条新消息（正式产品用浏览器原生通知，点击跳到该会话）`, 'info')
+  }, [unreadTotal, notifyOn, seatName])
 
   return (
     <div className="flex h-full flex-col">
@@ -91,9 +117,10 @@ export function WorkbenchLayout() {
         </div>
 
         <nav className="ml-2 flex items-center gap-1">
-          {NAV.map((it) => (
+          {nav.map((it) => (
             <NavLink key={it.to} to={it.to} className={({ isActive }) => clsx('flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px]', isActive ? 'bg-zinc-100 font-medium text-zinc-900' : 'text-zinc-600 hover:bg-zinc-50')}>
               <it.icon size={14} /> {it.label}
+              {it.tag && <span className="rounded bg-amber-100 px-1 text-[9px] leading-3 text-amber-700">{it.tag}</span>}
             </NavLink>
           ))}
         </nav>

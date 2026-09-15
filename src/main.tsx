@@ -50,6 +50,8 @@ import { CustomersPage } from '@/apps/workbench/pages/CustomersPage'
 import { InvitesPage } from '@/apps/workbench/pages/InvitesPage'
 import { BroadcastPage } from '@/apps/workbench/pages/BroadcastPage'
 import { WbSettingsPage } from '@/apps/workbench/pages/WbSettingsPage'
+import { BotsPage } from '@/apps/workbench/pages/BotsPage'
+import { WithdrawalsPage } from '@/apps/workbench/pages/WithdrawalsPage'
 import { PhoneApp } from '@/apps/phone/PhoneApp'
 
 const router = createBrowserRouter([
@@ -123,6 +125,8 @@ const router = createBrowserRouter([
       { path: 'invites', element: <InvitesPage /> },
       { path: 'broadcast', element: <BroadcastPage /> },
       { path: 'settings', element: <WbSettingsPage /> },
+      { path: 'bots', element: <BotsPage /> },
+      { path: 'withdrawals', element: <WithdrawalsPage /> },
     ],
   },
   { path: '/phone', element: <PhoneApp /> },

@@ -26,6 +26,8 @@ const NUMBER_LABEL: Record<keyof PolicyNumbers, string> = {
   imageMaxMb: '图片最大大小',
   videoMaxMb: '视频最大大小',
   voiceMaxSeconds: '语音最大时长',
+  maxDevices: '最大同时在线设备数',
+  idleDays: '长期未跟进天数',
 }
 
 function change(kind: PolicyChange['kind'], detail: string, byStaffId: string): PolicyChange {

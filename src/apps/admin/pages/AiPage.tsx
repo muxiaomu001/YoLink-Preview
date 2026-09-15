@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Plug } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ExternalLink, Plug } from 'lucide-react'
 import type { AiSettings } from '@/domain/types'
 import { fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { Button, Field, Input, Select, Switch, Textarea } from '@/ui/primitives'
-import { Card, KV, Note, PageHeader, Pill, Stat, Tabs } from '@/ui/display'
+import { Avatar, Card, KV, Note, PageHeader, Pill, Stat, Table, Tabs } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 import { KnowledgeTab, UsageTab } from './AiPage.parts'
 
@@ -160,7 +161,9 @@ function GroupTab() {
   const g = s.aiSettings.group
   const lic = s.license.modules.find((m) => m.key === 'ai')
   const botLimit = lic?.botLimit ?? g.botLimit
-  const botUsed = lic?.botUsed ?? g.botUsed
+  // 已用按真实机器人账号算：启用中的才占授权名额
+  const botUsed = s.bots.filter((b) => b.enabled).length
+  const pendingRuns = s.botRuns.filter((r) => r.status === 'pending_review').length
   const [rule, setRule] = useState(g.defaultRule)
   const [reviewMode, setReviewMode] = useState<'auto' | 'review'>(g.reviewMode)
   const error = !rule.trim() ? '全局默认规则不能为空' : rule.length > 1000 ? '规则最多 1000 字' : ''
@@ -176,6 +179,32 @@ function GroupTab() {
         <Stat label="已用" value={botUsed} sub={`剩余 ${Math.max(0, botLimit - botUsed)} 个可绑定到群`} tone={botUsed >= botLimit ? 'warn' : 'default'} />
         <Stat label="许可到期" value={lic ? fmtDateTime(lic.expiresAt).slice(0, 10) : '-'} />
       </div>
+      <Card
+        title="机器人账号"
+        padded={false}
+        extra={
+          <Link to="/workbench/bots" target="_blank" className="flex items-center gap-1 text-xs text-brand-700 hover:underline">
+            <ExternalLink size={11} /> 去工作台管理
+          </Link>
+        }
+      >
+        <Table
+          rows={s.bots}
+          rowKey={(b) => b.id}
+          dense
+          empty="还没有机器人账号，去工作台 → 群活跃助手 新建"
+          columns={[
+            { key: 'name', title: '昵称', render: (b) => <span className="flex items-center gap-1.5"><Avatar text={b.nickname} color={b.avatarColor} size={20} /><span className="font-medium text-zinc-900">{b.nickname}</span></span> },
+            { key: 'groups', title: '所属群', render: (b) => b.groupIds.map((id) => s.chatGroups.find((x) => x.id === id)?.name).filter(Boolean).join('、') || <span className="text-zinc-400">未入群</span> },
+            { key: 'rules', title: '规则数', align: 'right', render: (b) => <span className="tabular-nums">{s.botRules.filter((r) => r.botIds.includes(b.id)).length}</span> },
+            { key: 'pending', title: '待审', align: 'right', render: (b) => <span className="tabular-nums">{s.botRuns.filter((r) => r.botId === b.id && r.status === 'pending_review').length}</span> },
+            { key: 'status', title: '状态', render: (b) => (b.enabled ? <Pill tone="green">启用</Pill> : <Pill>停用</Pill>) },
+          ]}
+        />
+        <div className="border-t border-zinc-100 px-3 py-1.5 text-[11px] text-zinc-400">
+          规则 {s.botRules.length} 条（启用 {s.botRules.filter((r) => r.enabled).length}）· 待审核 {pendingRuns} 条{s.botsPausedAll ? ' · 全部已暂停' : ''}。机器人账号、剧本与规则在工作台维护，这里只看全局默认规则与授权。
+        </div>
+      </Card>
       <Card title="全局默认规则" extra={<Button size="sm" variant="primary" disabled={!!error} onClick={save}>保存</Button>}>
         <div className="space-y-3">
           <Field label="规则" required hint="多行文本，写给模型看的边界与话题范围">

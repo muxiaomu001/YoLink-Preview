@@ -3,6 +3,7 @@ import { Eye, Trash2 } from 'lucide-react'
 import type { Message } from '@/domain/types'
 import { useStore } from '@/store/store'
 import { customerById, operatorAt, seatById, staffById } from '@/store/selectors'
+import { botById } from '@/store/policy'
 import { Button, Input, Select } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, Table, type Column } from '@/ui/display'
 import { toast } from '@/ui/overlay'
@@ -22,6 +23,8 @@ export function MessageAuditPage() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [ctxId, setCtxId] = useState<string | null>(null)
+  /** 发送者类型：全部 / 只看坐席 / 只看客户 / 只看机器人（14 文档：消息审计可按机器人消息筛选） */
+  const [senderKind, setSenderKind] = useState<'' | 'seat' | 'customer' | 'bot'>('')
 
   // 会话下拉：私聊显示「客户 ↔ 坐席」，群显示群名，按最近活跃排
   const convOptions = useMemo(
@@ -39,10 +42,11 @@ export function MessageAuditPage() {
         return conv?.customerId === customerFilter || m.senderId === customerFilter
       })
       .filter((m) => !convFilter || m.convId === convFilter)
+      .filter((m) => !senderKind || m.senderKind === senderKind)
       .filter((m) => inDateRange(m.at, from, to))
       .filter((m) => !kw || m.text.includes(kw))
       .sort((a, b) => b.at.localeCompare(a.at))
-  }, [s, q, customerFilter, convFilter, from, to])
+  }, [s, q, customerFilter, convFilter, senderKind, from, to])
   const rows = filtered.slice(0, MAX_ROWS)
 
   const reset = () => {
@@ -84,6 +88,18 @@ export function MessageAuditPage() {
             </div>
           )
         }
+        if (m.senderKind === 'bot') {
+          const b = botById(s, m.senderId)
+          return (
+            <div>
+              <div className="flex items-center gap-1">
+                <span className="font-medium text-zinc-900">{b?.nickname ?? '未知机器人'}</span>
+                <Pill tone="purple">机器人</Pill>
+              </div>
+              <div className="text-[11px] text-zinc-500">{m.botRuleId ? '规则触发' : `手动：${staffById(s, m.operatorId)?.name ?? '未记录'}`}</div>
+            </div>
+          )
+        }
         const c = customerById(s, m.senderId)
         return (
           <div>
@@ -117,7 +133,7 @@ export function MessageAuditPage() {
     {
       key: 'text',
       title: '消息内容',
-      render: (m) => (m.deletedAt ? <span className="italic text-zinc-400">[已删除]</span> : <span className="line-clamp-2 max-w-md text-zinc-800">{messageText(m)}</span>),
+      render: (m) => (m.deletedAt || m.recalledAt ? <span className="italic text-zinc-400">{m.recalledAt ? '[已撤回] ' : '[已删除] '}{m.text}</span> : <span className="line-clamp-2 max-w-md text-zinc-800">{messageText(m)}</span>),
     },
     {
       key: 'ops',
@@ -153,6 +169,12 @@ export function MessageAuditPage() {
                 {c.nickname}（{c.accountId}）
               </option>
             ))}
+          </Select>
+          <Select value={senderKind} onChange={(e) => setSenderKind(e.target.value as typeof senderKind)} className="w-32" aria-label="发送者类型">
+            <option value="">全部发送者</option>
+            <option value="seat">只看坐席</option>
+            <option value="customer">只看客户</option>
+            <option value="bot">只看机器人</option>
           </Select>
           <Select value={convFilter} onChange={(e) => setConvFilter(e.target.value)} className="w-56">
             <option value="">全部会话</option>

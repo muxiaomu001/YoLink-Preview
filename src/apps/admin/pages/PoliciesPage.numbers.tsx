@@ -1,5 +1,5 @@
 /**
- * 数值型策略表单：8 个字段，只提交有变化的。
+ * 数值型策略表单：10 个字段（05 文档 8 项 + 最大设备数 + 长期未跟进天数），只提交有变化的。
  */
 import { useState } from 'react'
 import type { PolicyNumbers } from '@/domain/types'
@@ -27,6 +27,8 @@ const FIELDS: NumberField[] = [
   { key: 'imageMaxMb', label: '图片最大大小', unit: 'MB', defaultValue: 10 },
   { key: 'videoMaxMb', label: '视频最大大小', unit: 'MB', defaultValue: 100 },
   { key: 'voiceMaxSeconds', label: '语音最大时长', unit: '秒', defaultValue: 60 },
+  { key: 'maxDevices', label: '最大同时在线设备数', unit: '台', defaultValue: 2, hint: '03 文档 account.max_devices；超出后最早登录的设备下线' },
+  { key: 'idleDays', label: '工作台长期未跟进天数', unit: '天', defaultValue: 14, hint: '04 文档：会话列表「长期未跟进」筛选的阈值' },
 ]
 
 type Draft = Record<keyof PolicyNumbers, string>

@@ -15,6 +15,7 @@ function useTodos() {
     { n: s.seats.filter((x) => x.status === 'paused').length, label: '暂停接新的坐席', to: '/admin/seats' },
     { n: s.webhookLogs.filter((l) => l.httpStatus >= 400 && Date.now() - new Date(l.at).getTime() < 86400000).length, label: '24 小时内 Webhook 失败', to: '/admin/webhooks' },
     { n: licenseDays <= 30 ? 1 : 0, label: `许可 ${licenseDays} 天后到期`, to: '/admin/license' },
+    { n: s.botRuns.filter((r) => r.status === 'pending_review').length, label: '群活跃助手待审发言', to: '/admin/ai' },
   ]
   return items.filter((it) => it.n > 0)
 }

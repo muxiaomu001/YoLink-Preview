@@ -4,6 +4,7 @@
  */
 import type { Conversation, Customer, DemoState, Message, Seat, Staff } from '@/domain/types'
 import { daysSince } from '@/domain/time'
+import { senderName } from './policy'
 
 export const LONG_IDLE_DAYS = 14
 
@@ -46,14 +47,18 @@ export function waitingSince(s: DemoState, conv: Conversation): string | null {
   return last && last.senderKind === 'customer' ? last.at : null
 }
 
-/** 坐席视角的未读：最后一条坐席消息之后客户发的条数 */
-export function unreadForSeat(s: DemoState, conv: Conversation): number {
+/** 坐席视角的未读：坐席上次读到之后（或最后一条坐席消息之后）客户与机器人发的条数；手动标未读算 1 */
+export function unreadForSeat(s: DemoState, conv: Conversation, seatId?: string): number {
   const list = messagesOf(s, conv.id)
+  const readAt = seatId ? conv.readAtBySeat?.[seatId] : undefined
   let n = 0
   for (let i = list.length - 1; i >= 0; i -= 1) {
-    if (list[i].senderKind === 'customer') n += 1
-    else break
+    const m = list[i]
+    if (readAt && m.at <= readAt) break
+    if (m.senderKind === 'customer' || m.senderKind === 'bot') n += 1
+    else if (m.senderKind === 'seat') break
   }
+  if (seatId && conv.unreadMarkBySeatIds?.includes(seatId)) return Math.max(1, n)
   return n
 }
 
@@ -69,6 +74,8 @@ export interface ConvRow {
   waitingSince: string | null
   mentioned: boolean
   idleDays: number
+  pinned: boolean
+  muted: boolean
 }
 
 /** 某坐席能看到的会话：它的私聊 + 它所在的群与频道 */
@@ -86,10 +93,12 @@ export function conversationsForSeat(s: DemoState, seatId: string): ConvRow[] {
           subtitle: last?.text ?? '',
           customer,
           last,
-          unread: unreadForSeat(s, conv),
+          unread: unreadForSeat(s, conv, seatId),
           waitingSince: waitingSince(s, conv),
           mentioned: false,
           idleDays: daysSince(conv.lastMessageAt),
+          pinned: !!conv.pinnedBySeatIds?.includes(seatId),
+          muted: !!conv.mutedBySeatIds?.includes(seatId),
         }
       }
       const g = s.chatGroups.find((x) => x.id === conv.chatGroupId)
@@ -98,25 +107,29 @@ export function conversationsForSeat(s: DemoState, seatId: string): ConvRow[] {
       return {
         conv,
         title: g?.name ?? '群',
-        subtitle: last ? `${last.senderKind === 'seat' ? seatById(s, last.seatId)?.displayName : customerById(s, last.senderId)?.nickname}：${last.text}` : '',
+        subtitle: last ? `${senderName(s, last)}：${last.recalledAt ? '[已撤回]' : last.deletedAt ? '[已删除]' : last.text}` : '',
         last,
-        unread: 0,
+        unread: unreadForSeat(s, conv, seatId),
         waitingSince: null,
         mentioned,
         idleDays: daysSince(conv.lastMessageAt),
+        pinned: !!conv.pinnedBySeatIds?.includes(seatId),
+        muted: !!conv.mutedBySeatIds?.includes(seatId),
       }
     })
-    .sort((a, b) => b.conv.lastMessageAt.localeCompare(a.conv.lastMessageAt))
+    // 置顶在前，其余按最后消息时间
+    .sort((a, b) => (a.pinned !== b.pinned ? (a.pinned ? -1 : 1) : b.conv.lastMessageAt.localeCompare(a.conv.lastMessageAt)))
 }
 
-export function applyView(rows: ConvRow[], view: WorkbenchView): ConvRow[] {
+/** idleDays：企业数值型策略里的"长期未跟进天数"，默认 14 */
+export function applyView(rows: ConvRow[], view: WorkbenchView, idleDays: number = LONG_IDLE_DAYS): ConvRow[] {
   switch (view) {
     case 'waiting':
       return rows.filter((r) => r.waitingSince).sort((a, b) => a.waitingSince!.localeCompare(b.waitingSince!))
     case 'mentions':
       return rows.filter((r) => r.mentioned)
     case 'idle':
-      return rows.filter((r) => r.conv.kind === 'dm' && r.idleDays >= LONG_IDLE_DAYS).sort((a, b) => b.idleDays - a.idleDays)
+      return rows.filter((r) => r.conv.kind === 'dm' && r.idleDays >= idleDays).sort((a, b) => b.idleDays - a.idleDays)
     default:
       return rows
   }
@@ -133,6 +146,11 @@ export function seatsOfCustomer(s: DemoState, customerId: string) {
 export function primarySeatOfCustomer(s: DemoState, customerId: string): Seat | undefined {
   const cs = s.customerSeats.find((x) => x.customerId === customerId && x.primary)
   return seatById(s, cs?.seatId)
+}
+
+/** 未注销的客户 */
+export function activeCustomers(s: DemoState): Customer[] {
+  return s.customers.filter((c) => !c.deletedAt)
 }
 
 /** 某坐席主归属的客户 */

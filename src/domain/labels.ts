@@ -69,6 +69,22 @@ export const AUDIT_LABEL: Record<AuditType, string> = {
   'license.upload': '上传许可',
   'backup.run': '备份',
   'backup.restore': '恢复',
+  'group.setting': '群设置',
+  'group.announcement': '群公告',
+  'group.pin': '置顶',
+  'group.member': '群成员',
+  'group.admin': '群管理员',
+  'group.restrict': '禁言封禁',
+  'group.invite_link': '群邀请链接',
+  'group.create': '建群',
+  'message.recall': '撤回消息',
+  'customer.block': '拉黑客户',
+  'customer.mute': '禁言客户',
+  'customer.reset_password': '重置客户密码',
+  'bot.update': '群活跃助手',
+  'bot.run': '机器人发言',
+  'quick_reply.update': '快捷回复',
+  'staff.prefs': '个人设置',
 }
 
 export const MODULE_LABEL: Record<ModuleKey, { name: string; desc: string; level: 'P0' | 'P1' | 'P2' }> = {
@@ -112,6 +128,8 @@ export const CAPABILITIES: CapabilityMeta[] = [
   { cat: '管理后台', key: 'manage_settings', desc: '管理企业设置', level: 'P0' },
   { cat: '管理后台', key: 'view_audit_logs', desc: '查看审计日志', level: 'P0' },
   { cat: '管理后台', key: 'export_data', desc: '导出数据', level: 'P1' },
+  { cat: '工作台', key: 'manage_bots', desc: '管理群活跃助手：机器人账号、剧本与规则', level: 'P0' },
+  { cat: '工作台', key: 'manage_automation', desc: '配置客户画像自动化规则', level: 'P1' },
 ]
 
 export const API_SCOPE_LABEL: Record<ApiScope, string> = {

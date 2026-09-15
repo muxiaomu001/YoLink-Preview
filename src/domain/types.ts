@@ -35,6 +35,8 @@ export type Capability =
   | 'manage_settings'
   | 'view_audit_logs'
   | 'export_data'
+  | 'manage_bots'
+  | 'manage_automation'
 
 // ---------- 企业设置 ----------
 
@@ -100,6 +102,19 @@ export interface Enterprise {
   defaultChatGroupIds: string[]
   /** 模块启停：停用不删数据 */
   modules: Record<ModuleKey, boolean>
+  /** 群发频控：每个实操员工每天任务数（跨其持有的坐席合并） */
+  broadcastPerStaffPerDay: number
+  /** 群发频控：每客户每天最多收到的群发条数（跨坐席、跨任务合并） */
+  broadcastPerCustomerPerDay: number
+}
+
+/** 员工个人设置：跟人走，不跟坐席走 */
+export interface StaffPrefs {
+  theme: 'auto' | 'light' | 'dark'
+  desktopNotify: boolean
+  sound: boolean
+  language: Language
+  aiSuggest: boolean
 }
 
 // ---------- 员工、角色、坐席 ----------
@@ -127,6 +142,8 @@ export interface Staff {
   mustChangePassword?: boolean
   /** 最近一次强制下线的时间 */
   sessionsRevokedAt?: ISODate
+  /** 工作台个人设置；缺省用 DEFAULT_STAFF_PREFS */
+  prefs?: StaffPrefs
 }
 
 export type SeatType = 'assign' | 'notice'
@@ -204,6 +221,12 @@ export interface Customer {
   blockedSeatIds: string[]
   /** 已注销：保留数据，不再出现在工作台 */
   deletedAt?: ISODate
+  /** 被企业拉黑：客户发不出消息 */
+  blacklistedAt?: ISODate | null
+  /** 所有群禁言到期时间；null 表示未禁言 */
+  mutedAllUntil?: ISODate | null
+  /** 员工重置过密码，首次登录强制修改 */
+  mustChangePassword?: boolean
   /** 通用字段值（P1） */
   customFields?: Record<string, string>
 }
@@ -243,6 +266,8 @@ export interface InviteLink {
   uses: number
   clicks: number
   status: InviteLinkStatus
+  /** 附带动作：通过该链接注册的客户额外自动加入的群或频道（叠加在邀请组与企业默认之上） */
+  chatGroupIds: string[]
   createdAt: ISODate
 }
 
@@ -280,19 +305,106 @@ export interface TitleAssignment {
 
 export type ChatGroupKind = 'group' | 'supergroup' | 'channel'
 
+/** 群内管理员权限粒度（12 文档，P0 实现 9 项里的 8 项 + 频道发布） */
+export type GroupAdminPerm =
+  | 'can_manage_chat'
+  | 'can_delete_messages'
+  | 'can_restrict_members'
+  | 'can_promote_members'
+  | 'can_change_info'
+  | 'can_invite_users'
+  | 'can_pin_messages'
+  | 'can_post_messages'
+
+export type GroupMemberKind = 'seat' | 'customer'
+
+/** 群内管理员：坐席或客户都可以被任命，权限按项配置 */
+export interface GroupAdmin {
+  memberKind: GroupMemberKind
+  memberId: string
+  perms: GroupAdminPerm[]
+  promotedBySeatId: string
+  promotedAt: ISODate
+}
+
+/** 群设置：全员禁言、成员可见、限流档位（P2）、历史可见（P1） */
+export interface GroupSettings {
+  allMuted: boolean
+  membersVisible: boolean
+  /** null 用企业数值型策略 */
+  slowModeSeconds: number | null
+  historyVisible: boolean
+}
+
+/** 群公告：最多 1 条有效公告，新成员入群弹窗 */
+export interface GroupAnnouncement {
+  title: string
+  content: string
+  bySeatId: string
+  at: ISODate
+  notified: boolean
+}
+
+/** 单人禁言或封禁 */
+export interface GroupRestriction {
+  customerId: string
+  kind: 'mute' | 'ban'
+  /** null 为永久 */
+  until: ISODate | null
+  bySeatId: string
+  at: ISODate
+  reason?: string
+}
+
+/** 群邀请链接：主链接一条 + 附加链接若干（与注册用的邀请链接不是一回事） */
+export interface GroupInviteLink {
+  id: string
+  name: string
+  code: string
+  main: boolean
+  expiresAt: ISODate | null
+  maxUses: number | null
+  uses: number
+  status: 'active' | 'revoked' | 'expired'
+  bySeatId: string
+  createdAt: ISODate
+}
+
 export interface ChatGroup {
   id: string
   name: string
   kind: ChatGroupKind
   official: boolean
   desc: string
+  /** 群主：坐席 */
   ownerSeatId: string
+  /** 坐席成员（含群主）；是否管理员看 admins */
   memberSeatIds: string[]
   memberCustomerIds: string[]
+  /** 机器人账号成员（群活跃助手） */
+  memberBotIds: string[]
+  admins: GroupAdmin[]
+  settings: GroupSettings
+  announcement: GroupAnnouncement | null
+  pinnedMessageIds: string[]
+  restrictions: GroupRestriction[]
+  inviteLinks: GroupInviteLink[]
   requiredTitleId: string | null
   /** 人数上限，null 用数值型策略的单群上限 */
   maxMembers: number | null
   createdAt: ISODate
+}
+
+/** 管理员日志：仅管理员可见，保留 48 小时 */
+export interface GroupLog {
+  id: string
+  groupId: string
+  at: ISODate
+  actorKind: GroupMemberKind | 'system'
+  actorId: string
+  /** 操作类型，如 setting / member / admin / pin / announcement / delete_message / restrict */
+  action: string
+  detail: string
 }
 
 export type ConversationKind = 'dm' | 'group' | 'channel'
@@ -307,29 +419,47 @@ export interface Conversation {
   /** group / channel */
   chatGroupId?: string
   lastMessageAt: ISODate
+  /** 坐席侧会话操作：置顶、静音、手动标记（按坐席） */
+  pinnedBySeatIds?: string[]
+  mutedBySeatIds?: string[]
+  /** 坐席最近一次读到的时间；缺省按"最后一条坐席消息之后"算未读 */
+  readAtBySeat?: Record<string, ISODate>
+  /** 坐席手动标为未读 */
+  unreadMarkBySeatIds?: string[]
 }
 
-export type SenderKind = 'customer' | 'seat' | 'system'
+export type SenderKind = 'customer' | 'seat' | 'bot' | 'system'
 export type MessageKind = 'text' | 'image' | 'system'
 
 export interface Message {
   id: string
   convId: string
   senderKind: SenderKind
-  /** customer：客户 ID；seat：坐席 ID；system：空 */
+  /** customer：客户 ID；seat：坐席 ID；bot：机器人账号 ID；system：空 */
   senderId: string
   /** 坐席发的消息：署名坐席 */
   seatId?: string
-  /** 坐席发的消息：当时真正打字的员工 */
+  /** 坐席发的消息：当时真正打字的员工；机器人手动发言时也记 */
   operatorId?: string
   kind: MessageKind
   text: string
   at: ISODate
   mentionSeatIds?: string[]
+  mentionAll?: boolean
   aiDraftUsed?: boolean
   isWelcome?: boolean
   /** 管理员删除：内容对客户不可见，审计仍可查 */
   deletedAt?: ISODate
+  /** 发送者自己撤回：所有端不再显示内容，审计仍可查 */
+  recalledAt?: ISODate
+  /** 引用回复 */
+  replyToId?: string
+  /** 转发来源 */
+  forwardedFrom?: { convId: string; messageId: string }
+  /** 机器人消息：来自哪条规则；空为员工手动触发 */
+  botRuleId?: string | null
+  /** 群发任务产生的消息（频控按它统计） */
+  isBroadcast?: boolean
 }
 
 // ---------- 审计与安全 ----------
@@ -400,6 +530,22 @@ export type AuditType =
   | 'license.upload'
   | 'backup.run'
   | 'backup.restore'
+  | 'group.setting'
+  | 'group.announcement'
+  | 'group.pin'
+  | 'group.member'
+  | 'group.admin'
+  | 'group.restrict'
+  | 'group.invite_link'
+  | 'group.create'
+  | 'message.recall'
+  | 'customer.block'
+  | 'customer.mute'
+  | 'customer.reset_password'
+  | 'bot.update'
+  | 'bot.run'
+  | 'quick_reply.update'
+  | 'staff.prefs'
 
 export interface AuditEvent {
   id: string
@@ -459,21 +605,33 @@ export interface SensitiveHit {
 
 // ---------- 群发、快捷回复、知识库 ----------
 
+export type BroadcastTargetKind = 'mine' | 'tag' | 'title' | 'purchase' | 'role' | 'group'
+export type BroadcastStatus = 'scheduled' | 'sending' | 'done' | 'failed'
+
 export interface Broadcast {
   id: string
   name: string
   seatId: string
   operatorId: string
+  targetKind: BroadcastTargetKind
   targetDesc: string
+  contentKind: 'text' | 'image'
   text: string
   sentAt: ISODate
+  /** P1：定时发送 */
+  scheduledAt?: ISODate | null
+  status: BroadcastStatus
   sentCount: number
+  /** 因频控、拉黑、注销跳过的人数 */
+  skippedCount: number
   readCount: number
 }
 
 export interface QuickReply {
   id: string
   scope: 'enterprise' | 'personal'
+  /** 个人快捷回复的主人 */
+  staffId?: string
   title: string
   text: string
 }
@@ -486,12 +644,80 @@ export interface KnowledgeItem {
   enabled: boolean
 }
 
+// ---------- 群活跃助手（炒群，14 文档模块 D） ----------
+
+/** 机器人账号：客户看不出区别，员工与管理员看到标记 */
+export interface BotAccount {
+  id: string
+  nickname: string
+  avatarColor: string
+  /** 人设：性格、口吻、身份 */
+  persona: string
+  groupIds: string[]
+  enabled: boolean
+  /** 审核模式下谁来过目；手动发言记真实操作者 */
+  operatorStaffId: string | null
+  createdAt: ISODate
+}
+
+export type BotScriptSource = 'fixed' | 'ai' | 'mixed'
+
+export interface BotScript {
+  id: string
+  name: string
+  source: BotScriptSource
+  /** 固定台词或混合模式的开场 */
+  lines: string[]
+  /** 全局或指定群 */
+  groupId: string | null
+  /** AI 生成时的主题提示 */
+  topic?: string
+}
+
+export type BotTrigger = 'silence' | 'schedule' | 'after_staff' | 'manual'
+
+export interface BotRule {
+  id: string
+  name: string
+  trigger: BotTrigger
+  silenceMinutes?: number
+  scheduleTimes?: string[]
+  hourlyLimit: number
+  reviewMode: 'auto' | 'review'
+  groupIds: string[]
+  scriptId: string
+  botIds: string[]
+  enabled: boolean
+}
+
+export type BotRunStatus = 'sent' | 'pending_review' | 'skipped' | 'rejected'
+
+/** 规则运行记录：发了、待审、跳过（禁言 / 限流 / 已暂停）*/
+export interface BotRun {
+  id: string
+  at: ISODate
+  ruleId: string | null
+  botId: string
+  groupId: string
+  text: string
+  status: BotRunStatus
+  reason?: string
+  /** 手动触发或审核放行的员工 */
+  operatorStaffId?: string
+}
+
 // ---------- 策略 ----------
 
 export interface PolicyItem {
   key: string
   label: string
   group: string
+  desc: string
+  level: 'P0' | 'P1' | 'P2'
+  /** 模块能力键：模块停用或未授权时整体不生效 */
+  module?: ModuleKey
+  /** 只对坐席有意义的键：客户列显示"—" */
+  staffOnly?: boolean
 }
 
 /** 策略矩阵的列：角色 × 端 */
@@ -518,12 +744,19 @@ export interface PolicyNumbers {
   imageMaxMb: number
   videoMaxMb: number
   voiceMaxSeconds: number
+  /** 最大同时在线设备数（03 文档 account.max_devices） */
+  maxDevices: number
+  /** 工作台"长期未跟进"的天数阈值（04 文档，默认 14） */
+  idleDays: number
 }
 
-/** P1：用户级覆盖，对某个客户或坐席单独放开或收紧 */
+/** 覆盖目标：群级覆盖（只作用于客户在该群里的能力）或用户级覆盖（客户 / 坐席） */
+export type PolicyOverrideTarget = 'customer' | 'seat' | 'group'
+
+/** P1：群级 / 用户级覆盖，对某个群、客户或坐席单独放开或收紧 */
 export interface PolicyOverride {
   id: string
-  targetKind: 'customer' | 'seat'
+  targetKind: PolicyOverrideTarget
   targetId: string
   caps: Record<string, boolean>
   byStaffId: string
@@ -931,6 +1164,13 @@ export interface DemoState {
   backups: Backup[]
   health: HealthStatus
   dailyStats: DailyStat[]
+  groupLogs: GroupLog[]
+  bots: BotAccount[]
+  botScripts: BotScript[]
+  botRules: BotRule[]
+  botRuns: BotRun[]
+  /** 一键暂停全部群活跃助手 */
+  botsPausedAll: boolean
   session: Session
   seededAt: ISODate
 }

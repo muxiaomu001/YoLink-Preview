@@ -27,6 +27,7 @@ import type {
 } from './types'
 import { ago, agoMs, iso } from './time'
 import { buildAdminSeed } from './seed-admin'
+import { BOTS, BOT_RULES, BOT_SCRIPTS, DEFAULT_STAFF_PREFS, GROUP_EXTRAS, botMessagesFor, buildBotRuns, buildGroupLogs, groupDefaults } from './seed-groups'
 
 /** 确定性伪随机，保证每次重置出来的数据一样 */
 function mulberry32(seed: number) {
@@ -81,6 +82,8 @@ export const ENTERPRISE: Enterprise = {
   defaultWelcome: '您好，我是恒信财富的{{seat.name}}，很高兴为您服务。有任何配置或账户问题随时找我。',
   defaultChatGroupIds: ['cg_strategy', 'cg_community'],
   modules: { customers: true, invite: true, wallet: true, checkin: true, referral: true, broadcast: true, banner: true, content: true },
+  broadcastPerStaffPerDay: 3,
+  broadcastPerCustomerPerDay: 2,
 }
 
 export const ALL_CAPS: Role['caps'] = [
@@ -105,6 +108,8 @@ export const ALL_CAPS: Role['caps'] = [
   'manage_settings',
   'view_audit_logs',
   'export_data',
+  'manage_bots',
+  'manage_automation',
 ]
 
 export const ROLES: Role[] = [
@@ -119,12 +124,14 @@ export const ROLES: Role[] = [
   {
     id: 'role_lead',
     name: '运营主管',
-    desc: '看全部会话与客户，管群，查消息审计与实操员工，审提现',
+    desc: '看全部会话与客户，管群与群活跃助手，查消息审计与实操员工，审提现',
     builtin: false,
     caps: [
       'review_withdrawal',
       'mark_paid',
       'export_customers',
+      'manage_bots',
+      'manage_automation',
       'view_all_conversations',
       'view_all_customers',
       'create_invite',
@@ -137,7 +144,7 @@ export const ROLES: Role[] = [
   },
 ]
 
-export const STAFF: Staff[] = [
+const STAFF_BASE: Staff[] = [
   {
     id: 'st_admin',
     name: '周敏',
@@ -189,6 +196,9 @@ export const STAFF: Staff[] = [
     createdAt: ago(2),
   },
 ]
+
+/** 个人设置缺省值跟人走 */
+export const STAFF: Staff[] = STAFF_BASE.map((st) => ({ ...st, prefs: { ...DEFAULT_STAFF_PREFS } }))
 
 // ---------- 坐席 ----------
 
@@ -291,7 +301,7 @@ export const TAGS: Tag[] = [
 
 // ---------- 群与频道 ----------
 
-export const CHAT_GROUPS: ChatGroup[] = [
+const CHAT_GROUPS_BASE: Omit<ChatGroup, keyof ReturnType<typeof groupDefaults>>[] = [
   {
     id: 'cg_strategy',
     name: '每日策略',
@@ -332,6 +342,9 @@ export const CHAT_GROUPS: ChatGroup[] = [
     createdAt: ago(80),
   },
 ]
+
+/** 基础字段 + 管理字段（群内角色、设置、公告、群邀请链接） */
+export const CHAT_GROUPS: ChatGroup[] = CHAT_GROUPS_BASE.map((g) => ({ ...g, ...groupDefaults(), ...GROUP_EXTRAS[g.id] }))
 
 // ---------- 邀请组与邀请链接 ----------
 
@@ -383,6 +396,7 @@ export const INVITE_LINKS: InviteLink[] = [
     uses: 63,
     clicks: 412,
     status: 'active',
+    chatGroupIds: ['cg_vip'],
     createdAt: ago(14),
   },
   {
@@ -396,6 +410,7 @@ export const INVITE_LINKS: InviteLink[] = [
     uses: 28,
     clicks: 190,
     status: 'active',
+    chatGroupIds: [],
     createdAt: ago(30),
   },
   {
@@ -409,6 +424,7 @@ export const INVITE_LINKS: InviteLink[] = [
     uses: 9,
     clicks: 31,
     status: 'active',
+    chatGroupIds: [],
     createdAt: ago(35),
   },
   {
@@ -422,6 +438,7 @@ export const INVITE_LINKS: InviteLink[] = [
     uses: 22,
     clicks: 60,
     status: 'expired',
+    chatGroupIds: [],
     createdAt: ago(50),
   },
 ]
@@ -821,6 +838,11 @@ function buildGroupMessages(customers: Customer[], chatGroups: ChatGroup[]) {
     }
     convCommunity.lastMessageAt = iso(t)
   })
+  // 机器人（群活跃助手）已发出的发言混在社群消息里，客户看不出区别
+  messages.push(...botMessagesFor(convCommunity.id))
+  // 置顶：策略会报名那条
+  const pinned = messages.find((m) => m.convId === convCommunity.id && m.text.startsWith('10 月 12 日'))
+  if (pinned) community.pinnedMessageIds = [pinned.id]
   conversations.push(convCommunity)
 
   // VIP 群：安静一点
@@ -842,8 +864,8 @@ export const QUICK_REPLIES: QuickReply[] = [
   { id: 'qr_2', scope: 'enterprise', title: '入金时效', text: '跨境汇款一般 1 到 2 个工作日到账，到账后系统自动通知，我这边也会跟您确认。' },
   { id: 'qr_3', scope: 'enterprise', title: '合规声明', text: '温馨提示：以上内容仅为信息分享，不构成投资建议。投资有风险，请根据自身风险承受能力谨慎决策。' },
   { id: 'qr_4', scope: 'enterprise', title: '风险测评', text: '风险测评在 App"我的 → 风险测评"，大约 3 分钟。结果出来后我会结合您的情况给配置建议。' },
-  { id: 'qr_5', scope: 'personal', title: '约时间', text: '您看明天下午 3 点或 5 点，哪个时间方便？我们电话过一遍，20 分钟左右。' },
-  { id: 'qr_6', scope: 'personal', title: '赎回说明', text: '赎回随时可以提交，T+3 个工作日到账，不收赎回费。' },
+  { id: 'qr_5', scope: 'personal', staffId: 'st_lin', title: '约时间', text: '您看明天下午 3 点或 5 点，哪个时间方便？我们电话过一遍，20 分钟左右。' },
+  { id: 'qr_6', scope: 'personal', staffId: 'st_lin', title: '赎回说明', text: '赎回随时可以提交，T+3 个工作日到账，不收赎回费。' },
 ]
 
 export const KNOWLEDGE: KnowledgeItem[] = [
@@ -858,9 +880,9 @@ export const KNOWLEDGE: KnowledgeItem[] = [
 
 function buildBroadcasts(): Broadcast[] {
   return [
-    { id: sid('bc'), name: '本周市场观点', seatId: 'seat_lin', operatorId: 'st_lin', targetDesc: '头衔 = 私享会员', text: '各位会员好，本周观点已整理：美元短端仍有吸引力，港股科技反弹属修复，黄金维持区间配置。周五晚 8 点线上复盘，欢迎参加。', sentAt: ago(2, 3), sentCount: 9, readCount: 7 },
-    { id: sid('bc'), name: '策略会报名', seatId: 'seat_lin', operatorId: 'st_lin', targetDesc: '我的客户', text: '10 月 12 日"四季度全球配置展望"线下策略会开放报名，回复"报名"我帮您登记。', sentAt: ago(5, 1), sentCount: 22, readCount: 15 },
-    { id: sid('bc'), name: '开户资料提醒', seatId: 'seat_cs', operatorId: 'st_chen', targetDesc: '内部标签 = 观望中', text: '您的开户流程还差资料上传这一步，需要帮助的话在这里回复我即可。', sentAt: ago(9, 4), sentCount: 8, readCount: 5 },
+    { id: sid('bc'), name: '本周市场观点', seatId: 'seat_lin', operatorId: 'st_lin', targetKind: 'title', targetDesc: '头衔 = 私享会员', contentKind: 'text', status: 'done', skippedCount: 1, text: '各位会员好，本周观点已整理：美元短端仍有吸引力，港股科技反弹属修复，黄金维持区间配置。周五晚 8 点线上复盘，欢迎参加。', sentAt: ago(2, 3), sentCount: 9, readCount: 7 },
+    { id: sid('bc'), name: '策略会报名', seatId: 'seat_lin', operatorId: 'st_lin', targetKind: 'mine', targetDesc: '我的客户', contentKind: 'text', status: 'done', skippedCount: 3, text: '10 月 12 日"四季度全球配置展望"线下策略会开放报名，回复"报名"我帮您登记。', sentAt: ago(5, 1), sentCount: 22, readCount: 15 },
+    { id: sid('bc'), name: '开户资料提醒', seatId: 'seat_cs', operatorId: 'st_chen', targetKind: 'tag', targetDesc: '内部标签 = 观望中', contentKind: 'text', status: 'done', skippedCount: 0, text: '您的开户流程还差资料上传这一步，需要帮助的话在这里回复我即可。', sentAt: ago(9, 4), sentCount: 8, readCount: 5 },
   ]
 }
 
@@ -915,7 +937,7 @@ function buildAiEvents(convs: Conversation[]): AiEvent[] {
 export function buildSeed(): DemoState {
   seq = 0
   rand = mulberry32(SEED)
-  const chatGroups = CHAT_GROUPS.map((g) => ({ ...g, memberCustomerIds: [...g.memberCustomerIds] }))
+  const chatGroups = CHAT_GROUPS.map((g) => ({ ...g, memberCustomerIds: [...g.memberCustomerIds], pinnedMessageIds: [...g.pinnedMessageIds], restrictions: [...g.restrictions] }))
   const c = buildCustomers()
   const g = buildGroupMessages(c.customers, chatGroups)
   const conversations = [...c.conversations, ...g.conversations]
@@ -942,6 +964,12 @@ export function buildSeed(): DemoState {
     knowledge: KNOWLEDGE,
     aiEvents: buildAiEvents(conversations),
     ...buildAdminSeed({ customers: c.customers, conversations, messages }),
+    groupLogs: buildGroupLogs(),
+    bots: BOTS,
+    botScripts: BOT_SCRIPTS,
+    botRules: BOT_RULES,
+    botRuns: buildBotRuns(),
+    botsPausedAll: false,
     session: { adminStaffId: 'st_admin', workbenchStaffId: 'st_lin', workbenchSeatId: 'seat_lin', phoneCustomerId: null },
     seededAt: iso(Date.now()),
   }

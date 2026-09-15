@@ -7,43 +7,44 @@ import { Button } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, Table, Tabs } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
-import { MatrixTable, PresetDetailModal } from './PoliciesPage.parts'
+import { PresetDetailModal } from './PoliciesPage.parts'
+import { MatrixTab } from './PoliciesPage.matrix'
 import { NumbersTab } from './PoliciesPage.numbers'
 import { OverridesTab } from './PoliciesPage.overrides'
 
-type Tab = 'presets' | 'matrix' | 'numbers' | 'overrides' | 'changes'
+type Tab = 'matrix' | 'presets' | 'numbers' | 'overrides' | 'changes'
 
 const CHANGE_LABEL: Record<PolicyChange['kind'], { name: string; tone: 'blue' | 'green' | 'amber' | 'purple' }> = {
   preset: { name: '应用预设', tone: 'blue' },
   cap: { name: '修改能力', tone: 'green' },
   number: { name: '修改数值', tone: 'amber' },
-  override: { name: '用户覆盖', tone: 'purple' },
+  override: { name: '群级 / 用户级覆盖', tone: 'purple' },
 }
 
 export function PoliciesPage() {
   const s = useStore()
-  const [tab, setTab] = useState<Tab>('presets')
+  const [tab, setTab] = useState<Tab>('matrix')
   const active = s.policyPresets.find((p) => p.id === s.activePresetId)
   return (
     <div>
-      <PageHeader title="策略" desc={`策略决定客户与坐席在 App 里能做什么。预设只是批量填默认值，之后每一项仍可单独改。当前生效：${active?.name ?? '自定义'}`} />
+      <PageHeader title="策略与能力开关" desc={`客户与坐席在 App 里能做什么，全在这一页。预设只是批量填默认值，之后每一项仍可单独改。当前生效：${active?.name ?? '自定义'}`} />
       <Note>
-        裁决顺序：模块授权 → 角色硬边界（经营者只读、客户不进工作台、坐席不能直接登录）→ 策略矩阵（企业默认 → 群级覆盖 → 用户级覆盖）→ 员工角色能力与群内角色。
+        这里的每一行就是客户 App 与工作台里"能不能"的开关。改了，在线用户立即收到策略更新推送。裁决顺序：模块授权 → 角色硬边界 → 策略矩阵（企业默认 → 群级覆盖 → 用户级覆盖）→ 员工角色能力与群内角色。
       </Note>
       <Tabs
         className="mt-4 mb-4"
         value={tab}
         onChange={setTab}
         items={[
-          { key: 'presets', label: '预设列表', count: s.policyPresets.length },
           { key: 'matrix', label: '能力矩阵', count: s.policyItems.length },
+          { key: 'presets', label: '预设列表', count: s.policyPresets.length },
           { key: 'numbers', label: '数值型策略' },
-          { key: 'overrides', label: '用户级覆盖（P1）', count: s.policyOverrides.length },
+          { key: 'overrides', label: '群级 / 用户级覆盖（P1）', count: s.policyOverrides.length },
           { key: 'changes', label: '变更记录', count: s.policyChanges.length },
         ]}
       />
-      {tab === 'presets' && <PresetsTab />}
       {tab === 'matrix' && <MatrixTab />}
+      {tab === 'presets' && <PresetsTab />}
       {tab === 'numbers' && <NumbersTab />}
       {tab === 'overrides' && <OverridesTab />}
       {tab === 'changes' && <ChangesTab />}
@@ -75,9 +76,7 @@ function PresetsTab() {
 
   return (
     <>
-      <Note>
-        内置「客服预设」：客户不能加好友、搜索、互聊、看群成员、转发；坐席全部开放。「社交预设」：所有角色全部开放。复制后得到一份可删除的副本。
-      </Note>
+      <Note>内置「客服预设」：客户不能加好友、搜索、互聊、看群成员、建群建频道、@ 所有人、转发；坐席全部开放。「社交预设」：所有角色全部开放。复制后得到一份可删除的副本。应用后回到「能力矩阵」逐项微调。</Note>
       <Card className="mt-4" padded={false}>
         <Table
           rows={s.policyPresets}
@@ -124,26 +123,6 @@ function PresetsTab() {
         />
       </Card>
       {detail && <PresetDetailModal preset={detail} items={s.policyItems} onClose={() => setDetail(null)} />}
-    </>
-  )
-}
-
-function MatrixTab() {
-  const s = useStore()
-  const admin = s.session.adminStaffId!
-  return (
-    <>
-      <Note>修改后立即保存，在线用户收到策略更新推送；聊天层能力作用在坐席上（按 staff 取值），不在员工上。</Note>
-      <Card className="mt-4" title="能力矩阵（行 = 能力键，列 = 角色 × 端）" padded={false}>
-        <MatrixTable
-          items={s.policyItems}
-          matrix={s.policyMatrix}
-          onToggle={(key, col, value) => {
-            s.setPolicyCap(key, col, value, admin)
-            toast(`${key} 已${value ? '开启' : '关闭'}，已推送在线用户`)
-          }}
-        />
-      </Card>
     </>
   )
 }

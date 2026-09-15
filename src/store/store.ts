@@ -6,6 +6,8 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type {
   AuditType,
+  Broadcast,
+  BroadcastTargetKind,
   Capability,
   Conversation,
   Customer,
@@ -29,9 +31,14 @@ import { policyActions, type PolicyActions } from './actions/policy'
 import { contentActions, type ContentActions } from './actions/content'
 import { moduleActions, type ModuleActions } from './actions/modules'
 import { integrationActions, type IntegrationActions } from './actions/integrations'
+import { groupActions, type GroupActions } from './actions/groups'
+import { workbenchActions, type WorkbenchActions } from './actions/workbench'
+import { botActions, type BotActions } from './actions/bots'
+import { aExtraActions, type AExtraActions } from './actions/A-extra'
+import { dExtraActions, type DExtraActions } from './actions/D-extra'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
-export const STORAGE_KEY = 'yolink-demo-v2'
+export const STORAGE_KEY = 'yolink-demo-v3'
 
 const now = () => iso(Date.now())
 
@@ -50,6 +57,8 @@ export interface RegisterResult {
   error?: string
   customerId?: string
   addedSeatIds?: string[]
+  /** 注册时自动加入的群与频道 */
+  addedGroupIds?: string[]
 }
 
 export interface CoreActions {
@@ -72,8 +81,9 @@ export interface CoreActions {
   createTag: (name: string, color: string, source: Tag['source']) => Tag
   setNote: (customerId: string, note: string) => void
   updateSeatWelcome: (seatId: string, welcome: string) => void
-  sendBroadcast: (input: { name: string; seatId: string; operatorId: string; targetDesc: string; text: string; customerIds: string[] }) => void
-  createInviteLink: (input: { name: string; inviteGroupId: string; creatorStaffId: string; expiresAt: string | null; maxUses: number | null }) => InviteLink
+  /** 群发：返回实际发送数与因频控/拉黑/注销跳过数；频控超限返回 null（按钮应禁用） */
+  sendBroadcast: (input: { name: string; seatId: string; operatorId: string; targetKind: BroadcastTargetKind; targetDesc: string; contentKind?: 'text' | 'image'; text: string; customerIds: string[]; chatGroupId?: string; scheduledAt?: string | null }) => { sent: number; skipped: number } | null
+  createInviteLink: (input: { name: string; inviteGroupId: string; creatorStaffId: string; expiresAt: string | null; maxUses: number | null; chatGroupIds?: string[] }) => InviteLink
   revokeInviteLink: (id: string, byStaffId: string) => void
   // 管理后台
   createSeat: (input: Omit<Seat, 'id' | 'createdAt' | 'avatarText' | 'avatarColor'> & { avatarColor?: string }, byStaffId: string) => Seat
@@ -91,7 +101,7 @@ export interface CoreActions {
   updateTitle: (id: string, patch: Partial<Title>, byStaffId: string) => void
 }
 
-export type DemoActions = CoreActions & SettingsActions & PeopleActions & PolicyActions & ContentActions & ModuleActions & IntegrationActions
+export type DemoActions = CoreActions & SettingsActions & PeopleActions & PolicyActions & ContentActions & ModuleActions & IntegrationActions & GroupActions & WorkbenchActions & BotActions & AExtraActions & DExtraActions
 
 export type DemoStore = DemoState & DemoActions
 
@@ -177,11 +187,11 @@ export const useStore = create<DemoStore>()(
             isWelcome: true,
           })
         })
-        const joinGroupIds = Array.from(new Set([...s.enterprise.defaultChatGroupIds, ...group.chatGroupIds]))
+        const joinGroupIds = Array.from(new Set([...s.enterprise.defaultChatGroupIds, ...group.chatGroupIds, ...(link?.chatGroupIds ?? [])])).filter((gid) => s.chatGroups.some((g) => g.id === gid))
         const chatGroups = s.chatGroups.map((g) => (joinGroupIds.includes(g.id) ? { ...g, memberCustomerIds: [...g.memberCustomerIds, customer.id] } : g))
         const inviteLinks = link ? s.inviteLinks.map((l) => (l.id === link!.id ? { ...l, uses: l.uses + 1 } : l)) : s.inviteLinks
         const auditEntries = [
-          { id: newId('au'), at, actorStaffId: null, type: 'customer.register' as AuditType, detail: `客户「${customer.nickname}」通过${link ? `邀请链接「${link.name}」（${group.name}）` : `邀请组「${group.name}」`}注册，自动添加：${usable.map((id) => seatById[id].displayName).join('、')}${skipped.length ? `；跳过：${skipped.map((id) => seatById[id]?.displayName).join('、')}` : ''}` },
+          { id: newId('au'), at, actorStaffId: null, type: 'customer.register' as AuditType, detail: `客户「${customer.nickname}」通过${link ? `邀请链接「${link.name}」（${group.name}）` : `邀请组「${group.name}」`}注册，自动添加：${usable.map((id) => seatById[id].displayName).join('、')}${skipped.length ? `；跳过：${skipped.map((id) => seatById[id]?.displayName).join('、')}` : ''}${joinGroupIds.length ? `；自动入群：${joinGroupIds.map((gid) => s.chatGroups.find((g) => g.id === gid)?.name).join('、')}` : ''}` },
         ]
         set({
           customers: [customer, ...s.customers],
@@ -193,7 +203,7 @@ export const useStore = create<DemoStore>()(
           audit: [...auditEntries, ...s.audit],
           session: { ...s.session, phoneCustomerId: customer.id },
         })
-        return { ok: true, customerId: customer.id, addedSeatIds: usable }
+        return { ok: true, customerId: customer.id, addedSeatIds: usable, addedGroupIds: joinGroupIds }
       },
 
       customerSend: (convId, text) => {
@@ -278,31 +288,74 @@ export const useStore = create<DemoStore>()(
       sendBroadcast: (input) => {
         const s = get()
         const at = now()
+        const today = at.slice(0, 10)
         const seat = s.seats.find((x) => x.id === input.seatId)
-        const targets = input.customerIds.filter((cid) => {
-          const c = s.customers.find((x) => x.id === cid)
-          return c && !c.blockedSeatIds.includes(input.seatId)
-        })
+        // 频控一：每个实操员工每天任务数，跨其持有的坐席合并
+        const myToday = s.broadcasts.filter((b) => b.operatorId === input.operatorId && b.sentAt.slice(0, 10) === today).length
+        if (myToday >= s.enterprise.broadcastPerStaffPerDay) return null
         const newMsgs: Message[] = []
         const convs = s.conversations.map((c) => ({ ...c }))
-        targets.forEach((cid) => {
-          const conv = convs.find((c) => c.kind === 'dm' && c.customerId === cid && c.seatId === input.seatId)
-          if (!conv) return
-          conv.lastMessageAt = at
-          newMsgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: 'text', text: input.text, at })
-        })
+        let skipped = 0
+        if (input.targetKind === 'group' && input.chatGroupId) {
+          // 指定群：往该群发一条群消息，不是私发群成员
+          const conv = convs.find((c) => c.kind !== 'dm' && c.chatGroupId === input.chatGroupId)
+          if (conv) {
+            conv.lastMessageAt = at
+            newMsgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.contentKind ?? 'text', text: input.text, at })
+          }
+        } else {
+          // 频控二：每客户每天最多收到的群发条数，跨坐席、跨任务合并
+          const todayBroadcastConvs = new Set(s.broadcasts.filter((b) => b.sentAt.slice(0, 10) === today).map((b) => b.id))
+          void todayBroadcastConvs
+          input.customerIds.forEach((cid) => {
+            const c = s.customers.find((x) => x.id === cid)
+            if (!c || c.deletedAt || c.blacklistedAt || c.blockedSeatIds.includes(input.seatId)) {
+              skipped += 1
+              return
+            }
+            const conv = convs.find((x) => x.kind === 'dm' && x.customerId === cid && x.seatId === input.seatId)
+            if (!conv) {
+              skipped += 1
+              return
+            }
+            const receivedToday = s.messages.filter((m) => m.senderKind === 'seat' && m.at.slice(0, 10) === today && m.isBroadcast && s.conversations.find((x) => x.id === m.convId)?.customerId === cid).length
+            if (receivedToday >= s.enterprise.broadcastPerCustomerPerDay) {
+              skipped += 1
+              return
+            }
+            conv.lastMessageAt = at
+            newMsgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.contentKind ?? 'text', text: input.text, at, isBroadcast: true })
+          })
+        }
+        const record: Broadcast = {
+          id: newId('bc'),
+          name: input.name,
+          seatId: input.seatId,
+          operatorId: input.operatorId,
+          targetKind: input.targetKind,
+          targetDesc: input.targetDesc,
+          contentKind: input.contentKind ?? 'text',
+          text: input.text,
+          sentAt: at,
+          scheduledAt: input.scheduledAt ?? null,
+          status: input.scheduledAt ? 'scheduled' : 'done',
+          sentCount: input.scheduledAt ? 0 : newMsgs.length,
+          skippedCount: skipped,
+          readCount: 0,
+        }
         set({
-          messages: [...s.messages, ...newMsgs],
-          conversations: convs,
-          broadcasts: [{ id: newId('bc'), name: input.name, seatId: input.seatId, operatorId: input.operatorId, targetDesc: input.targetDesc, text: input.text, sentAt: at, sentCount: newMsgs.length, readCount: 0 }, ...s.broadcasts],
-          audit: [{ id: newId('au'), at, actorStaffId: input.operatorId, type: 'broadcast.send', detail: `以「${seat?.displayName}」身份群发「${input.name}」，目标：${input.targetDesc}，${newMsgs.length} 人` }, ...s.audit],
+          messages: input.scheduledAt ? s.messages : [...s.messages, ...newMsgs],
+          conversations: input.scheduledAt ? s.conversations : convs,
+          broadcasts: [record, ...s.broadcasts],
+          audit: [{ id: newId('au'), at, actorStaffId: input.operatorId, type: 'broadcast.send', detail: `以「${seat?.displayName}」身份群发「${input.name}」，目标：${input.targetDesc}，${input.scheduledAt ? `定时 ${input.scheduledAt.slice(0, 16).replace('T', ' ')}` : `${newMsgs.length} 人，跳过 ${skipped} 人`}`, ip: DEMO_IP }, ...s.audit],
         })
+        return { sent: newMsgs.length, skipped }
       },
 
       createInviteLink: (input) => {
         const s = get()
         const group = s.inviteGroups.find((g) => g.id === input.inviteGroupId)
-        const link: InviteLink = { id: newId('il'), name: input.name, inviteGroupId: input.inviteGroupId, code: newInviteCode(), creatorStaffId: input.creatorStaffId, expiresAt: input.expiresAt, maxUses: input.maxUses, uses: 0, clicks: 0, status: 'active', createdAt: now() }
+        const link: InviteLink = { id: newId('il'), name: input.name, inviteGroupId: input.inviteGroupId, code: newInviteCode(), creatorStaffId: input.creatorStaffId, expiresAt: input.expiresAt, maxUses: input.maxUses, uses: 0, clicks: 0, status: 'active', chatGroupIds: input.chatGroupIds ?? [], createdAt: now() }
         set({
           inviteLinks: [link, ...s.inviteLinks],
           audit: [{ id: newId('au'), at: now(), actorStaffId: input.creatorStaffId, type: 'invite_link.create', detail: `在「${group?.name}」下创建邀请链接「${input.name}」，码 ${link.code}` }, ...s.audit],
@@ -475,6 +528,11 @@ export const useStore = create<DemoStore>()(
       ...contentActions(set, get),
       ...moduleActions(set, get),
       ...integrationActions(set, get),
+      ...groupActions(set, get),
+      ...workbenchActions(set, get),
+      ...botActions(set, get),
+      ...aExtraActions(set, get),
+      ...dExtraActions(set, get),
     }),
     {
       name: STORAGE_KEY,

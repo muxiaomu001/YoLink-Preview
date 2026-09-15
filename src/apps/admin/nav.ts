@@ -101,7 +101,7 @@ export const ADMIN_NAV: NavGroup[] = [
   },
   {
     group: '策略',
-    items: [{ to: '/admin/policies', label: '策略', icon: KeyRound }],
+    items: [{ to: '/admin/policies', label: '策略与能力开关', icon: KeyRound }],
   },
   {
     group: '群与频道',

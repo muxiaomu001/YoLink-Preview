@@ -1,0 +1,127 @@
+/**
+ * 「我的」页：13 文档的功能清单；钱包 / 签到 / 邀请 / 注销等入口按模块 + 策略显示，被禁用的直接不显示。
+ */
+import { useState } from 'react'
+import { CalendarCheck, Wallet } from 'lucide-react'
+import { useStore } from '@/store/store'
+import { customerById } from '@/store/selectors'
+import { customerCan } from '@/store/policy'
+import { walletBalance } from '@/store/actions/modules'
+import { Avatar, TitleChip } from '@/ui/display'
+import { toast } from '@/ui/overlay'
+import { confirm } from '@/ui/confirm'
+import { Row, SectionLabel, TabTitle } from '../parts'
+import { AppearanceScreen, InfoScreen, NotificationScreen, ProfileScreen } from './MeSubScreens'
+
+type Sub = 'profile' | 'appearance' | 'notification' | 'privacy' | 'storage' | 'security' | 'language' | 'help' | 'about' | 'wallet' | 'referral' | null
+
+export function MeScreen({ customerId, onLoggedOut }: { customerId: string; onLoggedOut: () => void }) {
+  const s = useStore()
+  const c = customerById(s, customerId)!
+  const [sub, setSub] = useState<Sub>(null)
+  const titles = c.titleIds.map((id) => s.titles.find((t) => t.id === id && t.enabled)).filter((t) => !!t)
+  const can = (k: string) => customerCan(s, customerId, k)
+  const back = () => setSub(null)
+
+  if (sub === 'profile') return <ProfileScreen customerId={customerId} onBack={back} />
+  if (sub === 'appearance') return <AppearanceScreen customerId={customerId} onBack={back} />
+  if (sub === 'notification') return <NotificationScreen onBack={back} />
+  if (sub === 'privacy') return <InfoScreen title="隐私（P1）" onBack={back} rows={[{ label: '手机号可见', value: '我的好友', level: 'P1' }, { label: '最后上线时间', value: '所有人', level: 'P1' }, { label: '头像可见', value: '所有人', level: 'P1' }, { label: '谁可以拉我入群', value: '我的好友', level: 'P1' }]} />
+  if (sub === 'storage') return <InfoScreen title="数据与存储（P1）" onBack={back} rows={[{ label: '存储用量', value: '128 MB', level: 'P1' }, { label: '清理缓存', level: 'P1' }, { label: '自动下载媒体', value: 'Wi-Fi', level: 'P1' }]} />
+  if (sub === 'security') return <InfoScreen title="账号安全（P1）" onBack={back} rows={[{ label: '修改密码', level: 'P1' }, { label: '设备管理', value: `最多 ${s.policyNumbers.maxDevices} 台在线`, level: 'P1' }, { label: '两步验证', value: '未开启', level: 'P1' }]} note={c.mustChangePassword ? '员工重置过你的密码，首次登录需强制修改。' : `同时在线设备数上限来自数值型策略（${s.policyNumbers.maxDevices} 台）。`} />
+  if (sub === 'language') return <InfoScreen title="语言" onBack={back} rows={[{ label: '中文', value: '✓' }, { label: 'English' }]} />
+  if (sub === 'help') return <InfoScreen title="帮助与反馈" onBack={back} rows={[{ label: '帮助文档', value: s.enterprise.faqUrl }, { label: '意见反馈' }]} />
+  if (sub === 'about') return <InfoScreen title="关于" onBack={back} rows={[{ label: '版本号', value: '1.0.0（演示）' }, { label: '服务条款', value: s.enterprise.agreementUrl }, { label: '隐私政策', value: s.enterprise.privacyUrl }]} />
+  if (sub === 'wallet') return <WalletScreen customerId={customerId} onBack={back} />
+  if (sub === 'referral') return <InfoScreen title="邀请好友（P2）" onBack={back} rows={[{ label: '我的邀请码', value: c.accountId, level: 'P2' }, { label: '已邀请', value: `${c.inviteCount} 人`, level: 'P2' }, { label: '团队人数', value: `${c.teamCount} 人`, level: 'P2' }]} note="推荐奖励规则在管理后台「推荐奖励」配置。" />
+
+  const showWallet = s.enterprise.modules.wallet && can('wallet.view')
+  const showCheckin = s.enterprise.modules.checkin && can('checkin.sign')
+  const showReferral = s.enterprise.modules.referral && can('referral.invite')
+  const showDelete = can('account.delete')
+
+  const deleteAccount = async () => {
+    const ok = await confirm({ title: '注销账号？', body: '注销后数据保留但不再出现在工作台，需要重新注册才能使用。', okText: '注销', danger: true })
+    if (!ok) return
+    s.deleteCustomer(customerId, s.session.adminStaffId ?? 'customer_self')
+    toast('账号已注销')
+    onLoggedOut()
+  }
+
+  return (
+    <div className="flex h-full flex-col bg-zinc-50">
+      <div className="bg-white">
+        <TabTitle title="我的" />
+        <button type="button" onClick={() => setSub('profile')} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-zinc-50">
+          <Avatar text={c.nickname} size={56} />
+          <div className="min-w-0 flex-1">
+            <div className="text-[15px] font-medium text-zinc-900">{c.nickname}</div>
+            <div className="text-[11px] text-zinc-400">账号 {c.accountId}</div>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {titles.map((t) => (
+                <TitleChip key={t.id} title={t} size="xs" />
+              ))}
+            </div>
+          </div>
+          <span className="text-[11px] text-zinc-400">资料 ›</span>
+        </button>
+      </div>
+      <div className="thin-scroll flex-1 overflow-y-auto">
+        {(showWallet || showCheckin) && (
+          <div className="mx-4 mt-3 grid grid-cols-2 gap-2">
+            {showWallet && (
+              <button type="button" onClick={() => setSub('wallet')} className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left active:bg-zinc-50">
+                <div className="flex items-center gap-1 text-[10px] text-zinc-500">
+                  <Wallet size={12} /> 钱包 <span className="rounded bg-zinc-100 px-1 text-[9px]">P2</span>
+                </div>
+                <div className="mt-0.5 text-[15px] font-semibold text-zinc-900">{walletBalance(s.walletTxs, customerId)} 积分</div>
+              </button>
+            )}
+            {showCheckin && (
+              <button type="button" onClick={() => toast('签到成功，奖励已入账（演示）')} className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left active:bg-zinc-50">
+                <div className="flex items-center gap-1 text-[10px] text-zinc-500">
+                  <CalendarCheck size={12} /> 每日签到 <span className="rounded bg-zinc-100 px-1 text-[9px]">P2</span>
+                </div>
+                <div className="mt-0.5 text-[13px] font-medium text-brand-700">点击签到</div>
+              </button>
+            )}
+          </div>
+        )}
+        <SectionLabel>设置</SectionLabel>
+        <div className="bg-white">
+          <Row label="外观" onClick={() => setSub('appearance')} />
+          <Row label="通知" onClick={() => setSub('notification')} />
+          <Row label="隐私" level="P1" onClick={() => setSub('privacy')} />
+          <Row label="数据与存储" level="P1" onClick={() => setSub('storage')} />
+          <Row label="账号安全" level="P1" onClick={() => setSub('security')} />
+          <Row label="语言" value="中文" onClick={() => setSub('language')} />
+          <Row label="帮助与反馈" onClick={() => setSub('help')} />
+          <Row label="关于" value="1.0.0" onClick={() => setSub('about')} />
+          {showReferral && <Row label="邀请好友" level="P2" onClick={() => setSub('referral')} />}
+          {showDelete && <Row label="注销账号" level="P1" danger onClick={() => void deleteAccount()} />}
+        </div>
+        <p className="px-4 py-3 text-[10px] leading-relaxed text-zinc-400">看不到的入口（钱包、签到、邀请好友、注销账号）是模块或策略关了；右侧演示控制面板列出了原因。</p>
+      </div>
+    </div>
+  )
+}
+
+function WalletScreen({ customerId, onBack }: { customerId: string; onBack: () => void }) {
+  const s = useStore()
+  const canWithdraw = customerCan(s, customerId, 'wallet.withdraw')
+  const canBind = customerCan(s, customerId, 'wallet.bind_account')
+  const txs = s.walletTxs.filter((t) => t.customerId === customerId).slice(0, 8)
+  return (
+    <InfoScreen
+      title="钱包（P2）"
+      onBack={onBack}
+      rows={[
+        { label: '积分余额', value: `${walletBalance(s.walletTxs, customerId)}`, level: 'P2' },
+        ...(canWithdraw ? [{ label: '申请提现', level: 'P2' as const }] : []),
+        ...(canBind ? [{ label: '绑定收款账户', level: 'P2' as const }] : []),
+        ...txs.map((t) => ({ label: t.note || t.type, value: `${t.amount > 0 ? '+' : ''}${t.amount}` })),
+      ]}
+      note={`提现入口按 wallet.withdraw（${canWithdraw ? '开' : '关'}）、绑定账户按 wallet.bind_account（${canBind ? '开' : '关'}）显示。`}
+    />
+  )
+}
