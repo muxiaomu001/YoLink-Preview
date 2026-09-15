@@ -14,7 +14,7 @@ export interface ContentActions {
   /** 导出只记审计，演示里由页面自己生成 CSV 下载 */
   recordExport: (what: string, byStaffId: string) => void
   setGroupOfficial: (id: string, official: boolean, byStaffId: string) => void
-  updateChatGroup: (id: string, patch: Partial<Pick<ChatGroup, 'name' | 'desc' | 'requiredTitleId' | 'maxMembers' | 'kind'>>, byStaffId: string) => void
+  updateChatGroup: (id: string, patch: Partial<Pick<ChatGroup, 'name' | 'desc' | 'requiredTitleId' | 'maxMembers' | 'kind' | 'welcomeText'>>, byStaffId: string) => void
   setDefaultChatGroups: (ids: string[], byStaffId: string) => void
   removeGroupMember: (groupId: string, customerId: string, byStaffId: string) => void
   updateTag: (id: string, patch: Partial<Pick<Tag, 'name' | 'color'>>, byStaffId: string) => void

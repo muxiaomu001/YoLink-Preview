@@ -2,6 +2,7 @@
  * 群基础信息：头像、名称 / 简介行内编辑（can_change_info）、成员数（点击跳到成员列表）、
  * 创建者、创建时间、群类型、官方标记；「更多」弹窗改类型 / 入群头衔 / 人数上限。
  */
+import { GroupWelcome } from './GroupWelcome'
 import { useState } from 'react'
 import { Pencil } from 'lucide-react'
 import type { ChatGroupKind } from '@/domain/types'
@@ -93,6 +94,7 @@ export function GroupBasic({ group: g, actor, perm, compact, onJumpMembers }: Gr
           </Button>
         )}
       </div>
+      <GroupWelcome key={g.id} group={g} actor={actor} perm={perm} compact={compact}/>
       {more && <MoreModal group={g} actor={actor} onClose={() => setMore(false)} />}
     </div>
   )

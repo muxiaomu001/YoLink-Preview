@@ -8,6 +8,7 @@ import { useStore } from '@/store/store'
 import { customerById, messagesOf, seatById, staffById } from '@/store/selectors'
 import { Pill } from '@/ui/display'
 import { Modal } from '@/ui/overlay'
+import { PlayableMedia } from '@/ui/PlayableMedia'
 import { FileCard, ImageThumb } from '@/ui/media'
 import { convName, fmtDateTimeSec, messageText } from './audit-helpers'
 
@@ -69,6 +70,7 @@ export function MessageContextModal({ messageId, onClose }: { messageId: string;
                 {m.senderKind === 'system' && <Pill>系统</Pill>}
                 {isTarget && <Pill tone="amber">目标消息</Pill>}
               </div>
+              {(m.deletedAt||m.recalledAt)&&<Pill tone="red">已从普通聊天删除，审计保留</Pill>}
               {m.editedAt && <Pill tone="blue">已编辑</Pill>}
               {!!m.editHistory?.length && <details className="my-2 rounded border border-zinc-200 bg-white p-2 text-xs">
                 <summary className="cursor-pointer text-brand-700">查看 {m.editHistory.length} 次修改记录</summary>
@@ -77,9 +79,9 @@ export function MessageContextModal({ messageId, onClose }: { messageId: string;
                   <div className="mt-1 whitespace-pre-wrap text-zinc-800">修改前：{version.text}</div>
                 </div>)}
               </details>}
-              {m.media && !m.deletedAt && !m.recalledAt && (m.kind === 'image' || m.kind === 'file') ? (
+              {m.media ? (
                 <div className="mt-1 space-y-1">
-                  {m.kind === 'image' ? <ImageThumb media={m.media} maxWidth={200} /> : <FileCard media={m.media} />}
+                  {m.kind==='video'||m.kind==='voice'?<PlayableMedia kind={m.kind} media={m.media}/>:m.kind === 'image' ? <ImageThumb media={m.media} maxWidth={200} /> : <FileCard media={m.media} />}
                   {m.text && <div className="whitespace-pre-wrap break-words text-zinc-800">{m.text}</div>}
                 </div>
               ) : (

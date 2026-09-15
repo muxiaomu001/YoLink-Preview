@@ -1,9 +1,9 @@
-import type { DemoState, Message } from './types'
-import { seatCan, seatGroupPerm } from '@/store/policy'
+import type { ChatActor, DemoState, Message } from './types'
+import { customerCan, customerCanSpeakIn, groupPerm, seatCan, seatGroupPerm } from '@/store/policy'
 
 /** 普通聊天不露出坐席撤回的内容，也不留撤回提示；审计保留完整对象。 */
 export function customerVisibleMessage(m: Message) {
-  return !(m.senderKind === 'seat' && m.recalledAt)
+  return !m.recalledAt && !m.deletedAt && (!m.delivery || m.delivery === 'sent')
 }
 
 /** 0 为不限时间；演示初值用于体验，正式默认值待产品确认。 */
@@ -52,4 +52,72 @@ export function mentionsIn(s: DemoState, convId: string, text: string, selected?
     mentionCustomerIds: s.customers.filter((x) => customers.includes(x.id) && !x.deletedAt && has(x.nickname) && (selected?.mentionCustomerIds.includes(x.id) || s.customers.filter((p) => customers.includes(p.id) && p.nickname === x.nickname).length === 1)).map((x) => x.id),
     mentionAll: !!g && has('所有人'),
   }
+}
+
+
+export const actorKey = (actor: ChatActor) => `${actor.kind}:${actor.id}`
+export const draftKey = (actor: ChatActor, convId: string) => `${actor.kind === 'seat' ? actor.staffId + ':' : ''}${actorKey(actor)}:${convId}`
+
+export function actorCanView(s: DemoState, convId: string, actor: ChatActor) {
+  if (actor.kind === 'seat') return seatConversationAllowed(s, convId, actor.id, actor.staffId ?? '')
+  const c = s.customers.find((x) => x.id === actor.id && !x.deletedAt)
+  const conv = s.conversations.find((x) => x.id === convId)
+  return !!c && !!conv && (conv.kind === 'dm' ? conv.customerId === actor.id : s.chatGroups.some((g) => g.id === conv.chatGroupId && g.memberCustomerIds.includes(actor.id)))
+}
+
+export function messageVisibleFor(s: DemoState, m: Message, actor: ChatActor) {
+  const conv = s.conversations.find((c) => c.id === m.convId)
+  if(m.recipientCustomerId && (actor.kind!=='customer'||actor.id!==m.recipientCustomerId))return false
+  if (!conv || !actorCanView(s, conv.id, actor) || m.recalledAt || m.deletedAt) return false
+  if (m.hiddenFor?.includes(actorKey(actor)) || m.at <= (conv.clearedThroughByViewer?.[actorKey(actor)] ?? '')) return false
+  if (m.delivery && m.delivery !== 'sent') return m.senderKind === actor.kind && m.senderId === actor.id && (actor.kind !== 'seat' || m.operatorId === actor.staffId)
+  return true
+}
+
+export function canManageDelete(s: DemoState, m: Message, actor: ChatActor) {
+  if (!actorCanView(s, m.convId, actor)) return false
+  const conv = s.conversations.find((c) => c.id === m.convId)!
+  const group = s.chatGroups.find((g) => g.id === conv.chatGroupId)
+  if (actor.kind === 'seat') {
+    const staff = s.staff.find((x) => x.id === actor.staffId)
+    const caps = s.roles.find((x) => x.id === staff?.roleId)?.caps ?? []
+    if (staff?.roleId === 'role_admin' || caps.includes('manage_messages')) return true
+    return !!group && seatGroupPerm(s, group, actor.id, actor.staffId ?? null, 'can_delete_messages')
+  }
+  return !!group && groupPerm(group, 'customer', actor.id, 'can_delete_messages')
+}
+
+export function deleteAllBlock(s: DemoState, m: Message, actor: ChatActor) {
+  if (!messageVisibleFor(s, m, actor)) return '消息已不可用或无权访问'
+  if (m.delivery && m.delivery !== 'sent') return '这条消息尚未发出，只需从本方删除'
+  if (canManageDelete(s, m, actor)) return undefined
+  if (m.senderKind !== actor.kind || m.senderId !== actor.id) return '没有管理删除他人消息的权限'
+  const cap = actor.kind === 'seat' ? seatCan(s, actor.id, 'dm.recall') : customerCan(s, actor.id, 'dm.recall', s.conversations.find((c) => c.id === m.convId)?.chatGroupId)
+  if (!cap) return '当前策略未开放为所有人删除'
+  const limit = messageLimitSeconds(s, actor.kind, 'recall')
+  return limit > 0 && Date.now() - new Date(m.at).getTime() > limit * 1000 ? '已超过后台设置的删除时限' : undefined
+}
+
+export function sendFailure(s: DemoState, convId: string, actor: ChatActor, media = false) {
+  if (!actorCanView(s, convId, actor)) return '当前身份已无权访问此会话'
+  if (actor.kind === 'seat') return seatMessageSendAllowed(s, convId, actor.id, actor.staffId ?? '', media) ? undefined : '当前身份或策略不允许发送'
+  const conv = s.conversations.find((c) => c.id === convId)!
+  const customer = s.customers.find((c) => c.id === actor.id)!
+  if (customer.blacklistedAt) return '你已被限制发送消息'
+  if (conv.kind === 'dm') {
+    if (customer.blockedSeatIds.includes(conv.seatId!)) return '请先解除对该官方联系人的拉黑'
+    if (media && !customerCan(s, actor.id, 'dm.send_media')) return '当前不允许发送附件'
+  } else {
+    const group = s.chatGroups.find((g) => g.id === conv.chatGroupId)!
+    const result = customerCanSpeakIn(s, group, actor.id, new Date().toISOString())
+    if (!result.ok) return result.reason
+    if (media && !customerCan(s, actor.id, 'group.send_media', group.id)) return '当前不允许发送附件'
+  }
+  return undefined
+}
+
+export function channelOf(s: DemoState, m: Message) {
+  if (m.senderKind !== 'seat') return undefined
+  const conv = s.conversations.find((c) => c.id === m.convId)
+  return s.chatGroups.find((g) => g.id === (m.channelId ?? (conv?.kind === 'channel' ? conv.chatGroupId : undefined)))
 }

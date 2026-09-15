@@ -3,6 +3,7 @@
  * 建群、群设置、公告、置顶、成员增删、管理员任免、禁言封禁、群邀请链接、批量拉人。
  * 所有动作记管理员日志（groupLogs，48 小时）与审计。
  */
+import { groupWelcomeMessages } from '@/domain/groupWelcome'
 import type { ChatGroup, ChatGroupKind, Conversation, GroupAdminPerm, GroupInviteLink, GroupLog, GroupMemberKind, GroupSettings, Message } from '@/domain/types'
 import { newId } from '@/domain/ids'
 import { groupDefaults } from '@/domain/seed-groups'
@@ -174,7 +175,7 @@ export function groupActions(set: Set, get: Get): GroupActions {
       const sys: Message[] = conv ? [{ id: newId('msg'), convId: conv.id, senderKind: 'system', senderId: '', kind: 'system', text: `${names.slice(0, 3).join('、')}${names.length > 3 ? ` 等 ${names.length} 人` : ''} 加入了群聊`, at }] : []
       set({
         chatGroups: patchGroup(groupId, (x) => ({ ...x, memberCustomerIds: [...x.memberCustomerIds, ...toAdd] }))(s.chatGroups),
-        messages: [...s.messages, ...sys],
+        messages: [...s.messages, ...sys, ...(conv?groupWelcomeMessages(g,conv.id,s.customers.filter((c)=>toAdd.includes(c.id)),at):[])],
         groupLogs: [log(groupId, by, 'member', `拉入 ${toAdd.length} 位客户${skipped.length ? `，跳过 ${skipped.length} 位（已在群、已满、被封禁或不满足头衔条件）` : ''}`), ...s.groupLogs],
         audit: withAudit(s.audit, 'group.member', `往群「${g.name}」拉入 ${toAdd.length} 位客户`, by.staffId),
       })

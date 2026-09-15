@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { UserRound, Zap } from 'lucide-react'
+import { confirm } from '@/ui/confirm'
 import { seatGroupPerm } from '@/store/policy'
 import { applyView, conversationsForSeat, type WorkbenchView } from '@/store/selectors'
 import { Empty } from '@/ui/display'
@@ -38,7 +39,6 @@ export function ChatPage() {
   const [view, setView] = useState<WorkbenchView>('waiting')
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   // 本地删除的会话：只藏起来，不删服务端消息；有新消息时再出现
-  const [hidden, setHidden] = useState<Record<string, string>>({})
   const [menu, setMenu] = useState<{ x: number; y: number; convId: string } | null>(null)
   const searchRef = useRef<HTMLDivElement>(null)
   const chatRef = useRef<ChatAreaHandle>(null)
@@ -50,11 +50,11 @@ export function ChatPage() {
   const [rightOpen, setRightOpen] = useLocalPref('chat.rightOpen', true)
   const [rightTab, setRightTab] = useLocalPref<RightTab>('chat.rightTab', 'profile')
 
-  const rows = useMemo(() => (seat ? conversationsForSeat(s, seat.id) : []), [s, seat])
+  const rows = useMemo(() => (seat ? conversationsForSeat(s, seat.id).filter((r)=>!r.conv.hiddenAtByViewer?.[`seat:${seat.id}`]||(r.last?.at??'')>r.conv.hiddenAtByViewer[`seat:${seat.id}`]) : []), [s, seat])
   const counts = useMemo(() => Object.fromEntries(VIEWS.map((v) => [v.key, applyView(rows, v.key).length])), [rows])
   const visible = useMemo(
-    () => applyFilters(applyView(rows, view), s, filters, idleDays).filter((r) => !hidden[r.conv.id] || r.conv.lastMessageAt > hidden[r.conv.id]),
-    [rows, view, idleDays, s, filters, hidden],
+    () => applyFilters(applyView(rows, view), s, filters, idleDays),
+    [rows, view, idleDays, s, filters],
   )
   const current = rows.find((r) => r.conv.id === convId)
   const menuRow = menu ? rows.find((r) => r.conv.id === menu.convId) : undefined
@@ -152,7 +152,7 @@ export function ChatPage() {
 
       {/* 中：聊天区 */}
       <section className="flex min-w-0 flex-1 flex-col bg-zinc-50">
-        {current ? <ChatArea key={current.conv.id} ref={chatRef} row={current} seat={seat} rightOpen={rightOpen} onToggleRight={toggleRight} onGroupInfo={showGroupInfo} /> : <Empty className="h-full" text="选择一条会话" />}
+        {current ? <ChatArea key={`${staff.id}:${seat.id}:${current.conv.id}`} ref={chatRef} row={current} seat={seat} rightOpen={rightOpen} onToggleRight={toggleRight} onGroupInfo={showGroupInfo} /> : <Empty className="h-full" text="选择一条会话" />}
       </section>
 
       {/* 右：资料 / 话术两个页签（可收起） */}
@@ -203,8 +203,9 @@ export function ChatPage() {
           row={menuRow}
           seat={seat}
           onClose={closeMenu}
+          onClearChat={async()=>{const ok=await confirm({title:'清空聊天？',body:`仅清空「${seat.displayName}」的可见历史，该坐席的其他设备与接手者同样生效；其他参与者不受影响，联系人和群关系保留。`,okText:'清空',danger:true});if(ok)s.clearChatFor(menuRow.conv.id,{kind:'seat',id:seat.id,staffId:staff.id})}}
           onDeleteLocal={() => {
-            setHidden((h) => ({ ...h, [menuRow.conv.id]: menuRow.conv.lastMessageAt }))
+            s.hideChatFor(menuRow.conv.id,{kind:'seat',id:seat.id,staffId:staff.id})
             if (menuRow.conv.id === convId) nav('/workbench/chat', { replace: true })
           }}
         />

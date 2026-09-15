@@ -27,6 +27,7 @@ const NUMBER_LABEL: Record<keyof PolicyNumbers, string> = {
   groupMaxMembers: '单群上限',
   slowModeSeconds: '发言限流默认间隔',
   retentionDays: '消息保留天数',
+  fileMaxMb: '文件大小上限',
   imageMaxMb: '图片最大大小',
   videoMaxMb: '视频最大大小',
   voiceMaxSeconds: '语音最大时长',

@@ -89,6 +89,7 @@ export const ENTERPRISE: Enterprise = {
 }
 
 export const ALL_CAPS: Role['caps'] = [
+  'manage_messages',
   'view_all_conversations',
   'view_all_customers',
   'create_invite',

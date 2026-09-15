@@ -22,6 +22,7 @@ import type {
   Tag,
   Title,
 } from '@/domain/types'
+import { groupWelcomeMessages } from '@/domain/groupWelcome'
 import { buildSeed } from '@/domain/seed'
 import { newId, newInviteCode } from '@/domain/ids'
 import { iso } from '@/domain/time'
@@ -33,6 +34,7 @@ import { contentActions, type ContentActions } from './actions/content'
 import { moduleActions, type ModuleActions } from './actions/modules'
 import { integrationActions, type IntegrationActions } from './actions/integrations'
 import { groupActions, type GroupActions } from './actions/groups'
+import { chatExperienceActions, type ChatExperienceActions } from './actions/chatExperience'
 import { workbenchActions, type WorkbenchActions } from './actions/workbench'
 import { botActions, type BotActions } from './actions/bots'
 import { aExtraActions, type AExtraActions } from './actions/A-extra'
@@ -103,7 +105,7 @@ export interface CoreActions {
   updateTitle: (id: string, patch: Partial<Title>, byStaffId: string) => void
 }
 
-export type DemoActions = CoreActions & SettingsActions & PeopleActions & PolicyActions & ContentActions & ModuleActions & IntegrationActions & GroupActions & WorkbenchActions & BotActions & AExtraActions & DExtraActions & QuickReplyActions
+export type DemoActions = ChatExperienceActions & CoreActions & SettingsActions & PeopleActions & PolicyActions & ContentActions & ModuleActions & IntegrationActions & GroupActions & WorkbenchActions & BotActions & AExtraActions & DExtraActions & QuickReplyActions
 
 export type DemoStore = DemoState & DemoActions
 
@@ -192,6 +194,7 @@ export const useStore = create<DemoStore>()(
         })
         const joinGroupIds = Array.from(new Set([...s.enterprise.defaultChatGroupIds, ...group.chatGroupIds, ...(link?.chatGroupIds ?? [])])).filter((gid) => s.chatGroups.some((g) => g.id === gid))
         const chatGroups = s.chatGroups.map((g) => (joinGroupIds.includes(g.id) ? { ...g, memberCustomerIds: [...g.memberCustomerIds, customer.id] } : g))
+        for(const gid of joinGroupIds){const g=s.chatGroups.find((x)=>x.id===gid),conv=s.conversations.find((x)=>x.chatGroupId===gid);if(g&&conv)messages.push(...groupWelcomeMessages(g,conv.id,[customer],at))}
         const inviteLinks = link ? s.inviteLinks.map((l) => (l.id === link!.id ? { ...l, uses: l.uses + 1 } : l)) : s.inviteLinks
         const auditEntries = [
           { id: newId('au'), at, actorStaffId: null, type: 'customer.register' as AuditType, detail: `客户「${customer.nickname}」通过${link ? `邀请链接「${link.name}」（${group.name}）` : `邀请组「${group.name}」`}注册，自动添加：${usable.map((id) => seatById[id].displayName).join('、')}${skipped.length ? `；跳过：${skipped.map((id) => seatById[id]?.displayName).join('、')}` : ''}${joinGroupIds.length ? `；自动入群：${joinGroupIds.map((gid) => s.chatGroups.find((g) => g.id === gid)?.name).join('、')}` : ''}` },
@@ -535,6 +538,7 @@ export const useStore = create<DemoStore>()(
       ...integrationActions(set, get),
       ...groupActions(set, get),
       ...workbenchActions(set, get),
+      ...chatExperienceActions(set, get),
       ...botActions(set, get),
       ...aExtraActions(set, get),
       ...dExtraActions(set, get),
@@ -548,8 +552,11 @@ export const useStore = create<DemoStore>()(
         return {
           ...current,
           ...saved,
+          roles: (saved.roles??current.roles).map((role)=>role.id==='role_admin'?{...role,caps:[...role.caps.filter((c)=>c!=='manage_messages'),'manage_messages' as const]}:role),
+          chatRulesVersion: 1,
+          policyMatrix: saved.chatRulesVersion ? (saved.policyMatrix ?? current.policyMatrix) : { ...(saved.policyMatrix ?? current.policyMatrix), 'dm.recall': { staff: (saved.policyMatrix ?? current.policyMatrix)['dm.recall']?.staff ?? true, customer: false } },
           policyNumbers: { ...current.policyNumbers, ...saved.policyNumbers },
-          policyItems: (saved.policyItems ?? current.policyItems).map((item) => item.key === 'dm.edit' ? { ...item, level: 'P0' as const } : item),
+          policyItems: (saved.policyItems ?? current.policyItems).map((item) => item.key === 'dm.edit' ? { ...item, level: 'P0' as const } : item.key === 'dm.recall' ? { ...item, label: '为所有人删除自己的消息', desc: '按客户／坐席独立开关；时限见数值型策略' } : item),
         }
       },
       storage: createJSONStorage(() => localStorage),

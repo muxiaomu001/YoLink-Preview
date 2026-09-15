@@ -90,7 +90,7 @@ export const POLICY_ITEMS: PolicyItem[] = [
   { key: 'dm.create_with_friend', label: '与好友发起私聊', group: '私聊', desc: '客服预设下客户的好友只有官方坐席', level: 'P0' },
   { key: 'dm.create_with_stranger', label: '与非好友发起私聊', group: '私聊', desc: '不加好友直接私聊', level: 'P0' },
   { key: 'dm.send_media', label: '私聊发送媒体', group: '私聊', desc: '图片、视频、语音', level: 'P0' },
-  { key: 'dm.recall', label: '撤回自己的消息', group: '私聊', desc: '时限见数值型策略', level: 'P0' },
+  { key: 'dm.recall', label: '为所有人删除自己的消息', group: '私聊', desc: '时限见数值型策略', level: 'P0' },
   { key: 'dm.edit', label: '编辑自己的消息', group: '私聊', desc: '时限见数值型策略', level: 'P0' },
   { key: 'dm.forward', label: '转发私聊消息', group: '私聊', desc: '转发到其他会话', level: 'P0' },
   // 群与频道
@@ -128,6 +128,7 @@ export const POLICY_ITEMS: PolicyItem[] = [
 
 /** 客服预设下客户关闭的键：其余默认开 */
 const CS_CUSTOMER_OFF = [
+  'dm.recall',
   'friend.add',
   'friend.accept',
   'friend.search_user',
@@ -187,6 +188,7 @@ export const POLICY_NUMBERS: PolicyNumbers = {
   groupMaxMembers: 10000,
   slowModeSeconds: 0,
   retentionDays: 0,
+  fileMaxMb: 20,
   imageMaxMb: 10,
   videoMaxMb: 100,
   voiceMaxSeconds: 60,

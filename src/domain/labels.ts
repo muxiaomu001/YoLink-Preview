@@ -101,6 +101,7 @@ export const MODULE_LABEL: Record<ModuleKey, { name: string; desc: string; level
 }
 
 export interface CapabilityMeta {
+  label?: string
   key: Capability
   cat: string
   desc: string
@@ -109,6 +110,7 @@ export interface CapabilityMeta {
 
 /** 员工角色的权限清单，顺序与 PRD 05 一致 */
 export const CAPABILITIES: CapabilityMeta[] = [
+  { key: 'manage_messages', label: '管理删除消息', cat: '工作台', desc: '管理删除消息：在获授权会话内为所有人删除，不受作者时限限制', level: 'P0' },
   { cat: '会话访问', key: 'view_all_conversations', desc: '查看全部会话；关闭时仅看本人持有坐席的会话', level: 'P0' },
   { cat: '工作台', key: 'view_all_customers', desc: '查看全部客户；关闭时仅看本人持有坐席主归属的客户', level: 'P0' },
   { cat: '工作台', key: 'create_invite', desc: '生成邀请链接', level: 'P0' },

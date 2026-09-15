@@ -211,7 +211,7 @@ function RoleEditModal({ role, onClose }: { role?: Role; onClose: () => void }) 
                         onChange={(v) => toggle(c.key, v)}
                         label={
                           <span className="text-xs">
-                            <span className="font-mono text-zinc-800">{c.key}</span>
+                            <span className="font-mono text-zinc-800">{c.label??c.key}</span>
                             {c.level !== 'P0' && <Pill className="ml-1">{c.level}</Pill>}
                             <span className="block text-[11px] text-zinc-500">{c.desc}</span>
                           </span>

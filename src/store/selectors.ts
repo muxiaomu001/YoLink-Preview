@@ -3,7 +3,7 @@
  * 全部是纯函数，输入是 DemoState，方便页面和测试复用。
  */
 import type { Conversation, Customer, DemoState, Message, QuickReply, QuickReplyCategory, Seat, Staff } from '@/domain/types'
-import { customerVisibleMessage } from '@/domain/messageRules'
+import { messageVisibleFor } from '@/domain/messageRules'
 import { daysSince } from '@/domain/time'
 import { senderName } from './policy'
 
@@ -50,7 +50,7 @@ export function waitingSince(s: DemoState, conv: Conversation): string | null {
 
 /** 坐席视角的未读：坐席上次读到之后（或最后一条坐席消息之后）客户与机器人发的条数；手动标未读算 1 */
 export function unreadForSeat(s: DemoState, conv: Conversation, seatId?: string): number {
-  const list = messagesOf(s, conv.id)
+  const list = messagesOf(s, conv.id).filter((m) => !seatId || messageVisibleFor(s,m,{kind:'seat',id:seatId,staffId:s.seats.find((x)=>x.id===seatId)?.operatorStaffId??undefined}))
   const readAt = seatId ? conv.readAtBySeat?.[seatId] : undefined
   let n = 0
   for (let i = list.length - 1; i >= 0; i -= 1) {
@@ -87,7 +87,9 @@ export function conversationsForSeat(s: DemoState, seatId: string): ConvRow[] {
   return s.conversations
     .filter((c) => (c.kind === 'dm' ? c.seatId === seatId : groupIds.includes(c.chatGroupId!)))
     .map((conv) => {
-      const last = lastMessage(s, conv.id)
+      const actor = { kind: 'seat' as const, id: seatId, staffId: s.seats.find((x) => x.id === seatId)?.operatorStaffId ?? undefined }
+      const visibleMessages = messagesOf(s,conv.id).filter((m)=>messageVisibleFor(s,m,actor))
+      const last = visibleMessages.at(-1)
       if (conv.kind === 'dm') {
         const customer = customerById(s, conv.customerId)
         return {
@@ -97,7 +99,7 @@ export function conversationsForSeat(s: DemoState, seatId: string): ConvRow[] {
           customer,
           last,
           unread: unreadForSeat(s, conv, seatId),
-          waitingSince: waitingSince(s, conv),
+          waitingSince: last?.senderKind === 'customer' ? last.at : null,
           mentioned: false,
           idleDays: daysSince(conv.lastMessageAt),
           pinned: !!conv.pinnedBySeatIds?.includes(seatId),
@@ -105,7 +107,7 @@ export function conversationsForSeat(s: DemoState, seatId: string): ConvRow[] {
         }
       }
       const g = s.chatGroups.find((x) => x.id === conv.chatGroupId)
-      const list = messagesOf(s, conv.id)
+      const list = visibleMessages
       const mentioned = list.some((m) => !m.recalledAt && !m.deletedAt && (m.mentionSeatIds?.includes(seatId) || m.mentionAll) && m.senderId !== seatId && m.at > (conv.readAtBySeat?.[seatId] ?? ''))
       return {
         conv,
@@ -121,7 +123,7 @@ export function conversationsForSeat(s: DemoState, seatId: string): ConvRow[] {
       }
     })
     // 置顶在前，其余按最后消息时间
-    .sort((a, b) => (a.pinned !== b.pinned ? (a.pinned ? -1 : 1) : b.conv.lastMessageAt.localeCompare(a.conv.lastMessageAt)))
+    .sort((a, b) => (a.pinned !== b.pinned ? (a.pinned ? -1 : 1) : (b.last?.at??b.conv.lastMessageAt).localeCompare(a.last?.at??a.conv.lastMessageAt)))
 }
 
 /** 三个视图：全部 / 待我回复（按等待时长）/ 未读。「长期未跟进」是筛选条件，见 isIdle */
@@ -180,7 +182,7 @@ export function conversationsForCustomer(s: DemoState, customerId: string) {
   return s.conversations
     .filter((conv) => (conv.kind === 'dm' ? conv.customerId === customerId : groupIds.includes(conv.chatGroupId!)))
     .map((conv) => {
-      const last = messagesOf(s, conv.id).filter(customerVisibleMessage).at(-1)
+      const last = messagesOf(s, conv.id).filter((m)=>messageVisibleFor(s,m,{kind:'customer',id:customerId})).at(-1)
       if (conv.kind === 'dm') {
         const seat = seatById(s, conv.seatId)!
         return { conv, title: seat.displayName, seat, group: undefined, last, official: true, order: order.get(seat.id) ?? 99 }
@@ -188,7 +190,7 @@ export function conversationsForCustomer(s: DemoState, customerId: string) {
       const group = s.chatGroups.find((x) => x.id === conv.chatGroupId)!
       return { conv, title: group.name, seat: undefined, group, last, official: group.official, order: 100 }
     })
-    .sort((a, b) => (a.order !== b.order ? a.order - b.order : b.conv.lastMessageAt.localeCompare(a.conv.lastMessageAt)))
+    .sort((a, b) => (a.order !== b.order ? a.order - b.order : (b.last?.at??b.conv.lastMessageAt).localeCompare(a.last?.at??a.conv.lastMessageAt)))
 }
 
 /** 消息发出时坐席归谁：按交接区间反推（与 operatorId 互为双保险） */

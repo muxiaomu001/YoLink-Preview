@@ -32,11 +32,14 @@ export function MessageActionMenu({ actions, position, onClose, triggerId }: { t
     const scroll = (e: Event) => { if (!ref.current?.contains(e.target as Node)) onClose() }
     document.addEventListener('mousedown', outside)
     window.addEventListener('resize', onClose)
-    window.addEventListener('scroll', scroll, true)
+    // 仅用户滚动关闭菜单，浏览器布局调整或自动滚动不应误关。
+    window.addEventListener('wheel',scroll,true)
+    window.addEventListener('touchmove',scroll,true)
     return () => {
       document.removeEventListener('mousedown', outside)
       window.removeEventListener('resize', onClose)
-      window.removeEventListener('scroll', scroll, true)
+      window.removeEventListener('wheel',scroll,true)
+      window.removeEventListener('touchmove',scroll,true)
     }
   }, [onClose, triggerId])
   return createPortal(

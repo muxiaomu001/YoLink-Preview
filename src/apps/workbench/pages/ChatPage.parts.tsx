@@ -3,14 +3,15 @@
  */
 import { useEffect, useState, type RefObject } from 'react'
 import { clsx } from 'clsx'
-import { BellOff, Pin, Search, SlidersHorizontal, X } from 'lucide-react'
+import { Bell, BellOff, Eraser, Eye, Mail, Pin, Search, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import type { Seat } from '@/domain/types'
 import { fmtRelative, fmtWait } from '@/domain/time'
+import { draftKey } from '@/domain/messageRules'
+import { MessageActionMenu } from '../components/MessageActionMenu'
 import { senderName } from '@/store/policy'
 import { type ConvRow, type WorkbenchView } from '@/store/selectors'
 import { Avatar, TitleChip } from '@/ui/display'
 import { Checkbox, Input } from '@/ui/primitives'
-import { toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
 import { activeFilterCount, EMPTY_FILTERS, previewOf, type Filters, type TypeFilter } from './ChatPage.shared'
 
@@ -94,22 +95,24 @@ export function ConvItem({ row, active, view, onClick, onContextMenu }: { row: C
   const isDm = row.conv.kind === 'dm'
   const primaryTitle = row.customer?.primaryTitleId ? s.titles.find((t) => t.id === row.customer!.primaryTitleId && t.enabled) : undefined
   const group = !isDm ? s.chatGroups.find((g) => g.id === row.conv.chatGroupId) : undefined
+  const mediaDraft=s.mediaDrafts?.[draftKey({kind:'seat',id:s.session.workbenchSeatId??'',staffId:s.session.workbenchStaffId??undefined},row.conv.id)]
+  const draft=s.chatDrafts?.[draftKey({kind:'seat',id:s.session.workbenchSeatId??'',staffId:s.session.workbenchStaffId??undefined},row.conv.id)]
   const preview = isDm ? previewOf(row.last) : row.last ? `${senderName(s, row.last)}：${previewOf(row.last)}` : ''
   return (
-    <button type="button" onClick={onClick} onContextMenu={onContextMenu} className={clsx('flex w-full items-start gap-2.5 border-b border-zinc-100 px-3 py-2.5 text-left hover:bg-zinc-50', active && 'bg-brand-50/70 hover:bg-brand-50/70', row.pinned && !active && 'bg-zinc-50/80')}>
+    <button type="button" data-conversation-id={row.conv.id} onClick={onClick} onContextMenu={onContextMenu} className={clsx('flex w-full items-start gap-2.5 border-b border-zinc-100 px-3 py-2.5 text-left hover:bg-zinc-50', active && 'bg-brand-50/70 hover:bg-brand-50/70', row.pinned && !active && 'bg-zinc-50/80')}>
       {isDm ? <Avatar text={row.title} size={38} /> : <Avatar text={row.title} size={38} color={group?.kind === 'channel' ? '#b45309' : '#0f766e'} official={group?.official} />}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <span className="truncate text-[13px] font-medium text-zinc-900">{row.title}</span>
           {primaryTitle && <TitleChip title={primaryTitle} size="xs" />}
           {!isDm && <span className="shrink-0 text-[11px] text-zinc-400">{group?.kind === 'channel' ? '频道' : `群 · ${(group?.memberCustomerIds.length ?? 0) + (group?.memberSeatIds.length ?? 0)}`}</span>}
-          <span className="ml-auto shrink-0 text-[11px] tabular-nums text-zinc-400">{fmtRelative(row.conv.lastMessageAt)}</span>
+          <span className="ml-auto shrink-0 text-[11px] tabular-nums text-zinc-400">{row.last?fmtRelative(row.last.at):''}</span>
         </div>
         <div className="mt-0.5 flex items-center gap-1.5">
-          <span className="min-w-0 flex-1 truncate text-[12px] text-zinc-500">{preview}</span>
+          <span className="min-w-0 flex-1 truncate text-[12px] text-zinc-500">{draft?.text||mediaDraft?<><span className="text-red-600">草稿：</span>{draft?.text||`[附件 ${mediaDraft?.items.length} 项]`}</>:preview}</span>
           {row.pinned && <Pin size={11} className="shrink-0 text-zinc-400" />}
           {row.muted && <BellOff size={11} className="shrink-0 text-zinc-400" />}
-          {row.unread > 0 && <span className={clsx('shrink-0 rounded-full px-1.5 text-[11px] leading-4 text-white', row.muted ? 'bg-zinc-400' : 'bg-red-500')}>{row.unread}</span>}
+          {row.unread > 0 && <span className={clsx('shrink-0 rounded-full px-1.5 text-[11px] leading-4 text-white', row.muted ? 'bg-zinc-400' : 'bg-red-500')}>{row.unread>99?'99+':row.unread}</span>}
           {row.mentioned && <span className="shrink-0 rounded-full bg-amber-500 px-1.5 text-[11px] leading-4 text-white">@</span>}
         </div>
         {view === 'waiting' && row.waitingSince && <div className="mt-0.5 text-[11px] text-amber-600">已等待 {fmtWait(row.waitingSince)}</div>}
@@ -119,35 +122,13 @@ export function ConvItem({ row, active, view, onClick, onContextMenu }: { row: C
 }
 
 /** 右键菜单：标记已读 / 未读、置顶、静音、本地删除 */
-export function ContextMenu({ x, y, row, seat, onClose, onDeleteLocal }: { x: number; y: number; row: ConvRow; seat: Seat; onClose: () => void; onDeleteLocal: () => void }) {
-  const { s } = useWorkbench()
-  useEffect(() => {
-    const close = () => onClose()
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('mousedown', close)
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('mousedown', close)
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [onClose])
-  const run = (fn: () => void, msg: string) => {
-    fn()
-    toast(msg)
-    onClose()
-  }
-  const item = (label: string, fn: () => void, msg: string, danger?: boolean) => (
-    <button type="button" onMouseDown={(e) => e.stopPropagation()} onClick={() => run(fn, msg)} className={clsx('block w-full px-3 py-1.5 text-left text-[12px] hover:bg-zinc-50', danger ? 'text-red-700' : 'text-zinc-700')}>
-      {label}
-    </button>
-  )
-  return (
-    <div className="fixed z-40 w-44 rounded-md border border-zinc-200 bg-white py-1 shadow-lg" style={{ left: x, top: y }} onMouseDown={(e) => e.stopPropagation()}>
-      {row.unread > 0 ? item('标记已读', () => s.markRead(row.conv.id, seat.id), '已标记为已读') : item('标记未读', () => s.markUnread(row.conv.id, seat.id), '已标记为未读')}
-      {item(row.pinned ? '取消置顶' : '置顶会话', () => s.togglePinConversation(row.conv.id, seat.id), row.pinned ? '已取消置顶' : '已置顶，排在列表最前')}
-      {item(row.muted ? '取消静音' : '静音', () => s.toggleMuteConversation(row.conv.id, seat.id), row.muted ? '已取消静音' : '已静音：不推送，未读角标变灰')}
-      <div className="my-1 border-t border-zinc-100" />
-      {item('删除会话（本地）', onDeleteLocal, '已从本地列表移除；服务端消息不删，有新消息会再出现', true)}
-    </div>
-  )
+export function ContextMenu({ x,y,row,seat,onClose,onDeleteLocal,onClearChat }: {x:number;y:number;row:ConvRow;seat:Seat;onClose:()=>void;onDeleteLocal:()=>void;onClearChat:()=>void}) {
+  const {s}=useWorkbench()
+  return <MessageActionMenu position={{left:x,top:y}} triggerId="" onClose={onClose} actions={[
+    {label:row.unread?'标记已读':'标记未读',icon:row.unread?Eye:Mail,section:0,onSelect:()=>row.unread?s.markRead(row.conv.id,seat.id):s.markUnread(row.conv.id,seat.id)},
+    {label:row.pinned?'取消置顶':'置顶会话',icon:Pin,section:0,onSelect:()=>s.togglePinConversation(row.conv.id,seat.id)},
+    {label:row.muted?'取消静音':'静音',icon:row.muted?Bell:BellOff,section:0,onSelect:()=>s.toggleMuteConversation(row.conv.id,seat.id)},
+    {label:'清空聊天',icon:Eraser,section:1,danger:true,onSelect:onClearChat},
+    {label:'从列表移除',icon:Trash2,section:1,danger:true,onSelect:onDeleteLocal},
+  ]}/>
 }

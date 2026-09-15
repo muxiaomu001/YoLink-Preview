@@ -14,6 +14,7 @@ export type ISODate = string
 
 /** 员工角色能力键（工作台与管理后台功能，作用在员工上） */
 export type Capability =
+  | 'manage_messages'
   | 'view_all_conversations'
   | 'view_all_customers'
   | 'create_invite'
@@ -399,6 +400,9 @@ export interface ChatGroup {
   /** 人数上限，null 用数值型策略的单群上限 */
   maxMembers: number | null
   createdAt: ISODate
+  /** 频道帖子可选官方顾问署名 */
+  showSignature?: boolean
+  welcomeText?: string
 }
 
 /** 管理员日志：仅管理员可见，保留 48 小时 */
@@ -434,10 +438,12 @@ export interface Conversation {
   readAtByCustomer?: Record<string, ISODate>
   /** 坐席手动标为未读 */
   unreadMarkBySeatIds?: string[]
+  clearedThroughByViewer?: Record<string, ISODate>
+  hiddenAtByViewer?: Record<string, ISODate>
 }
 
 export type SenderKind = 'customer' | 'seat' | 'bot' | 'system'
-export type MessageKind = 'text' | 'image' | 'file' | 'system'
+export type MessageKind = 'text' | 'image' | 'file' | 'video' | 'voice' | 'system'
 
 /** 图片 / 文件消息的附件：演示里 url 是 public 下的静态文件或本机上传后的 data URL */
 export interface MessageMedia {
@@ -448,6 +454,8 @@ export interface MessageMedia {
   mime?: string
   width?: number
   height?: number
+  duration?: number
+  album?: MessageMedia[]
 }
 
 export interface Message {
@@ -483,13 +491,24 @@ export interface Message {
   editHistory?: { text: string; at: ISODate; operatorId: string }[]
   /** 引用回复 */
   replyToId?: string
+  quoteText?: string
   /** 转发来源 */
-  forwardedFrom?: { convId: string; messageId: string }
+  forwardedFrom?: { convId: string; messageId: string; name?: string }
   /** 机器人消息：来自哪条规则；空为员工手动触发 */
   botRuleId?: string | null
   /** 群发任务产生的消息（频控按它统计） */
   isBroadcast?: boolean
+  hiddenFor?: string[]
+  recipientCustomerId?: string
+  channelId?: string
+  channelSignature?: string
+  delivery?: 'pending' | 'failed' | 'sent'
+  failureReason?: string
+  attemptId?: string
 }
+
+export interface ChatActor { kind: 'seat' | 'customer'; id: string; staffId?: string }
+export interface ChatDraft { text: string; replyToId?: string; quoteText?: string }
 
 // ---------- 审计与安全 ----------
 
@@ -809,6 +828,7 @@ export interface PolicyNumbers {
   groupMaxMembers: number
   slowModeSeconds: number
   retentionDays: number
+  fileMaxMb?: number
   imageMaxMb: number
   videoMaxMb: number
   voiceMaxSeconds: number
@@ -1174,6 +1194,11 @@ export interface Session {
 }
 
 export interface DemoState {
+  mediaDrafts?: Record<string,{kind:'image'|'file'|'video'|'voice';items:MessageMedia[];text:string}>
+  chatTyping?: Record<string,{convId:string;until:number}>
+  chatDrafts?: Record<string, ChatDraft>
+  failNextSend?: boolean
+  chatRulesVersion?: number
   enterprise: Enterprise
   roles: Role[]
   staff: Staff[]

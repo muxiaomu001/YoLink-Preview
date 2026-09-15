@@ -19,13 +19,14 @@ interface NumberField {
 
 /** 顺序与 PRD 05 数值型策略表一致 */
 const FIELDS: NumberField[] = [
-  { key: 'seatRecallSeconds', label: '坐席撤回时限', unit: '秒', defaultValue: 0 },
+  { key: 'seatRecallSeconds', label: '坐席对所有人删除时限', unit: '秒', defaultValue: 0 },
   { key: 'seatEditSeconds', label: '坐席编辑时限', unit: '秒', defaultValue: 0 },
-  { key: 'customerRecallSeconds', label: '客户撤回时限', unit: '秒', defaultValue: 0 },
+  { key: 'customerRecallSeconds', label: '客户对所有人删除时限', unit: '秒', defaultValue: 0 },
   { key: 'customerEditSeconds', label: '客户编辑时限', unit: '秒', defaultValue: 0 },
   { key: 'groupMaxMembers', label: '单群上限', unit: '人', defaultValue: 10000 },
   { key: 'slowModeSeconds', label: '发言限流默认间隔', unit: '秒', defaultValue: 0, hint: '0 为关闭；策略键 group.slow_mode_seconds。群设置里的六档下拉 P2' },
   { key: 'retentionDays', label: '消息保留天数', unit: '天', defaultValue: 0, hint: '0 为永久' },
+  { key: 'fileMaxMb', label: '文件最大大小', unit: 'MB', defaultValue: 20 },
   { key: 'imageMaxMb', label: '图片最大大小', unit: 'MB', defaultValue: 10 },
   { key: 'videoMaxMb', label: '视频最大大小', unit: 'MB', defaultValue: 100 },
   { key: 'voiceMaxSeconds', label: '语音最大时长', unit: '秒', defaultValue: 60 },

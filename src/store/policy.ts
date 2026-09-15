@@ -134,6 +134,8 @@ export function botById(s: DemoState, id: string | null | undefined): BotAccount
 
 /** 消息发送者的显示名（客户 / 坐席 / 机器人 / 系统） */
 export function senderName(s: DemoState, m: Message): string {
+  const channelId=m.channelId??s.conversations.find((c)=>c.id===m.convId&&c.kind==='channel')?.chatGroupId
+  if(m.senderKind==='seat'&&channelId)return s.chatGroups.find((g)=>g.id===channelId)?.name??'频道'
   if (m.senderKind === 'seat') return s.seats.find((x) => x.id === m.seatId)?.displayName ?? '坐席'
   if (m.senderKind === 'customer') return s.customers.find((x) => x.id === m.senderId)?.nickname ?? '客户'
   if (m.senderKind === 'bot') return botById(s, m.senderId)?.nickname ?? '成员'

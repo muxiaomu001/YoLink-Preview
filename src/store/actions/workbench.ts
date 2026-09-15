@@ -3,7 +3,7 @@
  * 客户操作（重置密码、拉黑、全群禁言）、个人设置、客户手机端的社交动作。话术库见 quickReplies.ts。
  */
 import type { Message, MessageMedia, StaffPrefs } from '@/domain/types'
-import { messageLimitSeconds, mentionsIn, seatConversationAllowed, seatMessageSendAllowed } from '@/domain/messageRules'
+import { messageLimitSeconds, messageVisibleFor, mentionsIn, seatConversationAllowed, seatMessageSendAllowed } from '@/domain/messageRules'
 import { customerCan } from '../policy'
 import { seatCan } from '../policy'
 import { newId } from '@/domain/ids'
@@ -39,29 +39,12 @@ export interface WorkbenchActions {
 export function workbenchActions(set: Set, get: Get): WorkbenchActions {
   return {
     seatSendRich: (input) => {
-      const state = get()
-      if (!seatMessageSendAllowed(state, input.convId, input.seatId, input.operatorId, !!input.media)) return
-      const mentions = mentionsIn(state, input.convId, input.text, input.selectedMentions)
-      if (mentions.mentionAll && !seatCan(state, input.seatId, 'group.mention_all')) return
-      const group = state.chatGroups.find((g) => g.id === state.conversations.find((c) => c.id === input.convId)?.chatGroupId)
-      const at = now()
-      set((s) => ({
-        messages: [...s.messages, { id: newId('msg'), convId: input.convId, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.kind ?? 'text', text: input.text, media: input.media, at, replyToId: input.replyToId, ...mentions, receiptMemberSeatIds: group?.memberSeatIds, receiptMemberCustomerIds: group?.memberCustomerIds, aiDraftUsed: input.aiDraftUsed }],
-        conversations: s.conversations.map((c) => (c.id === input.convId ? { ...c, lastMessageAt: at, readAtBySeat: { ...(c.readAtBySeat ?? {}), [input.seatId]: at }, unreadMarkBySeatIds: (c.unreadMarkBySeatIds ?? []).filter((id) => id !== input.seatId) } : c)),
-      }))
+      get().queueChatMessage({ ...input, actor: {kind:'seat',id:input.seatId,staffId:input.operatorId} })
     },
-
-    recallMessage: (messageId, byStaffId) => {
-      const s = get()
-      const m = s.messages.find((x) => x.id === messageId)
-      if (!m || m.senderKind !== 'seat' || !m.seatId || !seatConversationAllowed(s, m.convId, m.seatId, byStaffId) || !seatCan(s, m.seatId, 'dm.recall') || m.recalledAt || m.deletedAt) return false
-      const limit = messageLimitSeconds(s, 'seat', 'recall')
-      if (limit > 0 && Date.now() - new Date(m.at).getTime() > limit * 1000) return false
-      set({
-        messages: s.messages.map((x) => (x.id === messageId ? { ...x, recalledAt: now() } : x)),
-        audit: withAudit(s.audit, 'message.recall', `撤回消息「${m.text.slice(0, 30)}」`, byStaffId),
-      })
-      return true
+    recallMessage: (id, staffId) => {
+      const m=get().messages.find((x)=>x.id===id)
+      if(!m?.seatId||m.senderKind!=='seat')return false
+      return get().deleteChatMessages([id],{kind:'seat',id:m.seatId,staffId},true).ok
     },
 
     editMessage: (messageId, text, byStaffId, expectedText) => {
@@ -81,24 +64,14 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
       return null
     },
 
-    seatDeleteMessage: (messageId, seatId, byStaffId) =>
-      set((s) => {
-        const m = s.messages.find((x) => x.id === messageId)
-        if (!m || m.deletedAt) return {}
-        const conv = s.conversations.find((c) => c.id === m.convId)
-        const g = s.chatGroups.find((x) => x.id === conv?.chatGroupId)
-        const seat = s.seats.find((x) => x.id === seatId)
-        return {
-          messages: s.messages.map((x) => (x.id === messageId ? { ...x, deletedAt: now() } : x)),
-          groupLogs: g ? [{ id: newId('glog'), groupId: g.id, at: now(), actorKind: 'seat' as const, actorId: seatId, action: 'delete_message', detail: `删除了一条消息：「${m.text.slice(0, 30)}」` }, ...s.groupLogs] : s.groupLogs,
-          audit: withAudit(s.audit, 'message.delete', `以「${seat?.displayName}」身份删除${g ? `群「${g.name}」里` : ''}的消息「${m.text.slice(0, 30)}」`, byStaffId),
-        }
-      }),
+    seatDeleteMessage: (id,seatId,staffId) => {
+      get().deleteChatMessages([id],{kind:'seat',id:seatId,staffId},true)
+    },
 
     forwardMessage: (messageId, toConvId, seatId, operatorId) => {
       const s = get()
       const m = s.messages.find((x) => x.id === messageId)
-      if (!m || m.recalledAt || m.deletedAt || m.kind === 'system' || !seatConversationAllowed(s, m.convId, seatId, operatorId) || !seatMessageSendAllowed(s, toConvId, seatId, operatorId, !!m.media)) return false
+      if (!m || !messageVisibleFor(s,m,{kind:'seat',id:seatId,staffId:operatorId}) || (m.delivery&&m.delivery!=='sent') || m.kind === 'system' || !seatConversationAllowed(s, m.convId, seatId, operatorId) || !seatMessageSendAllowed(s, toConvId, seatId, operatorId, !!m.media)) return false
       const source = s.conversations.find((c) => c.id === m.convId)!
       if (!seatCan(s, seatId, source.kind === 'dm' ? 'dm.forward' : 'group.forward', source.chatGroupId)) return false
       const at = now()
@@ -204,45 +177,8 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
       return null
     },
 
-    customerRecall: (messageId, customerId) => {
-      const s = get()
-      const m = s.messages.find((x) => x.id === messageId)
-      if (!m || m.senderKind !== 'customer' || m.senderId !== customerId || m.recalledAt || m.deletedAt || !customerCan(s, customerId, 'dm.recall')) return false
-      const conv = s.conversations.find((c) => c.id === m.convId)
-      const member = conv?.kind === 'dm' ? conv.customerId === customerId : s.chatGroups.some((g) => g.id === conv?.chatGroupId && g.memberCustomerIds.includes(customerId))
-      if (!member) return false
-      const limit = messageLimitSeconds(s, 'customer', 'recall')
-      if (limit > 0 && Date.now() - new Date(m.at).getTime() > limit * 1000) return false
-      set({ messages: s.messages.map((x) => (x.id === messageId ? { ...x, recalledAt: now() } : x)) })
-      return true
-    },
+    customerRecall: (id,customerId) => get().deleteChatMessages([id],{kind:'customer',id:customerId},true).ok,
 
-    customerSendIn: (convId, customerId, text, replyToId) => {
-      const s = get()
-      const conv = s.conversations.find((c) => c.id === convId)
-      const c = s.customers.find((x) => x.id === customerId)
-      if (!conv || !c) return { ok: false, reason: '会话不存在' }
-      if (c.blacklistedAt) return { ok: false, reason: '你已被限制发送消息' }
-      const at = now()
-      if (conv.kind !== 'dm') {
-        const g = s.chatGroups.find((x) => x.id === conv.chatGroupId)
-        if (!g) return { ok: false, reason: '群不存在' }
-        if (g.kind === 'channel') return { ok: false, reason: '频道只读' }
-        if (c.mutedAllUntil && c.mutedAllUntil > at) return { ok: false, reason: '你已被禁言' }
-        const isAdmin = g.admins.some((a) => a.memberKind === 'customer' && a.memberId === customerId)
-        if (g.settings.allMuted && !isAdmin) return { ok: false, reason: '全员禁言中，仅管理员可发言' }
-        const r = g.restrictions.find((x) => x.customerId === customerId && (x.until === null || x.until > at))
-        if (r) return { ok: false, reason: r.kind === 'ban' ? '你已被移出该群' : '你已被禁言' }
-      }
-      const mentions = mentionsIn(s, convId, text)
-      if (mentions.mentionAll && !customerCan(s, customerId, 'group.mention_all', conv.chatGroupId)) return { ok: false, reason: '当前策略不允许 @所有人' }
-      const group = s.chatGroups.find((g) => g.id === conv.chatGroupId)
-      set({
-        messages: [...s.messages, { id: newId('msg'), convId, senderKind: 'customer', senderId: customerId, kind: 'text', text, at, ...mentions, receiptMemberSeatIds: group?.memberSeatIds, receiptMemberCustomerIds: group?.memberCustomerIds, replyToId }],
-        conversations: s.conversations.map((x) => (x.id === convId ? { ...x, lastMessageAt: at } : x)),
-        customers: s.customers.map((x) => (x.id === customerId ? { ...x, lastActiveAt: at } : x)),
-      })
-      return { ok: true }
-    },
+    customerSendIn: (convId,customerId,text,replyToId) => get().queueChatMessage({convId,actor:{kind:'customer',id:customerId},text,replyToId}),
   }
 }

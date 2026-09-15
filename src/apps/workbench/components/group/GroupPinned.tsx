@@ -1,6 +1,8 @@
 /**
  * 置顶消息列表：每条可跳转到聊天区（不在视图时提示）、可取消置顶（can_pin_messages）。
  */
+import type { Message } from '@/domain/types'
+import { messageVisibleFor } from '@/domain/messageRules'
 import { Pin } from 'lucide-react'
 import { fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
@@ -13,7 +15,9 @@ import { Section, type GroupPanelProps } from './shared'
 export function GroupPinned({ group: g, actor, perm, compact }: GroupPanelProps) {
   const s = useStore()
   const canPin = perm('can_pin_messages')
-  const list = g.pinnedMessageIds.map((id) => s.messages.find((m) => m.id === id)).filter((m) => !!m)
+  const manager=s.staff.find((x)=>x.id===actor.staffId)
+  const managementView=manager?.roleId==='role_admin'
+  const list = g.pinnedMessageIds.map((id) => s.messages.find((m) => m.id === id)).filter((m):m is Message => !!m&&(managementView?!m.deletedAt&&!m.recalledAt:messageVisibleFor(s,m,{kind:'seat',id:actor.seatId,staffId:actor.staffId})))
 
   const jump = (id: string) => {
     if (!jumpToMessage(id)) toast('该消息不在当前聊天视图里', 'info')
@@ -24,7 +28,7 @@ export function GroupPinned({ group: g, actor, perm, compact }: GroupPanelProps)
   }
 
   return (
-    <Section title={`置顶消息（${list.length}）`} compact={compact} hint={canPin ? '在聊天区悬停消息可置顶' : '取消置顶需要「置顶消息」权限'}>
+    <Section title={`置顶消息（${list.length}）`} compact={compact} hint={canPin ? '在聊天区消息菜单中可置顶' : '取消置顶需要「置顶消息」权限'}>
       {!list.length && <div className="text-[12px] text-zinc-400">还没有置顶消息。置顶数量不限，置顶时可选是否通知成员。</div>}
       <ul className="space-y-1.5">
         {list.map((m) => (

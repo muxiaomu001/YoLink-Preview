@@ -1,3 +1,4 @@
+import { messageVisibleFor } from '@/domain/messageRules'
 import { Inbox, Mail, MessageSquare } from 'lucide-react'
 import type { DemoState, Message } from '@/domain/types'
 import { isIdle, type ConvRow, type WorkbenchView } from '@/store/selectors'
@@ -26,6 +27,9 @@ export function previewOf(m: Message | undefined): string {
   if (!m) return ''
   if (m.recalledAt) return '[已撤回]'
   if (m.deletedAt) return '[已删除]'
+  if(m.kind==='video')return '[视频] '+m.text
+  if(m.kind==='voice')return '[语音] '+m.text
+  if(m.media?.album)return `[图片 ${m.media.album.length} 张] ${m.text}`
   if (m.kind === 'image') return '[图片]'
   if (m.kind === 'file') return `[文件] ${m.media?.name ?? ''}`.trim()
   return m.text
@@ -39,7 +43,7 @@ export function applyFilters(rows: ConvRow[], s: DemoState, f: Filters, idleDays
     if (f.idle && !isIdle(r, idleDays)) return false
     if (q) {
       const inTitle = r.title.toLowerCase().includes(q) || !!r.customer?.nickname.toLowerCase().includes(q)
-      const inMsgs = inTitle || s.messages.some((m) => m.convId === r.conv.id && !m.recalledAt && !m.deletedAt && m.text.toLowerCase().includes(q))
+      const inMsgs = inTitle || s.messages.some((m) => m.convId === r.conv.id && messageVisibleFor(s,m,{kind:'seat',id:s.session.workbenchSeatId??'',staffId:s.session.workbenchStaffId??undefined}) && m.text.toLowerCase().includes(q))
       if (!inMsgs) return false
     }
     return true

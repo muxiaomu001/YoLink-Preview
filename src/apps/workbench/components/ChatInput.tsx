@@ -8,14 +8,15 @@
  * 变量 {{customer.nickname}} {{staff.name}} {{company.name}} 发送时替换；图片 / 文件按钮按策略 canMedia 显示，选本机文件后直接发出。
  */
 import { useMemo, useRef, useState } from 'react'
-import { AtSign, Image, Paperclip, Send, Smile, Sparkles, X, Zap } from 'lucide-react'
+import { AtSign, Image, Mic, Paperclip, Send, Smile, Sparkles, Video, X, Zap } from 'lucide-react'
 import type { ChatGroup, Customer, Message, MessageMedia, QuickReply, Seat } from '@/domain/types'
 import { DEFAULT_STAFF_PREFS } from '@/domain/seed-groups'
 import { seatCan, senderName, visibleText } from '@/store/policy'
 import { customerById, matchQuickReplies, renderQuickReplyVars, seatById } from '@/store/selectors'
 import { Avatar, SeatAvatar } from '@/ui/display'
 import { Button } from '@/ui/primitives'
-import { readFileAsMedia } from '@/ui/media'
+import { restoreLocalFile } from '@/domain/localMedia'
+import { MediaComposer, type ChatMediaKind } from '@/ui/MediaComposer'
 import { toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
 import { CandidatePopover, type CandidateBase } from './quick-replies/CandidatePopover'
@@ -54,11 +55,13 @@ function suffixQueries(word: string): string[] {
 
 export function ChatInput({
   seat,
+  draftId,
   group,
   customer,
   text,
   setText,
   replyTo,
+  quoteText,
   onClearReply,
   disabledReason,
   onSend,
@@ -66,16 +69,18 @@ export function ChatInput({
   onAiSuggest,
 }: {
   seat: Seat
+  draftId:string
   group?: ChatGroup
   customer?: Customer
   text: string
   setText: (v: string) => void
   replyTo?: Message
+  quoteText?: string
   onClearReply: () => void
   disabledReason?: string
   onSend: (text: string, mentionAll: boolean, selected: { mentionSeatIds: string[]; mentionCustomerIds: string[] }) => void
   /** 图片 / 文件消息：工具栏选本机文件、话术里选到图片 / 文件时直接发出 */
-  onSendMedia: (kind: 'image' | 'file', media: MessageMedia, text: string) => void
+  onSendMedia: (kind: ChatMediaKind, media: MessageMedia, text: string) => boolean
   /** 不传则不显示「AI 推荐」按钮（策略不允许） */
   onAiSuggest?: () => void
 }) {
@@ -83,6 +88,8 @@ export function ChatInput({
   // Textarea 不透传 ref：从包裹层找 textarea
   const wrapRef = useRef<HTMLDivElement>(null)
   const ref = { get current() { return wrapRef.current?.querySelector('textarea') ?? null } }
+  const [mediaPick,setMediaPick]=useState<{kind:ChatMediaKind;files:File[]}|null>(null)
+  const videoInput=useRef<HTMLInputElement>(null)
   const imageInput = useRef<HTMLInputElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const [pop, setPopRaw] = useState<Pop | null>(null)
@@ -188,15 +195,7 @@ export function ChatInput({
   }
 
   /** 工具栏选本机图片 / 文件：读成 media 后直接发出 */
-  const pickFile = async (kind: 'image' | 'file', e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    const r = await readFileAsMedia(file)
-    if (!r.ok) return toast(r.error, 'warn')
-    onSendMedia(kind, r.media, '')
-    toast('已发送')
-  }
+  const pickFile = (kind: ChatMediaKind,e:React.ChangeEvent<HTMLInputElement>)=>{const files=Array.from(e.target.files??[]);e.target.value='';if(files.length)setMediaPick({kind,files})}
 
   const send = () => {
     const raw = text.trim()
@@ -230,33 +229,38 @@ export function ChatInput({
     }
   }
 
-  const mediaHint = '本机附件演示上限 500KB，产品上限另由后台策略控制'
+  const mediaHint = '选择附件后预览，确认再发送'
 
   return (
     <div className="border-t border-zinc-200 bg-white">
+      {mediaPick&&<MediaComposer draftId={draftId} files={mediaPick.files} kind={mediaPick.kind} onClose={()=>setMediaPick(null)} onSend={onSendMedia}/>}
       {replyTo && (
         <div className="mx-3 mt-2 flex items-center gap-2 rounded-md border-l-2 border-brand-400 bg-zinc-50 px-2 py-1 text-[12px] text-zinc-600">
           <span className="shrink-0 text-zinc-400">引用</span>
-          <span className="min-w-0 flex-1 truncate">{senderName(s, replyTo)}：{visibleText(replyTo, 'staff')}</span>
+          <span className="min-w-0 flex-1 truncate">{senderName(s, replyTo)}：{quoteText&&replyTo.text.includes(quoteText)?quoteText:visibleText(replyTo,'staff')}</span>
           <button type="button" onClick={onClearReply} className="text-zinc-400 hover:text-zinc-700" aria-label="取消引用"><X size={13} /></button>
         </div>
       )}
 
+      {!mediaPick&&s.mediaDrafts?.[draftId]&&<button type="button" className="mx-3 mt-2 rounded-md bg-brand-50 px-3 py-2 text-xs text-brand-700" onClick={async()=>{const draft=s.mediaDrafts?.[draftId];if(!draft)return;try{const files=await Promise.all(draft.items.map(restoreLocalFile));setMediaPick({kind:draft.kind,files})}catch{toast('附件草稿在此浏览器中已不可用','warn')}}}>继续编辑附件草稿（{s.mediaDrafts[draftId].items.length} 项）</button>}
       {/* 工具栏 */}
       <div className="flex items-center gap-0.5 px-2 pt-1.5">
         <Tool label="表情" onClick={() => setEmojiOpen((v) => !v)} disabled={disabled}><Smile size={16} /></Tool>
         {canMedia && (
           <>
-            <input ref={imageInput} type="file" accept="image/*" className="hidden" onChange={(e) => void pickFile('image', e)} />
-            <input ref={fileInput} type="file" className="hidden" onChange={(e) => void pickFile('file', e)} />
+            <input ref={imageInput} type="file" multiple accept="image/*" className="hidden" onChange={(e) => void pickFile('image', e)} />
+            <input ref={fileInput} multiple type="file" className="hidden" onChange={(e) => void pickFile('file', e)} />
             <Tool label={`发送图片（${mediaHint}）`} onClick={() => imageInput.current?.click()} disabled={disabled}><Image size={16} /></Tool>
+            <input ref={videoInput} type="file" accept="video/*" className="hidden" onChange={(e)=>pickFile('video',e)}/>
+            <Tool label="发送视频" onClick={()=>videoInput.current?.click()} disabled={disabled}><Video size={16}/></Tool>
+            <Tool label="录制语音" onClick={()=>setMediaPick({kind:'voice',files:[]})} disabled={disabled}><Mic size={16}/></Tool>
             <Tool label={`发送文件（${mediaHint}）`} onClick={() => fileInput.current?.click()} disabled={disabled}><Paperclip size={16} /></Tool>
           </>
         )}
         <Tool label="话术（输入 / 也可打开；右栏「话术」页签可浏览全部）" onClick={() => openPop('quick')} disabled={disabled}><Zap size={16} /></Tool>
         <Tool label="@ 提及（输入 @ 也可打开）" onClick={() => openPop('mention')} disabled={disabled}><AtSign size={16} /></Tool>
         {onAiSuggest && <Tool label="AI 推荐：根据客户最后一句生成回复草稿" onClick={onAiSuggest} disabled={disabled}><Sparkles size={16} /></Tool>}
-        {group?.kind === 'channel' && !disabledReason && <span className="ml-auto text-[11px] text-zinc-400">以坐席身份发布，客户只读</span>}
+        {group?.kind === 'channel' && !disabledReason && <span className="ml-auto text-[11px] text-zinc-400">以频道身份发布，客户只读</span>}
       </div>
 
       {emojiOpen && <div className="mx-3 mt-1 flex flex-wrap gap-1 rounded-md border border-zinc-200 p-2" aria-label="表情选择器">{['😊', '👍', '🙏', '🌹', '🎉', '👌', '🤝', '☀️', '❤️', '✅', '👋', '💪'].map((emoji) => <button type="button" key={emoji} aria-label={`插入表情 ${emoji}`} className="rounded p-1 text-xl hover:bg-zinc-100" onClick={() => { setText(text + emoji); setEmojiOpen(false); ref.current?.focus() }}>{emoji}</button>)}</div>}
@@ -273,7 +277,7 @@ export function ChatInput({
           }}
           onKeyDown={onKey}
           onBlur={() => window.setTimeout(() => setPop(null), 150)}
-          placeholder={disabledReason ?? `以「${seat.displayName}」身份回复…`}
+          placeholder={disabledReason ?? (group?.kind==='channel'?`向「${group.name}」发布…`:`以「${seat.displayName}」身份回复…`)}
           className="w-full resize-none border-0 bg-transparent px-1 py-1.5 text-[13px] leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none disabled:text-zinc-400"
         />
         <div className="flex items-center justify-end gap-3">

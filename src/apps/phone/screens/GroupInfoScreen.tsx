@@ -29,10 +29,10 @@ export function GroupInfoScreen({ g, customerId, onBack, onLeft }: { g: ChatGrou
   const total = g.memberSeatIds.length + g.memberCustomerIds.length + g.memberBotIds.length
 
   const doLeave = async () => {
-    const ok = await confirm({ title: `退出${kindLabel}「${g.name}」？`, body: '退出后不再收到消息，需要重新通过链接加入。', okText: '退出', danger: true })
+    const ok = await confirm({ title: g.kind==='channel'?`取消订阅「${g.name}」？`:`退出${kindLabel}「${g.name}」？`, body: '之后不再收到消息，需要重新通过链接加入。', okText: g.kind==='channel'?'取消订阅':'退出', danger: true })
     if (!ok) return
     s.customerLeaveGroup(g.id, customerId)
-    toast(`已退出${kindLabel}「${g.name}」`)
+    toast(g.kind==='channel'?`已取消订阅「${g.name}」`:`已退出${kindLabel}「${g.name}」`)
     onLeft()
   }
   const invite = () => toast(mainLink ? `邀请链接 ${mainLink.code} 已复制（演示）` : '该群暂无有效邀请链接', mainLink ? 'ok' : 'warn')
@@ -91,7 +91,7 @@ export function GroupInfoScreen({ g, customerId, onBack, onLeft }: { g: ChatGrou
           )}
           {leave.allowed ? (
             <button type="button" onClick={() => void doLeave()} className="flex w-full items-center gap-2 px-4 py-2.5 text-[13px] text-red-600 active:bg-zinc-50">
-              <LogOut size={16} /> 退出{kindLabel === '群' ? '群聊' : '频道'}
+              <LogOut size={16} /> {g.kind==='channel'?'取消订阅':'退出群聊'}
             </button>
           ) : (
             <div className="flex items-center gap-2 px-4 py-2.5 text-[11px] text-zinc-400">

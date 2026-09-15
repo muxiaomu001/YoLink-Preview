@@ -11,7 +11,7 @@ import { seatConversationAllowed } from '@/domain/messageRules'
 export function MessageReceipt({ m, staffSeatId }: { m: Message; staffSeatId?: string }) {
   const s = useStore()
   const conv = s.conversations.find((c) => c.id === m.convId)
-  if (!conv || m.recalledAt || m.deletedAt) return null
+  if (!conv || conv.kind === 'channel' || m.recalledAt || m.deletedAt || (m.delivery && m.delivery !== 'sent')) return null
   if (conv.kind !== 'dm') {
     const g = s.chatGroups.find((x) => x.id === conv.chatGroupId)
     if (!g || !staffSeatId || !seatConversationAllowed(s, conv.id, staffSeatId, s.session.workbenchStaffId ?? '')) return null

@@ -61,9 +61,10 @@ export function DemoBar() {
             {conv && seat && staff && <div className="mt-3 border-t border-zinc-100 pt-2 text-xs text-zinc-600">
               <div className="mb-1 font-medium">体验消息操作</div>
               <button type="button" className="text-brand-700 hover:underline" onClick={() => { s.seatSendRich({ convId: conv.id, seatId: seat.id, operatorId: staff.id, text: '您好，明天下午三点我们再沟通。' }); setOpen(false) }}>发送一条演示消息</button>
-              <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">点击消息旁的 ··· 试编辑、引用或撤回。打开下方客户手机屏查看已读和双方变化。</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">点击消息旁的 ··· 试编辑、引用或删除。打开下方客户手机屏查看已读和双方变化。</p>
             </div>}
             <div className="mt-2 flex flex-col gap-1">
+              <button type="button" className="text-left text-[12px] text-brand-700" onClick={()=>{s.simulateNextSendFailure(!s.failNextSend);setOpen(false)}}>{s.failNextSend?'取消模拟发送失败':'模拟下一条发送失败'}</button>
               <Link to={phoneUrl} target="_blank" className="inline-flex items-center gap-1 text-[12px] text-brand-700 hover:underline">
                 <ExternalLink size={12} /> 打开当前会话的客户手机屏
               </Link>

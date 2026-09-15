@@ -4,19 +4,21 @@
  */
 import { useCallback, useState } from 'react'
 import { clsx } from 'clsx'
-import { Bot, Copy, Forward, MoreHorizontal, Pencil, Pin, Reply, Trash2, Undo2 } from 'lucide-react'
+import { Bot, CheckSquare, Copy, Forward, MoreHorizontal, Pencil, Pin, Reply, Trash2 } from 'lucide-react'
 import type { ChatGroup, Message, Seat } from '@/domain/types'
-import { messageLimitSeconds, timeLimitLabel } from '@/domain/messageRules'
+import { channelOf, messageVisibleFor } from '@/domain/messageRules'
 import { fmtDateTime, fmtTime } from '@/domain/time'
 import { botById, seatCan, seatGroupPerm, senderName } from '@/store/policy'
 import { customerById, seatById, staffById } from '@/store/selectors'
 import { Avatar, Pill, SeatAvatar, TitleChip } from '@/ui/display'
+import { PlayableMedia } from '@/ui/PlayableMedia'
 import { FileCard, ImageThumb } from '@/ui/media'
 import { MessageText } from '@/ui/MessageText'
 import { MessageReceipt } from '@/ui/MessageReceipt'
 import { Button, Textarea } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
-import { confirm } from '@/ui/confirm'
+import { DeleteMessagesModal } from '@/ui/DeleteMessagesModal'
+import { MessageDelivery } from '@/ui/MessageDelivery'
 import { MessageActionMenu, type MessageMenuAction } from './MessageActionMenu'
 import { useWorkbench } from '../useWorkbench'
 import { copyText, jumpToMessage } from './group/groupRules'
@@ -31,6 +33,8 @@ export function MessageItem({
   onReply,
   onForward,
   onPin,
+  onSelect,
+  selected,
 }: {
   m: Message
   showDate: boolean
@@ -38,9 +42,11 @@ export function MessageItem({
   group?: ChatGroup
   highlight?: string
   current?: boolean
-  onReply: (m: Message) => void
+  onReply: (m: Message, quoteText?:string) => void
   onForward: (m: Message) => void
   onPin: (m: Message) => void
+  onSelect?: (m: Message) => void
+  selected?: boolean
 }) {
   const { s, staff, can } = useWorkbench()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -48,7 +54,10 @@ export function MessageItem({
   const closeMenu = useCallback(() => setMenuOpen(false), [])
   const positionMenu = (left: number, top: number) => setMenuPosition({ left, top })
   const [editing, setEditing] = useState(false)
-  const [renderedAt] = useState(Date.now)
+  const [quoteSelection,setQuoteSelection]=useState('')
+  const [deleting, setDeleting] = useState(false)
+  const actor = { kind: 'seat' as const, id: seat.id, staffId: staff?.id }
+  const channel = channelOf(s,m)
   const isGroup = !!group
   const mine = m.senderKind === 'seat' && m.seatId === seat.id
   const gone = !!m.recalledAt || !!m.deletedAt
@@ -57,43 +66,25 @@ export function MessageItem({
   const bot = m.senderKind === 'bot' ? botById(s, m.senderId) : undefined
   const op = m.senderKind === 'seat' ? staffById(s, m.operatorId) : undefined
   const senderTitle = customer?.primaryTitleId ? s.titles.find((t) => t.id === customer.primaryTitleId && t.enabled) : undefined
-  const replyTo = m.replyToId ? s.messages.find((x) => x.id === m.replyToId) : undefined
+  const replyTo = m.replyToId ? s.messages.find((x) => x.id === m.replyToId && messageVisibleFor(s,x,actor)) : undefined
   const pinned = !!group?.pinnedMessageIds.includes(m.id)
-  const hasMedia = (m.kind === 'image' || m.kind === 'file') && !!m.media
-  const bubbleCls = mine ? 'bg-brand-700 text-white' : otherSeat ? 'bg-brand-50 text-brand-900' : bot ? 'bg-purple-50 text-purple-950' : 'bg-white text-zinc-800 shadow-sm'
+  const hasMedia = (m.kind === 'image' || m.kind === 'file' || m.kind === 'video' || m.kind === 'voice') && !!m.media
+  const bubbleCls = channel ? 'bg-white text-zinc-800 shadow-sm' : mine ? 'bg-brand-700 text-white' : otherSeat ? 'bg-brand-50 text-brand-900' : bot ? 'bg-purple-50 text-purple-950' : 'bg-white text-zinc-800 shadow-sm'
 
   // 操作权限
-  const recallLimit = messageLimitSeconds(s, 'seat', 'recall')
-  const recallExpired = recallLimit > 0 && renderedAt - new Date(m.at).getTime() > recallLimit * 1000
-  const showRecall = mine && !gone && seatCan(s, seat.id, 'dm.recall')
-  const showDelete = !gone && (isGroup ? !mine && seatGroupPerm(s, group, seat.id, staff?.id ?? null, 'can_delete_messages') : m.senderKind === 'customer' && (can('view_audit') || can('manage_groups')))
   const showForward = !gone && seatCan(s, seat.id, isGroup ? 'group.forward' : 'dm.forward', group?.id)
   const showPin = isGroup && !gone && !pinned && seatGroupPerm(s, group, seat.id, staff?.id ?? null, 'can_pin_messages')
 
-  const recall = async () => {
-    if (!staff) return
-    if (recallLimit > 0 && Date.now() - new Date(m.at).getTime() > recallLimit * 1000) return toast('已超过后台设置的撤回时限', 'warn')
-    const ok = await confirm({ title: '撤回这条消息？', body: '撤回后这条消息从客户聊天中消失，不显示撤回提示；工作台保留撤回记录，原文仅供审计。', okText: '撤回' })
-    if (!ok) return
-    toast(s.recallMessage(m.id, staff.id) ? '已撤回' : '撤回失败：权限或时限已变更', 'info')
-  }
-  const del = async () => {
-    if (!staff) return
-    const ok = await confirm({ title: '删除这条消息？', body: '客户端显示「消息已被管理员删除」，工作台仍能看到原文，审计可查。', okText: '删除', danger: true })
-    if (!ok) return
-    s.seatDeleteMessage(m.id, seat.id, staff.id)
-    toast('已删除，记入管理员日志与审计', 'warn')
-  }
   const copy = async () => toast((await copyText(m.text)) ? '已复制' : '复制失败：浏览器不允许访问剪贴板', 'info')
 
   const actions: MessageMenuAction[] = [
-    { label: '回复', icon: Reply, section: 0, onSelect: () => onReply(m) },
+    { label: quoteSelection ? '引用所选文字' : '回复', icon: Reply, section: 0, onSelect: () => onReply(m,quoteSelection||undefined) },
     ...(mine && seatCan(s, seat.id, 'dm.edit') ? [{ label: '编辑消息', icon: Pencil, section: 0, onSelect: () => setEditing(true) }] : []),
     ...(m.text ? [{ label: '拷贝文本', icon: Copy, section: 0, onSelect: () => void copy() }] : []),
     ...(showPin ? [{ label: '置顶消息', icon: Pin, section: 1, onSelect: () => onPin(m) }] : []),
     ...(showForward ? [{ label: '转发', icon: Forward, section: 1, opensPicker: true, onSelect: () => onForward(m) }] : []),
-    ...(showRecall ? [{ label: '撤回消息', icon: Undo2, section: 2, danger: true, disabled: recallExpired, hint: recallExpired ? '已超过撤回时限' : timeLimitLabel(recallLimit), onSelect: () => void recall() }] : []),
-    ...(showDelete ? [{ label: '删除消息', icon: Trash2, section: 2, danger: true, hint: '管理员删除，对方也不可见', onSelect: () => void del() }] : []),
+    ...(onSelect ? [{ label: '选择多条', icon: CheckSquare, section: 1, onSelect: () => onSelect(m) }] : []),
+    { label: '删除', icon: Trash2, section: 2, danger: true, onSelect: () => setDeleting(true) },
   ]
 
   if (m.senderKind === 'system') {
@@ -106,12 +97,12 @@ export function MessageItem({
   }
 
   return (
-    <div id={`msg-${m.id}`} data-message-id={m.id} className={clsx('rounded-md transition-shadow', current && 'ring-2 ring-amber-300')}>
+    <div id={`msg-${m.id}`} data-message-id={m.id} className={clsx('rounded-md transition-shadow', current && 'ring-2 ring-amber-300', selected && 'bg-brand-100/60 ring-1 ring-brand-300')}>
       {showDate && <div className="my-3 text-center text-[11px] text-zinc-400">{fmtDateTime(m.at).slice(0, 10)}</div>}
-      <div onContextMenu={(e) => { e.preventDefault(); if (gone) return; positionMenu(e.clientX, e.clientY); setMenuOpen(true) }} className={clsx('group relative mb-3.5 flex gap-2.5', mine && 'flex-row-reverse')}>
-        {mine ? <SeatAvatar seat={seat} size={30} /> : otherSeat ? <SeatAvatar seat={otherSeat} size={30} /> : bot ? <Avatar text={bot.nickname} size={30} color={bot.avatarColor} /> : <Avatar text={customer?.nickname ?? '?'} size={30} />}
-        <div className={clsx('max-w-[70%]', mine && 'items-end text-right')}>
-          {!mine && (isGroup || bot) && (
+      <div onContextMenu={(e) => { e.preventDefault(); if (gone) return; const selection=window.getSelection();const text=selection?.toString().trim()??'';setQuoteSelection(selection?.anchorNode&&e.currentTarget.contains(selection.anchorNode)&&text&&m.text.includes(text)?text.slice(0,1024):'');positionMenu(e.clientX, e.clientY); setMenuOpen(true) }} className={clsx('group relative mb-3.5 flex gap-2.5', mine && !channel && 'flex-row-reverse')}>
+        {channel ? <Avatar text={channel.name} color="#b45309" size={30} official={channel.official} /> : mine ? <SeatAvatar seat={seat} size={30} /> : otherSeat ? <SeatAvatar seat={otherSeat} size={30} /> : bot ? <Avatar text={bot.nickname} size={30} color={bot.avatarColor} /> : <Avatar text={customer?.nickname ?? '?'} size={30} />}
+        <div className={clsx('max-w-[70%]', mine && !channel && 'items-end text-right')}>
+          {(channel || !mine && (isGroup || bot)) && (
             <div className="mb-0.5 flex items-center gap-1 text-[11px] text-zinc-500">
               {senderName(s, m)}
               {senderTitle && <TitleChip title={senderTitle} size="xs" />}
@@ -126,26 +117,28 @@ export function MessageItem({
               className={clsx('mb-0.5 block max-w-full truncate rounded border-l-2 border-brand-400 bg-zinc-100 px-2 py-0.5 text-left text-[11px] text-zinc-500 hover:bg-zinc-200', mine && 'ml-auto')}
               title="点击跳到原消息"
             >
-              {senderName(s, replyTo)}：{replyTo.recalledAt || replyTo.deletedAt ? '原消息已不可用' : replyTo.text.slice(0, 40)}
+              {senderName(s, replyTo)}：{replyTo.recalledAt || replyTo.deletedAt ? '原消息已不可用' : (m.quoteText&&replyTo.text.includes(m.quoteText)?m.quoteText:replyTo.text).slice(0,1024)}
             </button>
           )}
           {!gone && hasMedia ? (
             // 图片 / 文件消息：附件不包在气泡里，说明文字单独一个小气泡
             <div className={clsx('inline-flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
-              {m.forwardedFrom && <div className="text-[11px] text-zinc-400">转发的消息</div>}
-              {m.kind === 'image' ? <ImageThumb media={m.media!} maxWidth={240} className="shadow-sm" /> : <FileCard media={m.media!} />}
+              {m.forwardedFrom && <div className="text-[11px] text-zinc-400">转发自 {m.forwardedFrom.name??'原会话'}</div>}
+              {m.kind === 'video' || m.kind === 'voice' ? <PlayableMedia kind={m.kind} media={m.media!}/> : m.kind === 'image' ? <ImageThumb media={m.media!} maxWidth={240} className="shadow-sm" /> : <FileCard media={m.media!} />}
               {m.text && <div className={clsx('rounded-lg px-3 py-1.5 text-left text-[13px] leading-relaxed whitespace-pre-wrap', bubbleCls)}>{<MessageText m={m} highlight={highlight} />}</div>}
             </div>
           ) : (
             <div className={clsx('inline-block rounded-lg px-3 py-2 text-left text-[13px] leading-relaxed whitespace-pre-wrap', gone ? 'bg-zinc-100 text-zinc-400 italic' : bubbleCls)}>
-              {m.forwardedFrom && <div className={clsx('mb-0.5 text-[11px]', mine ? 'text-brand-100' : 'text-zinc-400')}>转发的消息</div>}
+              {m.forwardedFrom && <div className={clsx('mb-0.5 text-[11px]', mine ? 'text-brand-100' : 'text-zinc-400')}>转发自 {m.forwardedFrom.name??'原会话'}</div>}
               {gone ? (m.recalledAt ? '消息已撤回' : '消息已被管理员删除') : <MessageText m={m} highlight={highlight} />}
             </div>
           )}
-          <div className={clsx('mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400', mine && 'justify-end')}>
+          <div className={clsx('mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400', mine && !channel && 'justify-end')}>
             <span className="tabular-nums">{fmtTime(m.at)}</span>
             {m.editedAt && !gone && <span title={`修改于 ${fmtDateTime(m.editedAt)}`}>已编辑</span>}
-            {(mine || group) && <MessageReceipt m={m} staffSeatId={seat.id} />}
+            {m.channelSignature && <span>{m.channelSignature}</span>}
+            {mine && <MessageDelivery message={m} actor={actor} />}
+            {(!m.delivery || m.delivery === 'sent') && (mine || group) && <MessageReceipt m={m} staffSeatId={seat.id} />}
             {pinned && <span className="inline-flex items-center gap-0.5 text-amber-600"><Pin size={10} />已置顶</span>}
             {m.isWelcome && <span className="rounded bg-zinc-100 px-1">欢迎语</span>}
             {m.isBroadcast && <span className="rounded bg-amber-50 px-1 text-amber-700">群发</span>}
@@ -155,9 +148,10 @@ export function MessageItem({
             {bot && m.operatorId && can('view_seat_operator') && <span title="客户看不到这个">手动：{staffById(s, m.operatorId)?.name}</span>}
           </div>
         </div>
-        {!gone && <button type="button" id={`menu-trigger-${m.id}`} aria-label="更多消息操作" aria-haspopup="menu" aria-expanded={menuOpen} title="更多消息操作（也可右键消息）" className="self-start rounded p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700" onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); positionMenu(rect.left, rect.bottom + 4); setMenuOpen((v) => !v) }}><MoreHorizontal size={16} /></button>}
+        {!gone && <button type="button" id={`menu-trigger-${m.id}`} aria-label="更多消息操作" aria-haspopup="menu" aria-expanded={menuOpen} title="更多消息操作（也可右键消息）" className="self-start rounded p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700" onClick={(e) => { setQuoteSelection('');const rect = e.currentTarget.getBoundingClientRect(); positionMenu(rect.left, rect.bottom + 4); setMenuOpen((v) => !v) }}><MoreHorizontal size={16} /></button>}
         {menuOpen && !gone && <MessageActionMenu triggerId={`menu-trigger-${m.id}`} actions={actions} position={menuPosition} onClose={closeMenu} />}
       </div>
+      {deleting && <DeleteMessagesModal ids={[m.id]} actor={actor} onClose={() => setDeleting(false)} />}
       {editing && <EditMessage message={m} onClose={() => setEditing(false)} />}
     </div>
   )
