@@ -1,58 +1,35 @@
 /**
- * 客户资料卡的分区：通用 Section、所在群与频道（跳转 / 移出 / 加入）、
- * 钱包 / 签到 / 推荐三个 P2 模块区块（企业模块启用时才显示）。
+ * 客户资料卡的分区：所在群与频道（跳转 / 移出 / 加入）、
+ * 钱包 / 签到 / 推荐三个模块区块（企业模块启用时才显示）。
  */
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import type { ChatGroup, Customer, DemoState, WalletTxType } from '@/domain/types'
 import { fmtDate, fmtDateTime } from '@/domain/time'
 import { walletBalance } from '@/store/actions/modules'
-import { groupCapacity, seatGroupPerm } from '@/store/policy'
+import { seatGroupPerm } from '@/store/policy'
 import { customerById } from '@/store/selectors'
-import { Button, Select } from '@/ui/primitives'
-import { KV, Pill } from '@/ui/display'
-import { Modal, toast } from '@/ui/overlay'
+import { Button } from '@/ui/primitives'
+import { KV } from '@/ui/display'
+import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { useWorkbench } from '../useWorkbench'
+import { CollapsibleSection, type SectionCtl } from './customer/CollapsibleSection'
+import { JoinGroupModal } from './customer/JoinGroupModal'
 
-export function Section({ title, hint, level, children }: { title: string; hint?: string; level?: string; children: ReactNode }) {
-  return (
-    <section className="border-b border-zinc-100 px-4 py-3">
-      <div className="mb-2 flex items-baseline justify-between gap-2">
-        <h4 className="flex items-center gap-1 text-[11px] font-semibold tracking-wide text-zinc-500">
-          {title}
-          {level && <Pill>{level}</Pill>}
-        </h4>
-        {hint && <span className="text-right text-[10px] text-zinc-400">{hint}</span>}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-/** 拉不进群的原因（与 addGroupMembers 的跳过条件一致） */
-function skipReason(s: DemoState, g: ChatGroup, c: Customer): string {
-  if (c.deletedAt) return '客户已注销'
-  if (g.memberCustomerIds.includes(c.id)) return '已在群里'
-  if (g.restrictions.some((r) => r.customerId === c.id && r.kind === 'ban' && (r.until === null || r.until > new Date().toISOString()))) return '该客户被这个群封禁'
-  if (g.requiredTitleId && !c.titleIds.includes(g.requiredTitleId)) return `需要头衔「${s.titles.find((t) => t.id === g.requiredTitleId)?.name ?? ''}」`
-  if (g.memberCustomerIds.length >= groupCapacity(s, g)) return '群已满'
-  return '未知原因'
-}
+type SectionProps = { c: Customer; ctl: SectionCtl }
 
 // ---------- 所在群与频道 ----------
 
-export function GroupsSection({ c }: { c: Customer }) {
+export function GroupsSection({ c, ctl }: SectionProps) {
   const { s, staff, seat } = useWorkbench()
   const nav = useNavigate()
   const [joining, setJoining] = useState(false)
-  const [pick, setPick] = useState('')
   if (!staff || !seat) return null
   const by = { seatId: seat.id, staffId: staff.id }
   const joined = s.chatGroups.filter((g) => g.memberCustomerIds.includes(c.id))
-  const candidates = s.chatGroups.filter((g) => !g.memberCustomerIds.includes(c.id))
-  const picked = s.chatGroups.find((g) => g.id === pick)
+  const hasCandidates = s.chatGroups.some((g) => !g.memberCustomerIds.includes(c.id))
 
   const open = (g: ChatGroup) => {
     const conv = s.conversations.find((x) => x.chatGroupId === g.id)
@@ -64,70 +41,36 @@ export function GroupsSection({ c }: { c: Customer }) {
     s.kickGroupMember(g.id, c.id, false, by)
     toast(`已把「${c.nickname}」移出「${g.name}」`)
   }
-  const join = () => {
-    if (!picked) return
-    const r = s.addGroupMembers(picked.id, [c.id], by)
-    if (r.added) toast(`已把「${c.nickname}」拉入「${picked.name}」`)
-    else toast(`未拉入「${picked.name}」：${skipReason(s, picked, c)}`, 'warn')
-    setJoining(false)
-    setPick('')
-  }
 
   return (
-    <Section title="所在群与频道" hint="点名称跳到该群会话">
+    <CollapsibleSection title="所在群与频道" ctl={ctl} summary={`${joined.length} 个`} help="点名称跳到该群会话；本坐席不在的群看不到会话。">
       <ul className="space-y-1">
         {joined.map((g) => {
           const seatIn = g.memberSeatIds.includes(seat.id)
           const canKick = seatGroupPerm(s, g, seat.id, staff.id, 'can_restrict_members')
           return (
             <li key={g.id} className="flex items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-zinc-50">
-              <button type="button" className="min-w-0 flex-1 truncate text-left text-xs text-zinc-800 disabled:text-zinc-400" disabled={!seatIn} title={seatIn ? '打开该群会话' : '本坐席不在该群，看不到会话'} onClick={() => open(g)}>
+              <button type="button" className="min-w-0 flex-1 truncate text-left text-[13px] text-zinc-800 disabled:text-zinc-400" disabled={!seatIn} title={seatIn ? '打开该群会话' : '本坐席不在该群，看不到会话'} onClick={() => open(g)}>
                 {g.name}
-                <span className="ml-1 text-[10px] text-zinc-400">{g.kind === 'channel' ? '频道' : '群'}</span>
+                <span className="ml-1 text-[11px] text-zinc-400">{g.kind === 'channel' ? '频道' : '群'}</span>
               </button>
-              <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" disabled={!canKick} title={canKick ? '移出该群' : '需要群主、有「禁言封禁」权限的管理员或 manage_groups 能力'} onClick={() => void kick(g)}>
+              <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" disabled={!canKick} title={canKick ? '移出该群' : '需要群主、有「限制成员」权限的管理员或 manage_groups 能力'} onClick={() => void kick(g)}>
                 移出
               </Button>
             </li>
           )
         })}
-        {joined.length === 0 && <li className="text-[11px] text-zinc-400">未加入任何群或频道</li>}
+        {joined.length === 0 && <li className="text-[12px] text-zinc-400">未加入任何群或频道</li>}
       </ul>
-      <Button size="sm" variant="ghost" className="mt-1.5 h-6 px-1.5 text-[11px]" disabled={candidates.length === 0} onClick={() => setJoining(true)}>
+      <Button size="sm" variant="ghost" className="mt-1.5 h-6 px-1.5 text-[11px]" disabled={!hasCandidates} onClick={() => setJoining(true)}>
         <Plus size={11} /> 加入群
       </Button>
-      <Modal
-        open={joining}
-        onClose={() => setJoining(false)}
-        title={`把「${c.nickname}」拉入群`}
-        width={420}
-        footer={
-          <>
-            <Button onClick={() => setJoining(false)}>取消</Button>
-            <Button variant="primary" disabled={!picked} onClick={join}>
-              拉入
-            </Button>
-          </>
-        }
-      >
-        <Select value={pick} onChange={(e) => setPick(e.target.value)}>
-          <option value="">选择群或频道…</option>
-          {candidates.map((g) => {
-            const allowed = seatGroupPerm(s, g, seat.id, staff.id, 'can_invite_users')
-            return (
-              <option key={g.id} value={g.id} disabled={!allowed}>
-                {g.name}（{g.memberCustomerIds.length}/{groupCapacity(s, g)}）{allowed ? '' : ' · 本坐席无拉人权限'}
-              </option>
-            )
-          })}
-        </Select>
-        <p className="mt-2 text-[11px] text-zinc-400">需要群主、有「邀请用户」权限的管理员或 manage_groups 能力。已满、被封禁或不满足头衔条件时会跳过并提示原因。</p>
-      </Modal>
-    </Section>
+      <JoinGroupModal c={c} open={joining} onClose={() => setJoining(false)} />
+    </CollapsibleSection>
   )
 }
 
-// ---------- 钱包（P2） ----------
+// ---------- 钱包 ----------
 
 const TX_LABEL: Record<WalletTxType, string> = {
   checkin_reward: '签到奖励',
@@ -137,6 +80,7 @@ const TX_LABEL: Record<WalletTxType, string> = {
   withdraw_paid: '提现打款',
   withdraw_refund: '提现驳回退回',
 }
+const TX_RECENT = 5
 
 function mask(v: string): string {
   return v.length > 6 ? `${v.slice(0, 3)}****${v.slice(-3)}` : `${v.slice(0, 1)}***`
@@ -151,17 +95,17 @@ function payoutAccount(s: DemoState, c: Customer): { text: string; from: string 
   return { text: Object.values(last.account).map(mask).join(' · '), from: '最近提现申请' }
 }
 
-export function WalletSection({ c }: { c: Customer }) {
+export function WalletSection({ c, ctl }: SectionProps) {
   const { s } = useWorkbench()
   const ws = s.walletSettings
   const balance = walletBalance(s.walletTxs, c.id)
   const mine = s.withdrawals.filter((w) => w.customerId === c.id)
   const frozen = mine.filter((w) => w.status === 'pending' || w.status === 'approved').reduce((n, w) => n + w.points, 0)
   const paid = mine.filter((w) => w.status === 'paid').reduce((n, w) => n + w.points, 0)
-  const txs = s.walletTxs.filter((t) => t.customerId === c.id).slice(0, 5)
+  const txs = s.walletTxs.filter((t) => t.customerId === c.id).slice(0, TX_RECENT)
   const account = payoutAccount(s, c)
   return (
-    <Section title="钱包" level="P2" hint="模块启用时显示">
+    <CollapsibleSection title="钱包" ctl={ctl} summary={`${balance.toLocaleString()} ${ws.unitName}`} help="完整流水与提现记录在管理后台钱包页。">
       <KV
         items={[
           { k: '积分余额', v: `${balance} ${ws.unitName}` },
@@ -170,8 +114,8 @@ export function WalletSection({ c }: { c: Customer }) {
           { k: '收款账户', v: account ? <span title={`来源：${account.from}`}>{account.text}</span> : <span className="text-zinc-400">未绑定</span> },
         ]}
       />
-      <div className="mt-2 text-[10px] text-zinc-400">最近流水</div>
-      <ul className="mt-1 space-y-0.5 text-[11px]">
+      <div className="mt-2 text-[11px] text-zinc-400">最近流水</div>
+      <ul className="mt-1 space-y-0.5 text-[12px]">
         {txs.map((t) => (
           <li key={t.id} className="flex justify-between gap-2">
             <span className="truncate text-zinc-700" title={t.note}>
@@ -185,12 +129,11 @@ export function WalletSection({ c }: { c: Customer }) {
         ))}
         {txs.length === 0 && <li className="text-zinc-400">暂无流水</li>}
       </ul>
-      <p className="mt-1 text-[10px] text-zinc-400">「查看全部」在管理后台钱包页；正式版从资料卡直接跳转。</p>
-    </Section>
+    </CollapsibleSection>
   )
 }
 
-// ---------- 签到（P2） ----------
+// ---------- 签到 ----------
 
 /** 当前连签：从今天（今天没签就从昨天）往前数连续签到的天数 */
 function currentStreak(ats: string[]): number {
@@ -205,12 +148,12 @@ function currentStreak(ats: string[]): number {
   return n
 }
 
-export function CheckinSection({ c }: { c: Customer }) {
+export function CheckinSection({ c, ctl }: SectionProps) {
   const { s } = useWorkbench()
   const recs = s.checkinRecords.filter((r) => r.customerId === c.id).sort((a, b) => b.at.localeCompare(a.at))
   const days = new Set(recs.map((r) => new Date(r.at).toDateString())).size
   return (
-    <Section title="签到" level="P2" hint="模块启用时显示">
+    <CollapsibleSection title="签到" ctl={ctl} summary={`${days} 天`}>
       <KV
         items={[
           { k: '累计天数', v: `${days} 天` },
@@ -218,13 +161,13 @@ export function CheckinSection({ c }: { c: Customer }) {
           { k: '最近签到', v: recs[0] ? fmtDateTime(recs[0].at) : '从未签到' },
         ]}
       />
-    </Section>
+    </CollapsibleSection>
   )
 }
 
-// ---------- 推荐（P2） ----------
+// ---------- 推荐 ----------
 
-export function ReferralSection({ c }: { c: Customer }) {
+export function ReferralSection({ c, ctl }: SectionProps) {
   const { s, seat } = useWorkbench()
   const nav = useNavigate()
   const referrer = customerById(s, c.referrerId)
@@ -241,7 +184,7 @@ export function ReferralSection({ c }: { c: Customer }) {
     </button>
   )
   return (
-    <Section title="推荐" level="P2" hint="模块启用时显示">
+    <CollapsibleSection title="推荐" ctl={ctl} summary={`被推荐 ${referred.length} 人`}>
       <KV
         items={[
           { k: '推荐人', v: referrer ? link(referrer.id, referrer.nickname) : '-' },
@@ -260,6 +203,6 @@ export function ReferralSection({ c }: { c: Customer }) {
           },
         ]}
       />
-    </Section>
+    </CollapsibleSection>
   )
 }

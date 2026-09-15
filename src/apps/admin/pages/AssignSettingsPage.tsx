@@ -9,7 +9,7 @@ import { Button, Checkbox, Field, Textarea } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 
-const KIND_LABEL: Record<ChatGroup['kind'], string> = { group: '群', supergroup: '超级群', channel: '频道' }
+const KIND_LABEL: Record<ChatGroup['kind'], string> = { group: '群', channel: '频道' }
 
 export function AssignSettingsPage() {
   const s = useStore()

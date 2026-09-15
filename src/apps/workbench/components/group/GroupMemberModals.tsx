@@ -5,7 +5,6 @@
 import { useState } from 'react'
 import type { Customer } from '@/domain/types'
 import { useStore } from '@/store/store'
-import { Note } from '@/ui/display'
 import { Button, Checkbox, Field, Select, Textarea } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
 import { RESTRICT_DURATIONS, type GroupPanelProps } from './shared'
@@ -34,9 +33,9 @@ export function RestrictModal({ group: g, actor, customer: c, kind, onClose }: P
         <Field label="原因" hint={`${reason.length}/${REASON_MAX}，记入管理员日志与审计`}>
           <Textarea rows={2} maxLength={REASON_MAX} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="例如：多次发第三方理财链接" />
         </Field>
-        <Note tone="amber">
+        <p className="text-[12px] leading-relaxed text-zinc-500">
           {isBan ? '封禁会同时把客户移出群，时限内无法通过邀请链接返回；解封后不会自动回群，可通过链接重新加入。' : '禁言只限制在本群发言；到期自动解除，也可以手动解除。'}
-        </Note>
+        </p>
       </div>
     </Modal>
   )

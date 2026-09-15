@@ -145,11 +145,9 @@ const CS_CUSTOMER_OFF = [
   'tag.create',
 ]
 
-export const POLICY_COLS: { key: PolicyCol; label: string }[] = [
-  { key: 'customer_mobile', label: '客户 · 手机' },
-  { key: 'customer_desktop', label: '客户 · 桌面' },
-  { key: 'staff_mobile', label: '坐席 · 手机' },
-  { key: 'staff_desktop', label: '坐席 · 桌面' },
+export const POLICY_COLS: { key: PolicyCol; label: string; hint: string }[] = [
+  { key: 'customer', label: '客户', hint: '客户只用手机 App' },
+  { key: 'staff', label: '坐席', hint: '坐席只用桌面工作台' },
 ]
 
 /** 用"客户是否允许"生成整张矩阵：坐席列全开 */
@@ -157,7 +155,7 @@ function matrixFrom(customerAllowed: Record<string, boolean>): PolicyMatrix {
   const m: PolicyMatrix = {}
   POLICY_ITEMS.forEach((p) => {
     const c = p.staffOnly ? false : (customerAllowed[p.key] ?? true)
-    m[p.key] = { customer_mobile: c, customer_desktop: c, staff_mobile: true, staff_desktop: true }
+    m[p.key] = { customer: c, staff: true }
   })
   return m
 }
@@ -293,7 +291,7 @@ export const CUSTOM_FIELDS: CustomField[] = [
 ]
 
 export const AUTOMATION_RULES: AutomationRule[] = [
-  { id: 'ar_1', name: '入金后挂「认证投资者」', trigger: '购买记录同步', condition: '单笔金额 ≥ 10,000 美元', action: '挂头衔：认证投资者', enabled: true, runs: 14, lastRunAt: ago(0, 3) },
+  { id: 'ar_1', name: '推荐满 10 人挂「认证推荐人」', trigger: '推荐关系同步', condition: '直接邀请人数 ≥ 10', action: '挂头衔：认证推荐人', enabled: true, runs: 14, lastRunAt: ago(0, 3) },
   { id: 'ar_2', name: '30 天没聊过打「需回访」', trigger: '每日 10:00', condition: '最近消息距今 ≥ 30 天且已入金', action: '打内部标签：需回访', enabled: false, runs: 0, lastRunAt: null },
   { id: 'ar_3', name: '会员到期前两周提醒顾问', trigger: '每日 10:00', condition: '头衔 = 私享会员 且 到期日 ≤ 14 天', action: '给主归属坐席的实操员工发提醒', enabled: true, runs: 3, lastRunAt: ago(1, 2) },
 ]

@@ -16,7 +16,7 @@ import { GROUP_KIND_TEXT, memberTotal, type GroupPanelProps } from './shared'
 const NAME_MAX = 128
 const DESC_MAX = 255
 
-export function GroupBasic({ group: g, actor, perm, compact }: GroupPanelProps) {
+export function GroupBasic({ group: g, actor, perm, compact, onJumpMembers }: GroupPanelProps & { onJumpMembers?: () => void }) {
   const s = useStore()
   const canEdit = perm('can_change_info')
   const owner = seatById(s, g.ownerSeatId)
@@ -24,7 +24,8 @@ export function GroupBasic({ group: g, actor, perm, compact }: GroupPanelProps) 
   const [editDesc, setEditDesc] = useState(false)
   const [more, setMore] = useState(false)
 
-  const jumpMembers = () => document.getElementById('group-members')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // 同页有成员面板时滚过去；在群管理弹窗里由调用方切到成员 tab
+  const jumpMembers = onJumpMembers ?? (() => document.getElementById('group-members')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   const saveName = (v: string) => {
     const name = v.trim()
     if (!name || name.length > NAME_MAX || name === g.name) return
@@ -41,7 +42,7 @@ export function GroupBasic({ group: g, actor, perm, compact }: GroupPanelProps) 
   return (
     <div className={compact ? 'border-b border-zinc-100 px-4 py-4' : 'rounded-lg border border-zinc-200 bg-white p-4'}>
       <div className="flex flex-col items-center text-center">
-        <button type="button" title={canEdit ? '点击上传新头像（演示：不上传）' : '需要「修改群信息」权限'} onClick={() => (canEdit ? toast('演示：群头像上传不落库，正式产品由服务端生成缩略图', 'info') : undefined)} className={canEdit ? 'cursor-pointer' : 'cursor-default'}>
+        <button type="button" title={canEdit ? '点击上传新头像' : '需要「修改群信息」权限'} onClick={() => (canEdit ? toast('群头像上传暂未开放', 'info') : undefined)} className={canEdit ? 'cursor-pointer' : 'cursor-default'}>
           <Avatar text={g.name} size={56} color={g.kind === 'channel' ? '#b45309' : '#0f766e'} official={g.official} />
         </button>
         <div className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-zinc-900">
@@ -59,7 +60,7 @@ export function GroupBasic({ group: g, actor, perm, compact }: GroupPanelProps) 
             </>
           )}
         </div>
-        <div className="mt-1 flex w-full items-start justify-center gap-1 text-[11px] text-zinc-500">
+        <div className="mt-1 flex w-full items-start justify-center gap-1 text-[12px] text-zinc-500">
           {editDesc ? (
             <InlineEdit initial={g.desc} max={DESC_MAX} multiline onDone={(v) => { setEditDesc(false); saveDesc(v) }} />
           ) : (
@@ -90,7 +91,6 @@ export function GroupBasic({ group: g, actor, perm, compact }: GroupPanelProps) 
             改类型 / 入群头衔 / 人数上限
           </Button>
         )}
-        {!canEdit && <div className="mt-2 text-[10px] text-zinc-400">名称、头像、简介需要「修改群信息」权限</div>}
       </div>
       {more && <MoreModal group={g} actor={actor} onClose={() => setMore(false)} />}
     </div>

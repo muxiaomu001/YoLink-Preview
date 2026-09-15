@@ -13,13 +13,6 @@ import { Button, Switch } from '@/ui/primitives'
 import { Pill } from '@/ui/display'
 import { Modal } from '@/ui/overlay'
 
-/** 列筛选：全部 / 只看客户端 / 只看坐席端 */
-export type ColFilter = 'all' | 'customer' | 'staff'
-
-export function colsOf(filter: ColFilter) {
-  return POLICY_COLS.filter((c) => filter === 'all' || c.key.startsWith(filter))
-}
-
 /** resolveCap 的 source → 给人看的文字 */
 export const SOURCE_LABEL: Record<CapResult['source'], string> = {
   default: '企业默认',
@@ -37,14 +30,13 @@ interface MatrixTableProps {
   items: PolicyItem[]
   matrix: PolicyMatrix
   modules: Record<ModuleKey, boolean>
-  colFilter?: ColFilter
   /** 为空时只读 */
   onToggle?: (key: string, col: PolicyCol, value: boolean) => void
 }
 
-/** 行按 group 分组，列为角色 × 端；模块停用整行灰显；staffOnly 的客户列显示「—」 */
-export function MatrixTable({ items, matrix, modules, colFilter = 'all', onToggle }: MatrixTableProps) {
-  const cols = colsOf(colFilter)
+/** 行按 group 分组，列只有客户 / 坐席两列（表头下用灰字注明端）；模块停用整行灰显；staffOnly 的客户列显示「—」 */
+export function MatrixTable({ items, matrix, modules, onToggle }: MatrixTableProps) {
+  const cols = POLICY_COLS
   const groups = Array.from(new Set(items.map((p) => p.group)))
   if (!items.length) return <div className="px-4 py-10 text-center text-xs text-zinc-400">没有匹配的能力键</div>
   return (
@@ -54,8 +46,9 @@ export function MatrixTable({ items, matrix, modules, colFilter = 'all', onToggl
           <tr className="border-b border-zinc-200 bg-zinc-50/80">
             <th className="px-4 py-2 text-left text-[11px] font-medium text-zinc-500">能力</th>
             {cols.map((c) => (
-              <th key={c.key} className="px-3 py-2 text-center text-[11px] font-medium text-zinc-700 whitespace-nowrap">
-                {c.label}
+              <th key={c.key} className="px-3 py-2 text-center whitespace-nowrap">
+                <div className="text-[12px] font-medium text-zinc-700">{c.label}</div>
+                <div className="text-[11px] font-normal text-zinc-400">{c.hint}</div>
               </th>
             ))}
             <th className="px-3 py-2 text-right text-[11px] font-medium text-zinc-500">状态</th>
@@ -71,7 +64,7 @@ export function MatrixTable({ items, matrix, modules, colFilter = 'all', onToggl
   )
 }
 
-function GroupRows({ group, items, matrix, modules, cols, onToggle }: { group: string; items: PolicyItem[]; matrix: PolicyMatrix; modules: Record<ModuleKey, boolean>; cols: { key: PolicyCol; label: string }[]; onToggle?: MatrixTableProps['onToggle'] }) {
+function GroupRows({ group, items, matrix, modules, cols, onToggle }: { group: string; items: PolicyItem[]; matrix: PolicyMatrix; modules: Record<ModuleKey, boolean>; cols: { key: PolicyCol; label: string; hint: string }[]; onToggle?: MatrixTableProps['onToggle'] }) {
   return (
     <>
       <tr id={groupAnchorId(group)} className="bg-zinc-50/60">
@@ -116,7 +109,7 @@ function GroupRows({ group, items, matrix, modules, cols, onToggle }: { group: s
 }
 
 function Cell({ item, col, on, disabled, onToggle }: { item: PolicyItem; col: PolicyCol; on: boolean; disabled: boolean; onToggle?: MatrixTableProps['onToggle'] }) {
-  if (item.staffOnly && col.startsWith('customer')) return <span className="text-zinc-300" title="只对坐席有意义">—</span>
+  if (item.staffOnly && col === 'customer') return <span className="text-zinc-300" title="只对坐席有意义">—</span>
   if (onToggle) return <Switch checked={on} disabled={disabled} onChange={(v) => onToggle(item.key, col, v)} />
   return on ? <Pill tone={disabled ? 'zinc' : 'green'}>开</Pill> : <Pill tone={disabled ? 'zinc' : 'red'}>关</Pill>
 }

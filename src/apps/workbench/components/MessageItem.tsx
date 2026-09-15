@@ -91,43 +91,43 @@ export function MessageItem({
   if (m.senderKind === 'system') {
     return (
       <div id={`msg-${m.id}`} className="my-2 rounded-md text-center">
-        {showDate && <div className="mb-2 text-[10px] text-zinc-400">{fmtDateTime(m.at).slice(0, 10)}</div>}
-        <span className="inline-block rounded-full bg-zinc-200/70 px-2.5 py-0.5 text-[10px] text-zinc-500">{m.text}{m.mentionAll ? ' · @所有人' : ''}</span>
+        {showDate && <div className="mb-2 text-[11px] text-zinc-400">{fmtDateTime(m.at).slice(0, 10)}</div>}
+        <span className="inline-block rounded-full bg-zinc-200/70 px-2.5 py-0.5 text-[11px] text-zinc-500">{m.text}{m.mentionAll ? ' · @所有人' : ''}</span>
       </div>
     )
   }
 
   return (
     <div id={`msg-${m.id}`} className={clsx('rounded-md transition-shadow', current && 'ring-2 ring-amber-300')}>
-      {showDate && <div className="my-3 text-center text-[10px] text-zinc-400">{fmtDateTime(m.at).slice(0, 10)}</div>}
-      <div className={clsx('group relative mb-3 flex gap-2', mine && 'flex-row-reverse')}>
-        {mine ? <SeatAvatar seat={seat} size={28} /> : otherSeat ? <SeatAvatar seat={otherSeat} size={28} /> : bot ? <Avatar text={bot.nickname} size={28} color={bot.avatarColor} /> : <Avatar text={customer?.nickname ?? '?'} size={28} />}
+      {showDate && <div className="my-3 text-center text-[11px] text-zinc-400">{fmtDateTime(m.at).slice(0, 10)}</div>}
+      <div className={clsx('group relative mb-3.5 flex gap-2.5', mine && 'flex-row-reverse')}>
+        {mine ? <SeatAvatar seat={seat} size={30} /> : otherSeat ? <SeatAvatar seat={otherSeat} size={30} /> : bot ? <Avatar text={bot.nickname} size={30} color={bot.avatarColor} /> : <Avatar text={customer?.nickname ?? '?'} size={30} />}
         <div className={clsx('max-w-[70%]', mine && 'items-end text-right')}>
           {!mine && (isGroup || bot) && (
-            <div className="mb-0.5 flex items-center gap-1 text-[10px] text-zinc-500">
+            <div className="mb-0.5 flex items-center gap-1 text-[11px] text-zinc-500">
               {senderName(s, m)}
               {senderTitle && <TitleChip title={senderTitle} size="xs" />}
               {otherSeat && <Pill tone="blue">官方</Pill>}
-              {bot && <Pill tone="purple"><Bot size={9} className="mr-0.5" />机器人</Pill>}
+              {bot && <Pill tone="purple"><Bot size={10} className="mr-0.5" />机器人</Pill>}
             </div>
           )}
           {replyTo && (
             <button
               type="button"
               onClick={() => !jumpToMessage(replyTo.id) && toast('原消息不在当前视图', 'info')}
-              className={clsx('mb-0.5 block max-w-full truncate rounded border-l-2 border-brand-400 bg-zinc-100 px-2 py-0.5 text-left text-[10px] text-zinc-500 hover:bg-zinc-200', mine && 'ml-auto')}
+              className={clsx('mb-0.5 block max-w-full truncate rounded border-l-2 border-brand-400 bg-zinc-100 px-2 py-0.5 text-left text-[11px] text-zinc-500 hover:bg-zinc-200', mine && 'ml-auto')}
               title="点击跳到原消息"
             >
               {senderName(s, replyTo)}：{visibleText(replyTo, 'staff').slice(0, 40)}
             </button>
           )}
           <div className={clsx('inline-block rounded-lg px-3 py-2 text-left text-[13px] leading-relaxed whitespace-pre-wrap', gone ? 'bg-zinc-100 text-zinc-400 italic' : mine ? 'bg-brand-700 text-white' : otherSeat ? 'bg-brand-50 text-brand-900' : bot ? 'bg-purple-50 text-purple-950' : 'bg-white text-zinc-800 shadow-sm')}>
-            {m.forwardedFrom && <div className={clsx('mb-0.5 text-[10px]', mine ? 'text-brand-100' : 'text-zinc-400')}>转发的消息</div>}
+            {m.forwardedFrom && <div className={clsx('mb-0.5 text-[11px]', mine ? 'text-brand-100' : 'text-zinc-400')}>转发的消息</div>}
             {gone ? visibleText(m, 'staff') : m.kind === 'image' ? `[图片] ${m.text}` : renderText(m.text, highlight)}
           </div>
-          <div className={clsx('mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-zinc-400', mine && 'justify-end')}>
+          <div className={clsx('mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400', mine && 'justify-end')}>
             <span className="tabular-nums">{fmtTime(m.at)}</span>
-            {pinned && <span className="inline-flex items-center gap-0.5 text-amber-600"><Pin size={9} />已置顶</span>}
+            {pinned && <span className="inline-flex items-center gap-0.5 text-amber-600"><Pin size={10} />已置顶</span>}
             {m.isWelcome && <span className="rounded bg-zinc-100 px-1">欢迎语</span>}
             {m.isBroadcast && <span className="rounded bg-amber-50 px-1 text-amber-700">群发</span>}
             {m.aiDraftUsed && <span className="rounded bg-violet-50 px-1 text-violet-600">AI 草稿</span>}
@@ -137,7 +137,7 @@ export function MessageItem({
           </div>
         </div>
         {/* 悬停操作 */}
-        <div className={clsx('absolute -top-3 hidden items-center gap-0.5 rounded-md border border-zinc-200 bg-white px-1 py-0.5 shadow-sm group-hover:flex', mine ? 'right-9' : 'left-9')}>
+        <div className={clsx('absolute -top-3 hidden items-center gap-0.5 rounded-md border border-zinc-200 bg-white px-1 py-0.5 shadow-sm group-hover:flex', mine ? 'right-10' : 'left-10')}>
           {!gone && <Act icon={Reply} label="引用回复" onClick={() => onReply(m)} />}
           {showRecall && <Act icon={Undo2} label={recallExpired ? `超过 ${recallLimit} 秒，不能撤回` : `撤回（${recallLimit} 秒内）`} disabled={recallExpired} onClick={() => void recall()} />}
           {showDelete && <Act icon={Trash2} label={isGroup ? '删除他人消息（群内权限）' : '删除客户消息（员工能力）'} danger onClick={() => void del()} />}
@@ -153,7 +153,7 @@ export function MessageItem({
 function Act({ icon: Icon, label, onClick, danger, disabled }: { icon: typeof Reply; label: string; onClick: () => void; danger?: boolean; disabled?: boolean }) {
   return (
     <button type="button" title={label} disabled={disabled} onClick={onClick} className={clsx('rounded p-1 text-zinc-500 hover:bg-zinc-100', disabled ? 'cursor-not-allowed text-zinc-300' : danger ? 'hover:text-red-700' : 'hover:text-brand-700')}>
-      <Icon size={13} />
+      <Icon size={14} />
     </button>
   )
 }

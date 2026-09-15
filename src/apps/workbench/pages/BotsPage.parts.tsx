@@ -6,7 +6,7 @@ import { Plus, Send } from 'lucide-react'
 import type { BotAccount, BotScript, BotScriptSource } from '@/domain/types'
 import { confirm } from '@/ui/confirm'
 import { Button, Checkbox, Field, Input, Select, Switch, Textarea } from '@/ui/primitives'
-import { Avatar, Card, Note, Pill, Table } from '@/ui/display'
+import { Avatar, Card, Pill, Table } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
 import { BOT_AVATAR_COLORS, SCRIPT_TEMPLATES, SOURCE_LABEL } from './BotsPage.shared'
@@ -55,7 +55,7 @@ export function BotsTab({ botLimit }: { botLimit: number }) {
           columns={[
             { key: 'avatar', title: '头像', width: '48px', render: (b) => <Avatar text={b.nickname} color={b.avatarColor} size={28} /> },
             { key: 'name', title: '昵称', render: (b) => <span className="font-medium text-zinc-900">{b.nickname}</span> },
-            { key: 'persona', title: '人设', render: (b) => <span className="line-clamp-2 max-w-[260px] text-xs text-zinc-600">{b.persona}</span> },
+            { key: 'persona', title: '人设', render: (b) => <span className="line-clamp-2 max-w-[260px] text-[12px] text-zinc-600">{b.persona}</span> },
             { key: 'groups', title: '所属群', render: (b) => (b.groupIds.length ? b.groupIds.map(groupName).join('、') : <span className="text-zinc-400">未入群</span>) },
             { key: 'status', title: '状态', render: (b) => (b.enabled ? <Pill tone="green">启用</Pill> : <Pill>停用</Pill>) },
             { key: 'op', title: '实操员工', render: (b) => s.staff.find((x) => x.id === b.operatorStaffId)?.name ?? <span className="text-zinc-400">未指定</span> },
@@ -143,7 +143,7 @@ function BotModal({ bot, onClose }: { bot?: BotAccount; onClose: () => void }) {
             ))}
           </Select>
         </Field>
-        {error && (nickname || persona) && <p className="text-xs text-red-600">{error}</p>}
+        {error && (nickname || persona) && <p className="text-[12px] text-red-600">{error}</p>}
       </div>
     </Modal>
   )
@@ -175,7 +175,6 @@ function ManualSendModal({ bot, onClose }: { bot: BotAccount; onClose: () => voi
       }
     >
       <div className="space-y-3">
-        <Note>客户看到的是「{bot.nickname}」，消息上记录真实操作者（{staff?.name}）与来源「手动」，消息审计可查。</Note>
         <Field label="群" required>
           <Select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
             {bot.groupIds.map((id) => (
@@ -183,10 +182,10 @@ function ManualSendModal({ bot, onClose }: { bot: BotAccount; onClose: () => voi
             ))}
           </Select>
         </Field>
-        <Field label="内容" required hint="按人设口吻写；不 @ 客户、不做交易承诺">
+        <Field label="内容" required hint={`按人设口吻写；不 @ 客户、不做交易承诺。消息记录真实操作者（${staff?.name ?? ''}）与来源「手动」`}>
           <Textarea rows={3} maxLength={300} value={text} onChange={(e) => setText(e.target.value)} />
         </Field>
-        {error && text && <p className="text-xs text-red-600">{error}</p>}
+        {error && text && <p className="text-[12px] text-red-600">{error}</p>}
       </div>
     </Modal>
   )
@@ -241,7 +240,7 @@ export function ScriptsTab() {
             <div key={t.name} className="flex items-start justify-between gap-3 rounded-md border border-zinc-200 p-3">
               <div>
                 <div className="text-[13px] font-medium text-zinc-900">{t.name} <Pill className="ml-1">{SOURCE_LABEL[t.script.source]}</Pill></div>
-                <div className="mt-0.5 text-xs text-zinc-500">{t.desc}</div>
+                <div className="mt-0.5 text-[12px] text-zinc-500">{t.desc}</div>
               </div>
               <Button size="sm" onClick={() => addTemplate(t)}>一键加入</Button>
             </div>
@@ -314,7 +313,7 @@ function ScriptModal({ script, onClose }: { script?: BotScript; onClose: () => v
             <Textarea rows={2} maxLength={300} value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="围绕当天市场热点提一个开放式问题，不给结论" />
           </Field>
         )}
-        {error && (name || linesText || topic) && <p className="text-xs text-red-600">{error}</p>}
+        {error && (name || linesText || topic) && <p className="text-[12px] text-red-600">{error}</p>}
       </div>
     </Modal>
   )

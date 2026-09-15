@@ -38,7 +38,7 @@ import { aExtraActions, type AExtraActions } from './actions/A-extra'
 import { dExtraActions, type DExtraActions } from './actions/D-extra'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
-export const STORAGE_KEY = 'yolink-demo-v3'
+export const STORAGE_KEY = 'yolink-demo-v4'
 
 const now = () => iso(Date.now())
 
@@ -149,9 +149,9 @@ export const useStore = create<DemoStore>()(
           device: 'iPhone 15 · iOS 18（演示）',
           inviteGroupId: group.id,
           inviteLinkId: link?.id,
-          tagIds: [],
-          titleIds: ['t_new'],
-          primaryTitleId: 't_new',
+          tagIds: ['tag_new'],
+          titleIds: [],
+          primaryTitleId: null,
           note: '',
           purchases: [],
           referrerId: null,
@@ -305,8 +305,7 @@ export const useStore = create<DemoStore>()(
           }
         } else {
           // 频控二：每客户每天最多收到的群发条数，跨坐席、跨任务合并
-          const todayBroadcastConvs = new Set(s.broadcasts.filter((b) => b.sentAt.slice(0, 10) === today).map((b) => b.id))
-          void todayBroadcastConvs
+          const seatName = s.seats.find((x) => x.id === input.seatId)?.displayName ?? ''
           input.customerIds.forEach((cid) => {
             const c = s.customers.find((x) => x.id === cid)
             if (!c || c.deletedAt || c.blacklistedAt || c.blockedSeatIds.includes(input.seatId)) {
@@ -324,7 +323,9 @@ export const useStore = create<DemoStore>()(
               return
             }
             conv.lastMessageAt = at
-            newMsgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.contentKind ?? 'text', text: input.text, at, isBroadcast: true })
+            // 变量逐人替换：客户收到的是带自己昵称的私聊
+            const text = input.text.replaceAll('{{customer.nickname}}', c.nickname).replaceAll('{{staff.name}}', seatName).replaceAll('{{company.name}}', s.enterprise.name)
+            newMsgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.contentKind ?? 'text', text, at, isBroadcast: true })
           })
         }
         const record: Broadcast = {

@@ -17,6 +17,7 @@ import { RolesPage } from '@/apps/admin/pages/RolesPage'
 import { SeatGroupsPage } from '@/apps/admin/pages/SeatGroupsPage'
 import { InviteGroupsPage } from '@/apps/admin/pages/InviteGroupsPage'
 import { InviteLinksPage } from '@/apps/admin/pages/InviteLinksPage'
+import { BroadcastsAdminPage } from '@/apps/admin/pages/BroadcastsAdminPage'
 import { AssignSettingsPage } from '@/apps/admin/pages/AssignSettingsPage'
 import { TitlesPage } from '@/apps/admin/pages/TitlesPage'
 import { TagsPage } from '@/apps/admin/pages/TagsPage'
@@ -76,6 +77,7 @@ const router = createBrowserRouter([
       // 邀请与分配
       { path: 'invite-groups', element: <InviteGroupsPage /> },
       { path: 'invite-links', element: <InviteLinksPage /> },
+      { path: 'broadcasts', element: <BroadcastsAdminPage /> },
       { path: 'assign-settings', element: <AssignSettingsPage /> },
       // 内部标签与头衔
       { path: 'titles', element: <TitlesPage /> },

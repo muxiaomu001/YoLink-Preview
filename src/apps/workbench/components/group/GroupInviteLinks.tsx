@@ -47,40 +47,36 @@ export function GroupInviteLinks({ group: g, actor, perm, compact }: GroupPanelP
   }
 
   return (
-    <Section
-      title="邀请链接"
-      compact={compact}
-      locked={!canInvite}
-      lockedReason="需要「邀请用户」权限"
-      extra={<Button size="sm" variant="ghost" onClick={() => setCreating(true)}>生成新链接</Button>}
-    >
+    <Section title="邀请链接" compact={compact} extra={canInvite && <Button size="sm" variant="ghost" onClick={() => setCreating(true)}>生成新链接</Button>}>
       <div className="rounded-md border border-zinc-200 px-2.5 py-2">
-        <div className="text-[10px] text-zinc-400">主链接 · 永久 · 已加入 {main?.uses ?? 0} 人</div>
+        <div className="text-[11px] text-zinc-400">主链接 · 永久 · 已加入 {main?.uses ?? 0} 人</div>
         <div className="mt-0.5 flex items-center gap-1.5">
-          <code className="min-w-0 flex-1 truncate text-[11px] text-zinc-800">{main ? GROUP_LINK_BASE + main.code : '（主链接已撤销）'}</code>
+          <code className="min-w-0 flex-1 truncate text-[12px] text-zinc-800">{main ? GROUP_LINK_BASE + main.code : '（主链接已撤销）'}</code>
           {main && (
             <button type="button" title="复制链接" className="text-zinc-400 hover:text-brand-700" onClick={() => void copy(main.code)}>
               <Copy size={12} />
             </button>
           )}
-          <button type="button" title="撤销并重新生成" className="text-zinc-400 hover:text-red-700" onClick={() => void regenerate()}>
-            <RefreshCw size={12} />
-          </button>
+          {canInvite && (
+            <button type="button" title="撤销并重新生成" className="text-zinc-400 hover:text-red-700" onClick={() => void regenerate()}>
+              <RefreshCw size={12} />
+            </button>
+          )}
         </div>
       </div>
-      <div className="mt-2.5 text-[10px] font-medium text-zinc-500">附加链接（{extras.length}）</div>
-      {!extras.length && <div className="text-[11px] text-zinc-400">没有附加链接。每条可设名称、过期时间、人数上限。</div>}
+      <div className="mt-2.5 text-[11px] font-medium text-zinc-500">附加链接（{extras.length}）</div>
+      {!extras.length && <div className="text-[12px] text-zinc-400">没有附加链接。每条可设名称、过期时间、人数上限。</div>}
       <ul className="mt-1 divide-y divide-zinc-100">
         {extras.map((l) => {
           const st = statusOf(l, nowIso)
           return (
-            <li key={l.id} className="flex items-center gap-2 py-1.5 text-[11px]">
+            <li key={l.id} className="flex items-center gap-2 py-1.5 text-[12px]">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
                   <span className="truncate font-medium text-zinc-800">{l.name}</span>
                   <Pill tone={st.tone}>{st.text}</Pill>
                 </div>
-                <div className="text-[10px] text-zinc-400">
+                <div className="text-[11px] text-zinc-400">
                   {l.expiresAt ? `${fmtDate(l.expiresAt)} 过期` : '永久'} · 已用 {l.uses}/{l.maxUses ?? '不限'} · <code>{l.code}</code>
                 </div>
               </div>
@@ -89,7 +85,7 @@ export function GroupInviteLinks({ group: g, actor, perm, compact }: GroupPanelP
                   <button type="button" title="复制链接" className="text-zinc-400 hover:text-brand-700" onClick={() => void copy(l.code)}>
                     <Copy size={12} />
                   </button>
-                  <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px] text-red-700" onClick={() => void revoke(l)}>撤销</Button>
+                  {canInvite && <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px] text-red-700" onClick={() => void revoke(l)}>撤销</Button>}
                 </>
               )}
             </li>

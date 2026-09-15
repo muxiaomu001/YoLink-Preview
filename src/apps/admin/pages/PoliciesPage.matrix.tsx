@@ -1,27 +1,19 @@
 /**
- * 能力矩阵标签：搜索、列筛选、分组跳转、可改矩阵、效果预览。
+ * 能力矩阵标签：搜索、分组跳转、可改矩阵（客户 / 坐席两列）、效果预览。
  */
 import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
-import { clsx } from 'clsx'
 import { useStore } from '@/store/store'
 import { Input } from '@/ui/primitives'
 import { Card, Note } from '@/ui/display'
 import { toast } from '@/ui/overlay'
-import { MatrixTable, groupAnchorId, type ColFilter } from './PoliciesPage.parts'
+import { MatrixTable, groupAnchorId } from './PoliciesPage.parts'
 import { EffectPreview } from './PoliciesPage.preview'
-
-const COL_FILTERS: { v: ColFilter; label: string }[] = [
-  { v: 'all', label: '全部列' },
-  { v: 'customer', label: '只看客户端' },
-  { v: 'staff', label: '只看坐席端' },
-]
 
 export function MatrixTab() {
   const s = useStore()
   const admin = s.session.adminStaffId!
   const [q, setQ] = useState('')
-  const [colFilter, setColFilter] = useState<ColFilter>('all')
 
   const groups = useMemo(() => Array.from(new Set(s.policyItems.map((p) => p.group))), [s.policyItems])
   const items = useMemo(() => {
@@ -37,7 +29,7 @@ export function MatrixTab() {
   return (
     <>
       <Note>
-        每一行就是客户 App 与工作台里"能不能"的开关：客户列管手机屏上的入口（加好友、建群、退群、发媒体……），坐席列管工作台聊天层。改了立即保存，在线用户立即收到策略更新推送并刷新能力快照。
+        每一行就是客户 App 与工作台里"能不能"的开关，只有两列：「客户」管客户手机 App 上的入口（加好友、建群、退群、发媒体……），「坐席」管桌面工作台的聊天层。改了立即保存，在线用户立即收到策略更新推送并刷新能力快照。
         {offModules.length > 0 && <span className="ml-1 text-amber-800">当前有模块已停用，其能力键整行灰显不生效。</span>}
       </Note>
       <Card
@@ -50,13 +42,6 @@ export function MatrixTab() {
         }
         extra={
           <div className="flex items-center gap-2">
-            <div className="flex overflow-hidden rounded-md border border-zinc-200 text-[11px]">
-              {COL_FILTERS.map((f) => (
-                <button key={f.v} type="button" onClick={() => setColFilter(f.v)} className={clsx('px-2 py-1', colFilter === f.v ? 'bg-brand-50 font-medium text-brand-800' : 'text-zinc-500 hover:bg-zinc-50')}>
-                  {f.label}
-                </button>
-              ))}
-            </div>
             <div className="relative">
               <Search size={12} className="pointer-events-none absolute top-2 left-2 text-zinc-400" />
               <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜能力名或键，如 friend" className="h-7 w-52 pl-6 text-xs" />
@@ -79,7 +64,6 @@ export function MatrixTab() {
           items={items}
           matrix={s.policyMatrix}
           modules={s.enterprise.modules}
-          colFilter={colFilter}
           onToggle={(key, col, value) => {
             s.setPolicyCap(key, col, value, admin)
             const item = s.policyItems.find((p) => p.key === key)

@@ -27,7 +27,7 @@ export function PoliciesPage() {
   const active = s.policyPresets.find((p) => p.id === s.activePresetId)
   return (
     <div>
-      <PageHeader title="策略与能力开关" desc={`客户与坐席在 App 里能做什么，全在这一页。预设只是批量填默认值，之后每一项仍可单独改。当前生效：${active?.name ?? '自定义'}`} />
+      <PageHeader title="策略与能力开关" desc={`客户在手机 App、坐席在桌面工作台能做什么，全在这一页。预设只是批量填默认值，之后每一项仍可单独改。当前生效：${active?.name ?? '自定义'}`} />
       <Note>
         这里的每一行就是客户 App 与工作台里"能不能"的开关。改了，在线用户立即收到策略更新推送。裁决顺序：模块授权 → 角色硬边界 → 策略矩阵（企业默认 → 群级覆盖 → 用户级覆盖）→ 员工角色能力与群内角色。
       </Note>

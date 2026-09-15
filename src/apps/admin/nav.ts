@@ -29,6 +29,7 @@ import {
   MessageSquareText,
   Puzzle,
   ScrollText,
+  Send,
   ShieldAlert,
   ShieldCheck,
   Smartphone,
@@ -89,6 +90,7 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       { to: '/admin/invite-groups', label: '邀请组', icon: UsersRound, module: 'invite' },
       { to: '/admin/invite-links', label: '邀请链接总览', icon: Link2, module: 'invite' },
+      { to: '/admin/broadcasts', label: '群发管理', icon: Send, module: 'broadcast' },
       { to: '/admin/assign-settings', label: '欢迎语与默认群', icon: MessageSquareText, module: 'invite' },
     ],
   },

@@ -10,7 +10,6 @@ import { daysSince, fmtAgo, fmtDate } from '@/domain/time'
 import { groupCapacity, seatGroupPerm } from '@/store/policy'
 import { primarySeatOfCustomer } from '@/store/selectors'
 import { Button, Checkbox, Input, Select } from '@/ui/primitives'
-import { Pill } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
 
@@ -36,6 +35,12 @@ export const EMPTY_FILTER: CustomerFilter = { q: '', tagIds: [], titleIds: [], b
 
 export function isFilterActive(f: CustomerFilter): boolean {
   return JSON.stringify(f) !== JSON.stringify(EMPTY_FILTER)
+}
+
+/** 高级筛选里生效的条件数（不含搜索框），给按钮角标用 */
+export function advancedFilterCount(f: CustomerFilter): number {
+  const flags = [f.tagIds.length > 0, f.titleIds.length > 0, f.bought !== 'any' || !!f.product || !!f.boughtWithinDays, !!f.roleLabel, !!f.inviteMin || !!f.inviteMax, !!f.regFrom || !!f.regTo, !!f.activeFrom || !!f.activeTo]
+  return flags.filter(Boolean).length
 }
 
 export function applyFilter(list: Customer[], f: CustomerFilter): Customer[] {
@@ -103,15 +108,15 @@ export function FilterPanel({ f, onChange, products, roles }: { f: CustomerFilte
   const patch = (p: Partial<CustomerFilter>) => onChange({ ...f, ...p })
   const range = (fromKey: 'regFrom' | 'activeFrom', toKey: 'regTo' | 'activeTo') => (
     <div className="flex items-center gap-1">
-      <Input type="date" className="h-7 text-xs" value={f[fromKey]} onChange={(e) => patch({ [fromKey]: e.target.value })} />
+      <Input type="date" className="h-7 text-[12px]" value={f[fromKey]} onChange={(e) => patch({ [fromKey]: e.target.value })} />
       <span className="text-zinc-400">–</span>
-      <Input type="date" className="h-7 text-xs" value={f[toKey]} onChange={(e) => patch({ [toKey]: e.target.value })} />
+      <Input type="date" className="h-7 text-[12px]" value={f[toKey]} onChange={(e) => patch({ [toKey]: e.target.value })} />
     </div>
   )
+  const count = advancedFilterCount(f)
   return (
-    <div className="mb-3 space-y-2 rounded-lg border border-zinc-200 bg-white p-3 text-xs">
+    <div className="mb-3 space-y-2 rounded-lg border border-zinc-200 bg-white p-3 text-[12px]">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <Input value={f.q} onChange={(e) => patch({ q: e.target.value })} placeholder="搜昵称、账号 ID" className="h-7 w-44 text-xs" />
         <div className="flex flex-wrap items-center gap-1">
           <span className="text-zinc-500">标签</span>
           {s.tags.map((t) => (
@@ -119,9 +124,7 @@ export function FilterPanel({ f, onChange, products, roles }: { f: CustomerFilte
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-1">
-          <span className="text-zinc-500">
-            头衔 <Pill>P1</Pill>
-          </span>
+          <span className="text-zinc-500">头衔</span>
           {s.titles
             .filter((t) => t.enabled)
             .map((t) => (
@@ -132,12 +135,12 @@ export function FilterPanel({ f, onChange, products, roles }: { f: CustomerFilte
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="flex items-center gap-1">
           <span className="text-zinc-500">购买</span>
-          <Select className="h-7 w-24 text-xs" value={f.bought} onChange={(e) => patch({ bought: e.target.value as CustomerFilter['bought'] })}>
+          <Select className="h-7 w-24 text-[12px]" value={f.bought} onChange={(e) => patch({ bought: e.target.value as CustomerFilter['bought'] })}>
             <option value="any">不限</option>
             <option value="yes">买过</option>
             <option value="no">未买过</option>
           </Select>
-          <Select className="h-7 w-40 text-xs" value={f.product} onChange={(e) => patch({ product: e.target.value })}>
+          <Select className="h-7 w-40 text-[12px]" value={f.product} onChange={(e) => patch({ product: e.target.value })}>
             <option value="">任一产品</option>
             {products.map((p) => (
               <option key={p} value={p}>
@@ -146,12 +149,12 @@ export function FilterPanel({ f, onChange, products, roles }: { f: CustomerFilte
             ))}
           </Select>
           <span className="text-zinc-500">最近</span>
-          <Input type="number" min={1} className="h-7 w-16 text-xs" placeholder="天" value={f.boughtWithinDays} onChange={(e) => patch({ boughtWithinDays: e.target.value })} />
+          <Input type="number" min={1} className="h-7 w-16 text-[12px]" placeholder="天" value={f.boughtWithinDays} onChange={(e) => patch({ boughtWithinDays: e.target.value })} />
           <span className="text-zinc-500">天内</span>
         </div>
         <div className="flex items-center gap-1">
           <span className="text-zinc-500">角色</span>
-          <Select className="h-7 w-28 text-xs" value={f.roleLabel} onChange={(e) => patch({ roleLabel: e.target.value })}>
+          <Select className="h-7 w-28 text-[12px]" value={f.roleLabel} onChange={(e) => patch({ roleLabel: e.target.value })}>
             <option value="">不限</option>
             {roles.map((r) => (
               <option key={r} value={r}>
@@ -160,9 +163,9 @@ export function FilterPanel({ f, onChange, products, roles }: { f: CustomerFilte
             ))}
           </Select>
           <span className="text-zinc-500">直接邀请</span>
-          <Input type="number" min={0} className="h-7 w-14 text-xs" value={f.inviteMin} onChange={(e) => patch({ inviteMin: e.target.value })} />
+          <Input type="number" min={0} className="h-7 w-14 text-[12px]" value={f.inviteMin} onChange={(e) => patch({ inviteMin: e.target.value })} />
           <span className="text-zinc-400">–</span>
-          <Input type="number" min={0} className="h-7 w-14 text-xs" value={f.inviteMax} onChange={(e) => patch({ inviteMax: e.target.value })} />
+          <Input type="number" min={0} className="h-7 w-14 text-[12px]" value={f.inviteMax} onChange={(e) => patch({ inviteMax: e.target.value })} />
           <span className="text-zinc-500">人</span>
         </div>
       </div>
@@ -175,11 +178,9 @@ export function FilterPanel({ f, onChange, products, roles }: { f: CustomerFilte
           <span className="text-zinc-500">最近活跃</span>
           {range('activeFrom', 'activeTo')}
         </div>
-        {isFilterActive(f) && (
-          <Button size="sm" variant="ghost" onClick={() => onChange(EMPTY_FILTER)}>
-            清空筛选
-          </Button>
-        )}
+        <Button size="sm" variant="ghost" className="ml-auto" disabled={count === 0} onClick={() => onChange({ ...EMPTY_FILTER, q: f.q })}>
+          清空{count ? `（${count}）` : ''}
+        </Button>
       </div>
     </div>
   )
@@ -199,11 +200,7 @@ export function BulkTagModal({ ids, onClose }: { ids: string[]; onClose: () => v
     <Modal
       open
       onClose={onClose}
-      title={
-        <span>
-          批量打标签 <Pill>P1</Pill>
-        </span>
-      }
+      title="批量打标签"
       width={420}
       footer={
         <>

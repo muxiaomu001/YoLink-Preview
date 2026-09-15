@@ -1,19 +1,21 @@
 /**
- * 聊天区：顶栏（在线状态 / 群成员数）→ 群置顶条 → 会话内搜索（⌘F）→ 消息列表 → AI 推荐 → 输入区。
+ * 聊天区：顶栏（在线状态 / 群成员数 / 会话内搜索 / 右栏收起）→ 群置顶条 → 会话内搜索（⌘F）→ 消息列表 → AI 推荐 → 输入区。
  * 发送走 seatSendRich（引用、@所有人）；频道要有「频道发布」权限才能发；拉黑的私聊发不出去。
+ * AI 推荐两种触发：员工偏好「自动弹出」开着时客户来消息自动弹；或点输入栏的「AI 推荐」按钮手动生成。
  */
 import { useEffect, useMemo, useState } from 'react'
 import { draftsFor, type AiDraft } from '@/domain/ai'
 import type { Message, Seat } from '@/domain/types'
 import { seatCan, seatGroupPerm } from '@/store/policy'
-import { messagesOf, type ConvRow } from '@/store/selectors'
+import { customerById, messagesOf, type ConvRow } from '@/store/selectors'
+import { toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
 import { AiPanel, ChatHeader, ForwardModal, MessageSearchBar, PinModal, PinnedBar } from './ChatArea.parts'
 import { ChatInput } from './ChatInput'
 import { MessageItem } from './MessageItem'
 import { jumpToMessage } from './group/shared'
 
-export function ChatArea({ row, seat }: { row: ConvRow; seat: Seat }) {
+export function ChatArea({ row, seat, rightOpen, onToggleRight, onGroupInfo }: { row: ConvRow; seat: Seat; rightOpen: boolean; onToggleRight: () => void; onGroupInfo: () => void }) {
   const { s, staff } = useWorkbench()
   const msgs = useMemo(() => messagesOf(s, row.conv.id), [s, row.conv.id])
   const [text, setText] = useState('')
@@ -24,6 +26,9 @@ export function ChatArea({ row, seat }: { row: ConvRow; seat: Seat }) {
   const [hitIdx, setHitIdx] = useState(0)
   const [forwardMsg, setForwardMsg] = useState<Message | null>(null)
   const [pinMsg, setPinMsg] = useState<Message | null>(null)
+  // 手动生成的 AI 草稿；自动弹出被关掉时记住是针对哪条客户消息关的，下一条再弹
+  const [manualDrafts, setManualDrafts] = useState<AiDraft[] | null>(null)
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null)
   const isDm = row.conv.kind === 'dm'
   const customer = row.customer
   const group = !isDm ? s.chatGroups.find((g) => g.id === row.conv.chatGroupId) : undefined
@@ -61,10 +66,23 @@ export function ChatArea({ row, seat }: { row: ConvRow; seat: Seat }) {
     if (hits[hitIdx]) jumpToMessage(hits[hitIdx])
   }, [hits, hitIdx])
 
-  // AI 推荐：私聊、客户在等、员工没关、策略允许
+  // AI 推荐：策略允许才有入口；自动弹出要求私聊、客户在等、员工偏好开着
+  const canAi = seatCan(s, seat.id, 'ai.suggest')
   const lastCustomerMsg = [...msgs].reverse().find((m) => m.senderKind === 'customer')
-  const aiOn = isDm && !!customer && !!row.waitingSince && !!lastCustomerMsg && staff?.prefs?.aiSuggest !== false && seatCan(s, seat.id, 'ai.suggest')
-  const drafts = aiOn && customer && lastCustomerMsg ? draftsFor({ lastCustomerText: lastCustomerMsg.text, customer, seat, knowledge: s.knowledge }) : []
+  const aiAuto = canAi && isDm && !!customer && !!row.waitingSince && !!lastCustomerMsg && !!staff?.prefs?.aiSuggest && dismissedFor !== lastCustomerMsg.id
+  const autoDrafts = aiAuto && customer && lastCustomerMsg ? draftsFor({ lastCustomerText: lastCustomerMsg.text, customer, seat, knowledge: s.knowledge }) : []
+  const drafts = manualDrafts ?? autoDrafts
+
+  const aiSuggest = () => {
+    if (!lastCustomerMsg) return toast('还没有客户消息可参考', 'info')
+    const from = isDm ? customer : customerById(s, lastCustomerMsg.senderId)
+    if (!from) return toast('还没有客户消息可参考', 'info')
+    setManualDrafts(draftsFor({ lastCustomerText: lastCustomerMsg.text, customer: from, seat, knowledge: s.knowledge }))
+  }
+  const closeAi = () => {
+    setManualDrafts(null)
+    if (lastCustomerMsg) setDismissedFor(lastCustomerMsg.id)
+  }
 
   const send = (body: string, mentionAll: boolean) => {
     if (!staff) return
@@ -73,11 +91,13 @@ export function ChatArea({ row, seat }: { row: ConvRow; seat: Seat }) {
     setText('')
     setDraftFrom(null)
     setReplyTo(undefined)
+    setManualDrafts(null)
   }
   const aiSend = (d: AiDraft) => {
     if (!staff) return
     s.seatSendRich({ convId: row.conv.id, seatId: seat.id, operatorId: staff.id, text: d.text, aiDraftUsed: true })
     s.recordAi(staff.id, row.conv.id, 'adopted')
+    setManualDrafts(null)
   }
   const aiEdit = (d: AiDraft) => {
     setText(d.text)
@@ -85,11 +105,11 @@ export function ChatArea({ row, seat }: { row: ConvRow; seat: Seat }) {
     if (staff) s.recordAi(staff.id, row.conv.id, 'edited')
   }
 
-  const disabledReason = blocked ? `对方已拉黑「${seat.displayName}」，私聊发不出去；群消息照常。` : !canPost ? '频道只有拥有「频道发布」权限的管理员能发布；你在本频道没有该权限，输入区已禁用。' : undefined
+  const disabledReason = blocked ? `对方已拉黑「${seat.displayName}」，发不出去` : !canPost ? '没有「频道发布」权限，不能发布' : undefined
 
   return (
     <>
-      <ChatHeader row={row} seat={seat} group={group} onGroupInfo={() => document.getElementById('wb-right-panel')?.scrollTo({ top: 0, behavior: 'smooth' })} />
+      <ChatHeader row={row} group={group} onGroupInfo={onGroupInfo} onSearch={() => setSearchOpen(true)} rightOpen={rightOpen} onToggleRight={onToggleRight} />
       {group && <PinnedBar group={group} canPin={canPin} />}
       {searchOpen && <MessageSearchBar query={query} onQuery={onQuery} total={hits.length} idx={hitIdx} onIdx={setHitIdx} onClose={() => { setSearchOpen(false); onQuery('') }} />}
 
@@ -110,7 +130,7 @@ export function ChatArea({ row, seat }: { row: ConvRow; seat: Seat }) {
         ))}
       </div>
 
-      {aiOn && <AiPanel drafts={drafts} onSend={aiSend} onEdit={aiEdit} />}
+      {drafts.length > 0 && <AiPanel drafts={drafts} onSend={aiSend} onEdit={aiEdit} onClose={closeAi} />}
       <ChatInput
         seat={seat}
         group={group}
@@ -121,6 +141,7 @@ export function ChatArea({ row, seat }: { row: ConvRow; seat: Seat }) {
         onClearReply={() => setReplyTo(undefined)}
         disabledReason={disabledReason}
         onSend={send}
+        onAiSuggest={canAi ? aiSuggest : undefined}
       />
 
       {forwardMsg && <ForwardModal message={forwardMsg} seat={seat} onClose={() => setForwardMsg(null)} />}

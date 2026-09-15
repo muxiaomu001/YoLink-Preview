@@ -114,6 +114,7 @@ export interface StaffPrefs {
   desktopNotify: boolean
   sound: boolean
   language: Language
+  /** AI 推荐是否在客户来消息后自动弹出草稿；关时只能点输入栏的「AI 推荐」按钮 */
   aiSuggest: boolean
 }
 
@@ -303,7 +304,8 @@ export interface TitleAssignment {
 
 // ---------- 群与会话 ----------
 
-export type ChatGroupKind = 'group' | 'supergroup' | 'channel'
+/** 群只有一种（上限走策略数值 groupMaxMembers），不再分普通群 / 大群；频道客户只读 */
+export type ChatGroupKind = 'group' | 'channel'
 
 /** 群内管理员权限粒度（12 文档，P0 实现 9 项里的 8 项 + 频道发布） */
 export type GroupAdminPerm =
@@ -605,7 +607,8 @@ export interface SensitiveHit {
 
 // ---------- 群发、快捷回复、知识库 ----------
 
-export type BroadcastTargetKind = 'mine' | 'tag' | 'title' | 'purchase' | 'role' | 'group'
+/** friends：本坐席全部好友（所有把它加为官方联系人的客户），一键群发的默认目标；mine：只算主归属 */
+export type BroadcastTargetKind = 'friends' | 'mine' | 'tag' | 'title' | 'purchase' | 'role' | 'group'
 export type BroadcastStatus = 'scheduled' | 'sending' | 'done' | 'failed'
 
 export interface Broadcast {
@@ -720,8 +723,8 @@ export interface PolicyItem {
   staffOnly?: boolean
 }
 
-/** 策略矩阵的列：角色 × 端 */
-export type PolicyCol = 'customer_mobile' | 'customer_desktop' | 'staff_mobile' | 'staff_desktop'
+/** 策略矩阵的列：客户（只有手机端）与坐席（只有桌面端），用户 2026-09-15 决定不按端拆列 */
+export type PolicyCol = 'customer' | 'staff'
 
 /** 能力键 → 每列开关 */
 export type PolicyMatrix = Record<string, Record<PolicyCol, boolean>>

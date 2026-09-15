@@ -62,7 +62,7 @@ export function unreadForSeat(s: DemoState, conv: Conversation, seatId?: string)
   return n
 }
 
-export type WorkbenchView = 'waiting' | 'all' | 'mentions' | 'idle'
+export type WorkbenchView = 'all' | 'waiting' | 'unread'
 
 export interface ConvRow {
   conv: Conversation
@@ -121,18 +121,21 @@ export function conversationsForSeat(s: DemoState, seatId: string): ConvRow[] {
     .sort((a, b) => (a.pinned !== b.pinned ? (a.pinned ? -1 : 1) : b.conv.lastMessageAt.localeCompare(a.conv.lastMessageAt)))
 }
 
-/** idleDays：企业数值型策略里的"长期未跟进天数"，默认 14 */
-export function applyView(rows: ConvRow[], view: WorkbenchView, idleDays: number = LONG_IDLE_DAYS): ConvRow[] {
+/** 三个视图：全部 / 待我回复（按等待时长）/ 未读。「长期未跟进」是筛选条件，见 isIdle */
+export function applyView(rows: ConvRow[], view: WorkbenchView): ConvRow[] {
   switch (view) {
     case 'waiting':
       return rows.filter((r) => r.waitingSince).sort((a, b) => a.waitingSince!.localeCompare(b.waitingSince!))
-    case 'mentions':
-      return rows.filter((r) => r.mentioned)
-    case 'idle':
-      return rows.filter((r) => r.conv.kind === 'dm' && r.idleDays >= idleDays).sort((a, b) => b.idleDays - a.idleDays)
+    case 'unread':
+      return rows.filter((r) => r.unread > 0)
     default:
       return rows
   }
+}
+
+/** 长期未跟进：私聊且超过企业数值型策略 idleDays 天没有往来 */
+export function isIdle(row: ConvRow, idleDays: number = LONG_IDLE_DAYS): boolean {
+  return row.conv.kind === 'dm' && row.idleDays >= idleDays
 }
 
 /** 客户的全部官方号（按邀请组顺序），带主归属 */
@@ -157,6 +160,12 @@ export function activeCustomers(s: DemoState): Customer[] {
 export function customersOfSeat(s: DemoState, seatId: string): Customer[] {
   const ids = new Set(s.customerSeats.filter((cs) => cs.seatId === seatId && cs.primary).map((cs) => cs.customerId))
   return s.customers.filter((c) => ids.has(c.id))
+}
+
+/** 某坐席的全部好友：所有把它加为官方联系人的在册客户（含非主归属），一键群发的范围 */
+export function friendsOfSeat(s: DemoState, seatId: string): Customer[] {
+  const ids = new Set(s.customerSeats.filter((cs) => cs.seatId === seatId).map((cs) => cs.customerId))
+  return s.customers.filter((c) => ids.has(c.id) && !c.deletedAt)
 }
 
 /** 客户屏视角：客户的会话列表（官方号私聊 + 群 + 频道） */

@@ -9,7 +9,7 @@ import { Card, Note, PageHeader, Pill, SeatAvatar, Table, type Column } from '@/
 import { Modal, toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 
-export const GROUP_KIND_LABEL: Record<ChatGroupKind, string> = { group: '普通群', supergroup: '大群', channel: '频道' }
+export const GROUP_KIND_LABEL: Record<ChatGroupKind, string> = { group: '群', channel: '频道' }
 
 type KindFilter = 'all' | ChatGroupKind
 
@@ -93,8 +93,7 @@ export function ChatGroupsPage() {
           <>
             <Select value={kind} onChange={(e) => setKind(e.target.value as KindFilter)} className="w-32">
               <option value="all">全部类型</option>
-              <option value="group">普通群</option>
-              <option value="supergroup">大群</option>
+              <option value="group">群</option>
               <option value="channel">频道</option>
             </Select>
             <Button variant="primary" onClick={() => setCreating(true)}>新建群 / 频道</Button>
@@ -152,7 +151,7 @@ function CreateGroupModal({ onClose, onCreated }: { onClose: () => void; onCreat
           <Textarea rows={2} value={desc} maxLength={DESC_MAX} onChange={(e) => setDesc(e.target.value)} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="类型" hint={kind === 'channel' ? '客户只读' : kind === 'supergroup' ? '读扩散，默认上限 10,000' : '上限 200'}>
+          <Field label="类型" hint={kind === 'channel' ? '客户只读' : `默认上限 ${s.policyNumbers.groupMaxMembers.toLocaleString()} 人`}>
             <Select value={kind} onChange={(e) => setKind(e.target.value as ChatGroupKind)}>
               {(Object.keys(GROUP_KIND_LABEL) as ChatGroupKind[]).map((k) => <option key={k} value={k}>{GROUP_KIND_LABEL[k]}</option>)}
             </Select>

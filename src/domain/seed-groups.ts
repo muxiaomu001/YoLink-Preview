@@ -5,7 +5,7 @@
 import type { BotAccount, BotRule, BotRun, BotScript, ChatGroup, GroupLog, Message, StaffPrefs } from './types'
 import { ago, iso } from './time'
 
-export const DEFAULT_STAFF_PREFS: StaffPrefs = { theme: 'auto', desktopNotify: true, sound: false, language: 'zh', aiSuggest: true }
+export const DEFAULT_STAFF_PREFS: StaffPrefs = { theme: 'auto', desktopNotify: true, sound: false, language: 'zh', aiSuggest: false }
 
 /** 新建群的默认管理字段 */
 export function groupDefaults(): Pick<ChatGroup, 'memberBotIds' | 'admins' | 'settings' | 'announcement' | 'pinnedMessageIds' | 'restrictions' | 'inviteLinks'> {

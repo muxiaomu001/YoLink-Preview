@@ -35,24 +35,22 @@ export function GroupAnnouncementPanel({ group: g, actor, perm, compact }: Group
       compact={compact}
       hint={a ? undefined : '没有公告'}
       extra={
-        canEdit ? (
+        canEdit && (
           <div className="flex gap-1">
             <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>{a ? '编辑' : '发布公告'}</Button>
             {a && <Button size="sm" variant="ghost" className="text-red-700" onClick={() => void remove()}>删除</Button>}
           </div>
-        ) : (
-          <span className="text-[10px] text-zinc-400" title="需要「修改群信息」权限">只读</span>
         )
       }
     >
       {a ? (
         <div className="rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-900"><Megaphone size={12} /> {a.title}</div>
-          <div className="mt-1 text-[11px] leading-relaxed whitespace-pre-wrap text-zinc-700">{a.content}</div>
-          <div className="mt-1.5 text-[10px] text-zinc-400">{by?.displayName ?? '坐席'} · {fmtDateTime(a.at)}{a.notified ? ' · 已通知全体成员' : ''}</div>
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-amber-900"><Megaphone size={12} /> {a.title}</div>
+          <div className="mt-1 text-[12px] leading-relaxed whitespace-pre-wrap text-zinc-700">{a.content}</div>
+          <div className="mt-1.5 text-[11px] text-zinc-400">{by?.displayName ?? '坐席'} · {fmtDateTime(a.at)}{a.notified ? ' · 已通知全体成员' : ''}</div>
         </div>
       ) : (
-        <div className="text-[11px] text-zinc-400">新成员入群时会弹窗显示公告。{canEdit ? '点「发布公告」创建。' : ''}</div>
+        <div className="text-[12px] text-zinc-400">新成员入群时会弹窗显示公告。{canEdit ? '点「发布公告」创建。' : ''}</div>
       )}
       {editing && <AnnouncementModal group={g} actor={actor} onClose={() => setEditing(false)} />}
     </Section>

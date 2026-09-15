@@ -5,7 +5,6 @@
 import { useState } from 'react'
 import type { GroupAdminPerm, GroupMemberKind } from '@/domain/types'
 import { useStore } from '@/store/store'
-import { Note } from '@/ui/display'
 import { Button, Checkbox } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
 import { PERM_META, type GroupPanelProps } from './shared'
@@ -59,10 +58,6 @@ export function GroupAdminModal({
         </div>
         {full && <div className="text-xs text-red-600">管理员已达上限 {MAX_ADMINS} 人（group.max_admins）。</div>}
         {!perms.length && !full && <div className="text-xs text-red-600">至少勾选一项权限。</div>}
-        <Note>
-          {target.kind === 'customer' ? '客户也可以当管理员（例如"助教"），全员禁言对管理员不生效；' : '坐席管理员在工作台按这些权限显示按钮；'}
-          群主拥有全部权限且不可被降级。员工角色有「管理所有群」的，不看群内角色。
-        </Note>
       </div>
     </Modal>
   )

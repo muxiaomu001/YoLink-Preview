@@ -18,7 +18,7 @@ pnpm dev
 | 入口 | 路径 | 以谁的视角 |
 |---|---|---|
 | 管理后台（完整版） | `/admin` | 管理员 周敏；侧边栏按 PRD 05 章节分组，P1/P2 标记对应正式产品优先级，钱包/签到/推荐等模块由「模块启停」控制显隐 |
-| 客服工作台 | `/workbench` | 顾问 林薇，以「林顾问」身份；右上角可切换登录员工（演示控制）。导航按员工能力与模块显隐：会话、客户、邀请链接、群发、群活跃助手（`/workbench/bots`）、提现审核（`/workbench/withdrawals`，P2）、设置 |
+| 客服工作台 | `/workbench` | 顾问 林薇，以「林顾问」身份。按 PC 客户端布局：左侧图标栏导航（按员工能力与模块显隐：会话、客户、群发、邀请链接、群活跃助手、提现审核、设置）、三栏可拖宽、右栏可收起；右下角浮钮是演示控制（切换登录员工、打开手机屏 / 后台） |
 | 客户手机屏 | `/phone` | 未登录时是注册页；右侧演示控制可切到任一已有客户。每个按钮按策略渲染，后台切开关立即生效 |
 
 首页 `/` 有两条穿越流程的分步说明，和「重置演示数据」按钮。
@@ -53,9 +53,10 @@ src/
   ui/             通用组件（按钮、表格、弹窗、二次确认、SVG 图表、头衔与内部标签的 chip）
   apps/
     admin/        管理后台 40 余页，nav.ts 是侧边栏与路由清单
-    workbench/    工作台：三栏会话（ChatPage）、客户（CustomersPage）、邀请链接、群发、
-                  群活跃助手（BotsPage：机器人账号 / 剧本库 / 规则 / 待审核 / 运行记录）、
-                  提现审核（WithdrawalsPage：筛选、批量通过、标记已打款、导出 CSV）、设置
+    workbench/    工作台（PC 客户端布局）：components/layout 图标栏 / 坐席切换 / 拖拽把手 / 演示浮条 / 系统通知，
+                  三栏会话（ChatPage：全部 / 待我回复 / 未读 + 筛选弹层）、components/customer 资料卡（顶部快捷动作 + 折叠分区）、
+                  components/group 群摘要卡 + 群管理弹窗（按权限显示分页）、客户（CustomersPage）、邀请链接、群发（全部好友一键群发）、
+                  群活跃助手（BotsPage）、提现审核（WithdrawalsPage）、设置（含快捷键）；useLocalPref.ts 记本机栏宽与折叠状态
     phone/        客户手机屏：注册、消息、联系人、我的、聊天；screens 下每个页面按策略渲染
     landing/      演示首页
 ```
@@ -66,7 +67,7 @@ src/
 
 1. 页面动作调 `actions/policy.ts` 的 `setPolicyCap / addPolicyOverride` 改 `policyMatrix` 或 `policyOverrides`，zustand `persist` 写进 localStorage，另一个窗口通过 `storage` 事件同步。
 2. 手机屏、工作台每个按钮都不直接读矩阵，而是问 `store/policy.ts`：客户端 `customerCan(s, customerId, key, groupId?)`，坐席端 `seatCan(s, seatId, key, groupId?)`，群管理权限 `seatGroupPerm(s, g, seatId, staffId, perm)`。
-3. `resolveCap` 的裁决顺序（03 文档）：**模块授权**（`enterprise.modules[item.module]` 关了直接 false）→ **角色硬边界**（官方群 `group.leave` 对客户强制关）→ **策略矩阵**（企业默认，按 `role_platform` 四列）→ **群级覆盖**（只作用于客户在该群里的能力）→ **用户级覆盖**（客户或坐席）。后一层覆盖前一层，返回 `{ allowed, source }`，`source` 说明是哪一层决定的。
+3. `resolveCap` 的裁决顺序（03 文档）：**模块授权**（`enterprise.modules[item.module]` 关了直接 false）→ **角色硬边界**（官方群 `group.leave` 对客户强制关）→ **策略矩阵**（企业默认，只有「客户」「坐席」两列：客户只有手机 App，坐席只有桌面工作台）→ **群级覆盖**（只作用于客户在该群里的能力）→ **用户级覆盖**（客户或坐席）。后一层覆盖前一层，返回 `{ allowed, source }`，`source` 说明是哪一层决定的。
 4. 员工角色能力（`Role.caps`，如 `manage_bots / review_withdrawal`）与坐席策略是两套：前者管"这个人能不能进这个页面"，后者管"这个坐席在聊天层能不能做这件事"。工作台入口两个都查。
 
 ## 模型要点（技术团队看这里）

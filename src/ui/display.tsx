@@ -34,7 +34,7 @@ export function SeatAvatar({ seat, size = 32, className }: { seat: Seat; size?: 
 export function TitleChip({ title, size = 'sm', onRemove }: { title: Title; size?: 'xs' | 'sm'; onRemove?: () => void }) {
   return (
     <span
-      className={clsx('inline-flex items-center gap-1 rounded-sm font-medium text-white whitespace-nowrap', size === 'xs' ? 'px-1 text-[10px] leading-4' : 'px-1.5 text-[11px] leading-5')}
+      className={clsx('inline-flex items-center gap-1 rounded-sm font-medium text-white whitespace-nowrap', size === 'xs' ? 'px-1 text-[11px] leading-4' : 'px-1.5 text-[11px] leading-5')}
       style={{ background: title.color }}
       title={title.desc}
     >
@@ -170,7 +170,7 @@ export function Tabs<T extends string>({ value, onChange, items, className }: { 
           className={clsx('-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] transition-colors', value === it.key ? 'border-brand-700 font-medium text-brand-800' : 'border-transparent text-zinc-500 hover:text-zinc-800')}
         >
           {it.label}
-          {typeof it.count === 'number' && <span className={clsx('rounded-full px-1.5 text-[10px] leading-4 tabular-nums', value === it.key ? 'bg-brand-100 text-brand-800' : 'bg-zinc-100 text-zinc-500')}>{it.count}</span>}
+          {typeof it.count === 'number' && <span className={clsx('rounded-full px-1.5 text-[11px] leading-4 tabular-nums', value === it.key ? 'bg-brand-100 text-brand-800' : 'bg-zinc-100 text-zinc-500')}>{it.count}</span>}
         </button>
       ))}
     </div>

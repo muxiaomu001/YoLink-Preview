@@ -6,7 +6,8 @@ import { Copy, Plus } from 'lucide-react'
 import type { InviteLink } from '@/domain/types'
 import { fmtDate } from '@/domain/time'
 import { Button } from '@/ui/primitives'
-import { Card, Note, PageHeader, Pill, SeatAvatar, Table } from '@/ui/display'
+import { Card, PageHeader, Pill, SeatAvatar, Table } from '@/ui/display'
+import { HelpTip } from '@/ui/help'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { useWorkbench } from '../useWorkbench'
@@ -42,7 +43,12 @@ export function InvitesPage() {
     <div className="thin-scroll h-full overflow-y-auto p-5">
       <PageHeader
         title="我的邀请链接"
-        desc="链接是邀请组下面的渠道码，落点由组决定。想要「只加我一个」的推广码，让管理员建一个只放本坐席的组。"
+        desc={
+          <span className="inline-flex items-center gap-1.5">
+            链接是邀请组下面的渠道码，落点由组决定。
+            <HelpTip text={<span>想要「只加我一个」的推广码，让管理员建一个只放本坐席的组。注册时自动入群按三层叠加取并集：企业默认（{defaults.length ? defaults.join('、') : '无'}）→ 邀请组的群 → 本链接的附带动作；表格「附带动作」列标明来源。</span>} />
+          </span>
+        }
         extra={
           can('create_invite') ? (
             <Button variant="primary" disabled={myGroups.length === 0} title={myGroups.length ? '' : '当前坐席不在任何邀请组里，让管理员先把坐席放进组'} onClick={() => setCreating(true)}>
@@ -55,23 +61,18 @@ export function InvitesPage() {
           )
         }
       />
-      <div className="space-y-2">
-        <Note>
-          注册时自动入群按三层叠加取并集：<b>企业默认</b>（{defaults.length ? defaults.join('、') : '无'}）→ <b>邀请组</b>的群 → <b>本链接</b>的附带动作。表格「附带动作」列把三层都列出来并标明来源；生成链接时已被前两层覆盖的群会打勾禁用。
-        </Note>
-        {myGroups.length > 0 && (
-          <Note>
-            当前坐席「{seat?.displayName}」所在的邀请组：
-            {myGroups.map((g) => (
-              <span key={g.id} className="ml-2 inline-flex items-center gap-1">
-                <b>{g.name}</b> <span className="rounded bg-white px-1 font-mono text-[11px]">{g.code}</span>
-                <span className="text-[11px] text-brand-700">（{g.seatIds.map((id) => s.seats.find((x) => x.id === id)?.displayName).join('、')}）</span>
-              </span>
-            ))}
-          </Note>
-        )}
-      </div>
-      <Card className="mt-4" padded={false}>
+      {myGroups.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-zinc-600">
+          <span className="text-zinc-500">「{seat?.displayName}」所在的邀请组：</span>
+          {myGroups.map((g) => (
+            <span key={g.id} className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 leading-6" title={`成员坐席：${g.seatIds.map((id) => s.seats.find((x) => x.id === id)?.displayName).join('、')}`}>
+              <b className="font-medium text-zinc-800">{g.name}</b>
+              <span className="font-mono text-[11px] text-zinc-400">{g.code}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      <Card className="mt-3" padded={false}>
         <Table
           rows={mine}
           rowKey={(l) => l.id}
@@ -110,16 +111,7 @@ export function InvitesPage() {
             { key: 'attach', title: '附带动作', render: (l) => <AttachedActionsCell s={s} link={l} /> },
             { key: 'expires', title: '有效期', render: (l) => <span className="text-zinc-600">{l.expiresAt ? fmtDate(l.expiresAt) : '永久'}</span> },
             { key: 'uses', title: '使用上限', align: 'right', render: (l) => <span className="tabular-nums">{l.uses}/{l.maxUses ?? '∞'}</span> },
-            {
-              key: 'clicks',
-              title: (
-                <span>
-                  点击数 <Pill>P1</Pill>
-                </span>
-              ),
-              align: 'right',
-              render: (l) => <span className="tabular-nums text-zinc-500">{l.clicks}</span>,
-            },
+            { key: 'clicks', title: <span title="由短链服务统计">点击数</span>, align: 'right', render: (l) => <span className="tabular-nums text-zinc-500">{l.clicks}</span> },
             { key: 'reg', title: '注册数', align: 'right', render: (l) => <span className="tabular-nums">{s.customers.filter((c) => c.inviteLinkId === l.id).length}</span> },
             { key: 'status', title: '状态', render: (l) => <StatusPill l={l} /> },
             {
@@ -142,7 +134,6 @@ export function InvitesPage() {
           ]}
         />
       </Card>
-      <p className="mt-2 text-[11px] text-zinc-400">点击数为 P1：正式版由短链服务统计。</p>
       <InviteCreateModal open={creating} onClose={() => setCreating(false)} />
     </div>
   )

@@ -1,5 +1,5 @@
 /**
- * 成员列表：坐席（群主 / 管理员 / 成员，标"官方"）、机器人、客户（管理员在前），搜索（P1）。
+ * 成员列表：坐席（群主 / 管理员 / 成员，标"官方"）、机器人、客户（管理员在前），可搜索。
  * 每项操作按 12 文档权限：任免管理员 can_promote_members；移出 / 禁言 / 封禁 / 解除 can_restrict_members；
  * 加坐席与批量拉人 can_invite_users。客户也可被设为管理员（"助教"）。
  */
@@ -68,31 +68,32 @@ export function GroupMembers({ group: g, actor, perm, compact, canViewAll }: Gro
       compact={compact}
       hint={g.settings.membersVisible ? '客户可见' : '客户端按策略不可见'}
       extra={
-        canInvite ? (
+        canInvite && (
           <div className="flex gap-1">
             <Button size="sm" variant="ghost" onClick={() => setDialog({ type: 'seat' })}>加坐席</Button>
             <Button size="sm" variant="primary" onClick={() => setDialog({ type: 'bulk' })}>批量拉人</Button>
           </div>
-        ) : (
-          <span className="text-[10px] text-zinc-400" title="需要「邀请用户」权限">不能拉人</span>
         )
       }
     >
-      <div className="mb-2 flex items-center gap-1.5">
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜索成员昵称" className="h-7 text-xs" />
-        <Pill>P1</Pill>
+      <div className="mb-2">
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜索成员昵称" className="h-7 text-[12px]" />
       </div>
       <ul className="space-y-1" onMouseLeave={() => setMenu(null)}>
         {shownSeats.map((seat) => {
           const role = groupRoleOf(g, 'seat', seat.id)
           const t: Target = { kind: 'seat', id: seat.id, name: seat.displayName }
+          // 群主不可降级；没有任免权限时不出现菜单
+          const actions = canPromote && role !== 'owner' ? (
+            <>
+              {role === 'member' && <MenuItem onClick={() => setDialog({ type: 'admin', target: t })}>设为管理员</MenuItem>}
+              {role === 'admin' && <MenuItem onClick={() => setDialog({ type: 'admin', target: t })}>修改权限</MenuItem>}
+              {role === 'admin' && <MenuItem danger onClick={() => demote(t)}>撤销管理员</MenuItem>}
+            </>
+          ) : undefined
           return (
             <Row key={seat.id} avatar={<SeatAvatar seat={seat} size={22} />} name={seat.displayName} role={role} extra={<Pill tone="blue">官方</Pill>} perms={adminPerms('seat', seat.id)} menuOpen={menu === seat.id} onMenu={() => setMenu(menu === seat.id ? null : seat.id)}>
-              {role === 'member' && canPromote && <MenuItem onClick={() => setDialog({ type: 'admin', target: t })}>设为管理员</MenuItem>}
-              {role === 'admin' && canPromote && <MenuItem onClick={() => setDialog({ type: 'admin', target: t })}>修改权限</MenuItem>}
-              {role === 'admin' && canPromote && <MenuItem danger onClick={() => demote(t)}>撤销管理员</MenuItem>}
-              {role === 'owner' && <MenuItem disabled>群主不可降级</MenuItem>}
-              {role !== 'owner' && !canPromote && <MenuItem disabled>任免管理员需「任免管理员」权限</MenuItem>}
+              {actions}
             </Row>
           )
         })}
@@ -104,8 +105,8 @@ export function GroupMembers({ group: g, actor, perm, compact, canViewAll }: Gro
           const r = g.restrictions.find((x) => x.customerId === c.id && isRestrictionActive(x, nowIso))
           const title = c.primaryTitleId ? s.titles.find((x) => x.id === c.primaryTitleId && x.enabled) : undefined
           const t: Target = { kind: 'customer', id: c.id, name: c.nickname }
-          return (
-            <Row key={c.id} avatar={<Avatar text={c.nickname} size={22} />} name={c.nickname} role={role} extra={title && <TitleChip title={title} size="xs" />} status={r ? restrictionLabel(r) : undefined} perms={adminPerms('customer', c.id)} menuOpen={menu === c.id} onMenu={() => setMenu(menu === c.id ? null : c.id)}>
+          const actions = canPromote || canRestrict ? (
+            <>
               {canPromote && role === 'member' && <MenuItem onClick={() => setDialog({ type: 'admin', target: t })}>设为管理员（助教）</MenuItem>}
               {canPromote && role === 'admin' && <MenuItem onClick={() => setDialog({ type: 'admin', target: t })}>修改权限</MenuItem>}
               {canPromote && role === 'admin' && <MenuItem danger onClick={() => demote(t)}>撤销管理员</MenuItem>}
@@ -113,7 +114,11 @@ export function GroupMembers({ group: g, actor, perm, compact, canViewAll }: Gro
               {canRestrict && r && <MenuItem onClick={() => lift(c)}>解除{r.kind === 'ban' ? '封禁' : '禁言'}</MenuItem>}
               {canRestrict && <MenuItem danger onClick={() => setDialog({ type: 'ban', customer: c })}>封禁</MenuItem>}
               {canRestrict && <MenuItem danger onClick={() => setDialog({ type: 'kick', customer: c })}>移出</MenuItem>}
-              {!canPromote && !canRestrict && <MenuItem disabled>需要「任免管理员」或「限制成员」权限</MenuItem>}
+            </>
+          ) : undefined
+          return (
+            <Row key={c.id} avatar={<Avatar text={c.nickname} size={22} />} name={c.nickname} role={role} extra={title && <TitleChip title={title} size="xs" />} status={r ? restrictionLabel(r) : undefined} perms={adminPerms('customer', c.id)} menuOpen={menu === c.id} onMenu={() => setMenu(menu === c.id ? null : c.id)}>
+              {actions}
             </Row>
           )
         })}
@@ -122,17 +127,17 @@ export function GroupMembers({ group: g, actor, perm, compact, canViewAll }: Gro
             <Button size="sm" variant="ghost" onClick={() => setLimit((n) => n + PAGE)}>还有 {customers.length - limit} 位，显示更多</Button>
           </li>
         )}
-        {!shownSeats.length && !shownBots.length && !customers.length && <li className="text-[11px] text-zinc-400">没有匹配的成员</li>}
+        {!shownSeats.length && !shownBots.length && !customers.length && <li className="text-[12px] text-zinc-400">没有匹配的成员</li>}
       </ul>
       {banned.length > 0 && (
         <div className="mt-3">
-          <div className="mb-1 text-[10px] font-medium text-zinc-500">已封禁（不在群，时限内无法通过链接返回）</div>
+          <div className="mb-1 text-[11px] font-medium text-zinc-500">已封禁（不在群，时限内无法通过链接返回）</div>
           <ul className="space-y-1">
             {banned.map(({ r, c }) => (
-              <li key={c!.id} className="flex items-center gap-2 text-[11px]">
+              <li key={c!.id} className="flex items-center gap-2 text-[12px]">
                 <Avatar text={c!.nickname} size={20} />
                 <span className="min-w-0 flex-1 truncate text-zinc-600">{c!.nickname}</span>
-                <span className="text-[10px] text-red-600">{restrictionLabel(r)}</span>
+                <span className="text-[11px] text-red-600">{restrictionLabel(r)}</span>
                 {canRestrict && <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => lift(c!)}>解封</Button>}
               </li>
             ))}
@@ -158,16 +163,16 @@ const ROLE_TEXT: Record<string, { label: string; tone: 'amber' | 'blue' | 'zinc'
 function Row({ avatar, name, role, extra, status, perms, menuOpen, onMenu, children }: { avatar: React.ReactNode; name: string; role: string; extra?: React.ReactNode; status?: string; perms: string[]; menuOpen: boolean; onMenu: () => void; children?: React.ReactNode }) {
   const rt = ROLE_TEXT[role] ?? ROLE_TEXT.member
   return (
-    <li className="relative flex items-center gap-2 text-xs">
+    <li className="relative flex items-center gap-2 text-[13px]">
       {avatar}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1">
           <span className="truncate text-zinc-900">{name}</span>
           {extra}
-          <Pill tone={rt.tone}>{role === 'owner' ? <Crown size={9} className="mr-0.5" /> : role === 'admin' ? <Shield size={9} className="mr-0.5" /> : null}{rt.label}</Pill>
+          <Pill tone={rt.tone}>{role === 'owner' ? <Crown size={10} className="mr-0.5" /> : role === 'admin' ? <Shield size={10} className="mr-0.5" /> : null}{rt.label}</Pill>
         </div>
         {(status || perms.length > 0) && (
-          <div className="truncate text-[10px] text-zinc-400" title={perms.map((p) => PERM_LABEL[p as keyof typeof PERM_LABEL]).join('、')}>
+          <div className="truncate text-[11px] text-zinc-400" title={perms.map((p) => PERM_LABEL[p as keyof typeof PERM_LABEL]).join('、')}>
             {status && <span className="text-red-600">{status}</span>}
             {status && perms.length > 0 && ' · '}
             {perms.length > 0 && `权限：${perms.map((p) => PERM_LABEL[p as keyof typeof PERM_LABEL]).join('、')}`}
@@ -186,7 +191,7 @@ function Row({ avatar, name, role, extra, status, perms, menuOpen, onMenu, child
 
 function MenuItem({ children, onClick, danger, disabled }: { children: React.ReactNode; onClick?: () => void; danger?: boolean; disabled?: boolean }) {
   return (
-    <button type="button" disabled={disabled} onClick={onClick} className={`block w-full px-3 py-1.5 text-left text-xs ${disabled ? 'cursor-default text-zinc-400' : danger ? 'text-red-700 hover:bg-red-50' : 'text-zinc-700 hover:bg-zinc-50'}`}>
+    <button type="button" disabled={disabled} onClick={onClick} className={`block w-full px-3 py-1.5 text-left text-[13px] ${disabled ? 'cursor-default text-zinc-400' : danger ? 'text-red-700 hover:bg-red-50' : 'text-zinc-700 hover:bg-zinc-50'}`}>
       {children}
     </button>
   )
@@ -209,7 +214,7 @@ function AddSeatModal({ group: g, actor, onClose }: Pick<GroupPanelProps, 'group
           {options.map((x) => <option key={x.id} value={x.id}>{x.displayName}（{x.roleDesc}）</option>)}
         </Select>
       )}
-      <div className="mt-2 text-[11px] text-zinc-400">坐席入群后默认是普通成员；要给管理权限再在成员列表里「设为管理员」。</div>
+      <div className="mt-2 text-[12px] text-zinc-400">坐席入群后默认是普通成员；要给管理权限再在成员列表里「设为管理员」。</div>
     </Modal>
   )
 }

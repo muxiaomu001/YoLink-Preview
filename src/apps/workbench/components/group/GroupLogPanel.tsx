@@ -1,5 +1,5 @@
 /**
- * 管理员日志：该群近 48 小时的操作记录，仅有「管理群」权限的管理员可见；按事件类型筛选（P1）。
+ * 管理员日志：该群近 48 小时的操作记录，按事件类型筛选。有无权限看由调用方决定渲染与否。
  */
 import { useMemo, useState } from 'react'
 import { fmtAgo } from '@/domain/time'
@@ -23,7 +23,7 @@ const ACTION_LABEL: Record<string, string> = {
   delete_message: '删除消息',
 }
 
-export function GroupLogPanel({ group: g, perm, compact }: GroupPanelProps) {
+export function GroupLogPanel({ group: g, compact }: GroupPanelProps) {
   const s = useStore()
   const [action, setAction] = useState('all')
   const since = new Date(Date.now() - RETENTION_HOURS * 3600000).toISOString()
@@ -43,26 +43,21 @@ export function GroupLogPanel({ group: g, perm, compact }: GroupPanelProps) {
       compact={compact}
       hint={`保留 ${RETENTION_HOURS} 小时`}
       defaultOpen={!compact}
-      locked={!perm('can_manage_chat')}
-      lockedReason="需要「管理群」权限才能看管理员日志"
       extra={
-        <span className="inline-flex items-center gap-1">
-          <Pill>P1</Pill>
-          <Select className="h-6 w-28 text-[11px]" value={action} onChange={(e) => setAction(e.target.value)}>
-            <option value="all">全部类型</option>
-            {kinds.map((k) => <option key={k} value={k}>{ACTION_LABEL[k] ?? k}</option>)}
-          </Select>
-        </span>
+        <Select className="h-7 w-28 text-[12px]" value={action} onChange={(e) => setAction(e.target.value)}>
+          <option value="all">全部类型</option>
+          {kinds.map((k) => <option key={k} value={k}>{ACTION_LABEL[k] ?? k}</option>)}
+        </Select>
       }
     >
-      {!visible.length && <div className="text-[11px] text-zinc-400">近 {RETENTION_HOURS} 小时没有记录。</div>}
-      <ul className="thin-scroll max-h-72 space-y-1.5 overflow-y-auto">
+      {!visible.length && <div className="text-[12px] text-zinc-400">近 {RETENTION_HOURS} 小时没有记录。</div>}
+      <ul className="thin-scroll max-h-72 space-y-2 overflow-y-auto">
         {visible.map((l) => (
-          <li key={l.id} className="text-[11px]">
+          <li key={l.id} className="text-[12px]">
             <div className="flex items-center gap-1.5">
               <Pill>{ACTION_LABEL[l.action] ?? l.action}</Pill>
               <span className="font-medium text-zinc-700">{actorName(l)}</span>
-              <span className="ml-auto text-[10px] text-zinc-400">{fmtAgo(l.at)}</span>
+              <span className="ml-auto text-[11px] text-zinc-400">{fmtAgo(l.at)}</span>
             </div>
             <div className="mt-0.5 leading-snug text-zinc-600">{l.detail}</div>
           </li>

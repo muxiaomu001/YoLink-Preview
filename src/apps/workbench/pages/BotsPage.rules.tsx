@@ -7,7 +7,7 @@ import type { BotRule, BotRun, BotTrigger } from '@/domain/types'
 import { fmtDateTime } from '@/domain/time'
 import { confirm } from '@/ui/confirm'
 import { Button, Checkbox, Field, Input, Select, Switch, Textarea } from '@/ui/primitives'
-import { Avatar, Card, Note, Pill, Table } from '@/ui/display'
+import { Avatar, Card, Pill, Table } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
 import { RUN_STATUS_LABEL, RUN_STATUS_TONE, TRIGGER_LABEL, describeTrigger } from './BotsPage.shared'
@@ -44,7 +44,7 @@ export function RulesTab() {
           rowKey={(r) => r.id}
           columns={[
             { key: 'name', title: '名称', render: (r) => <span className="font-medium text-zinc-900">{r.name}</span> },
-            { key: 'trigger', title: '触发', render: (r) => <span className="text-xs">{describeTrigger(r)}</span> },
+            { key: 'trigger', title: '触发', render: (r) => <span className="text-[12px]">{describeTrigger(r)}</span> },
             { key: 'limit', title: '每小时上限', align: 'right', render: (r) => <span className="tabular-nums">{r.hourlyLimit}</span> },
             { key: 'review', title: '审核模式', render: (r) => (r.reviewMode === 'review' ? <Pill tone="amber">先审后发</Pill> : <Pill tone="green">自动发</Pill>) },
             { key: 'groups', title: '群', render: (r) => names(r.groupIds, s.chatGroups) || <span className="text-zinc-400">无</span> },
@@ -161,10 +161,10 @@ function RuleModal({ rule, onClose }: { rule?: BotRule; onClose: () => void }) {
             {botsInGroups.map((b) => (
               <Checkbox key={b.id} checked={botIds.includes(b.id)} onChange={(v) => setBotIds((ids) => (v ? [...ids, b.id] : ids.filter((x) => x !== b.id)))} label={`${b.nickname}${b.groupIds.length ? '' : '（未入群）'}`} />
             ))}
-            {botsInGroups.length === 0 && <span className="text-xs text-zinc-400">没有启用中的机器人</span>}
+            {botsInGroups.length === 0 && <span className="text-[12px] text-zinc-400">没有启用中的机器人</span>}
           </div>
         </Field>
-        {error && name && <p className="text-xs text-red-600">{error}</p>}
+        {error && name && <p className="text-[12px] text-red-600">{error}</p>}
       </div>
     </Modal>
   )
@@ -210,7 +210,7 @@ export function ReviewAndRuns() {
           columns={[
             { key: 'bot', title: '机器人', render: (r) => <span className="flex items-center gap-1.5"><Avatar text={botOf(r.botId)?.nickname ?? '?'} color={botOf(r.botId)?.avatarColor} size={20} />{botOf(r.botId)?.nickname}</span> },
             { key: 'group', title: '群', render: (r) => groupName(r.groupId) },
-            { key: 'text', title: '内容', render: (r) => <span className="line-clamp-2 max-w-[240px] text-xs text-zinc-700">{r.text}</span> },
+            { key: 'text', title: '内容', render: (r) => <span className="line-clamp-2 max-w-[240px] text-[12px] text-zinc-700">{r.text}</span> },
             { key: 'at', title: '时间', render: (r) => <span className="tabular-nums text-zinc-500">{fmtDateTime(r.at)}</span> },
             {
               key: 'ops',
@@ -233,11 +233,11 @@ export function ReviewAndRuns() {
           dense
           columns={[
             { key: 'at', title: '时间', render: (r) => <span className="tabular-nums text-zinc-500">{fmtDateTime(r.at)}</span> },
-            { key: 'rule', title: '规则', render: (r) => <span className="text-xs">{ruleName(r.ruleId)}</span> },
+            { key: 'rule', title: '规则', render: (r) => <span className="text-[12px]">{ruleName(r.ruleId)}</span> },
             { key: 'bot', title: '机器人', render: (r) => botOf(r.botId)?.nickname ?? <span className="text-zinc-400">已删除</span> },
             { key: 'group', title: '群', render: (r) => groupName(r.groupId) },
             { key: 'status', title: '状态', render: (r) => <Pill tone={RUN_STATUS_TONE[r.status]}>{RUN_STATUS_LABEL[r.status]}</Pill> },
-            { key: 'detail', title: '原因 / 内容', render: (r) => <span className="line-clamp-1 max-w-[220px] text-xs text-zinc-600" title={r.reason ?? r.text}>{r.status === 'skipped' || r.status === 'rejected' ? r.reason : r.text}</span> },
+            { key: 'detail', title: '原因 / 内容', render: (r) => <span className="line-clamp-1 max-w-[220px] text-[12px] text-zinc-600" title={r.reason ?? r.text}>{r.status === 'skipped' || r.status === 'rejected' ? r.reason : r.text}</span> },
           ]}
         />
       </Card>
@@ -255,7 +255,10 @@ export function ReviewAndRuns() {
           }
         >
           <div className="space-y-3">
-            <Note>「{botOf(rejecting.botId)?.nickname}」→ {groupName(rejecting.groupId)}：{rejecting.text}</Note>
+            <div className="rounded-md bg-zinc-50 px-3 py-2 text-[12px] leading-relaxed text-zinc-700">
+              <span className="text-zinc-500">「{botOf(rejecting.botId)?.nickname}」→ {groupName(rejecting.groupId)}：</span>
+              {rejecting.text}
+            </div>
             <Field label="驳回原因" required hint="记入运行记录与审计">
               <Textarea rows={2} maxLength={100} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="如：话题重复 / 口吻不像人设" />
             </Field>

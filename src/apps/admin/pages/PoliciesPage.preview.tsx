@@ -32,7 +32,7 @@ export function EffectPreview() {
 
   const rows = s.policyItems
     .filter((p) => !p.staffOnly)
-    .map((p) => ({ item: p, ...resolveCap(s, { role: 'customer', platform: 'mobile', key: p.key, groupId: effectiveGroup || null, userId: customerId }) }))
+    .map((p) => ({ item: p, ...resolveCap(s, { role: 'customer', key: p.key, groupId: effectiveGroup || null, userId: customerId }) }))
   const off = rows.filter((r) => !r.allowed)
   const overridden = rows.filter((r) => r.allowed && r.source !== 'default')
 
@@ -112,7 +112,7 @@ export function EffectPreview() {
         </>
       )}
       <div className="mt-3">
-        <Note>来源含义：企业默认 = 上面矩阵里客户 · 手机这一列；群级覆盖 = 只在这个群里；用户级覆盖 = 只对这个人；模块停用 = 模块启停页关了；官方群 = 官方群强制不可退出。</Note>
+        <Note>来源含义：企业默认 = 上面矩阵里「客户」这一列；群级覆盖 = 只在这个群里；用户级覆盖 = 只对这个人；模块停用 = 模块启停页关了；官方群 = 官方群强制不可退出。</Note>
       </div>
     </Card>
   )

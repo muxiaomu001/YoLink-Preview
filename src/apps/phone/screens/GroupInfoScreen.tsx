@@ -22,7 +22,7 @@ export function GroupInfoScreen({ g, customerId, onBack, onLeft }: { g: ChatGrou
   const canViewProfile = customerCan(s, customerId, 'group.view_member_profile', g.id)
   const canInvite = customerCan(s, customerId, 'group.invite', g.id)
   const leaveKey = g.kind === 'channel' ? 'channel.leave' : 'group.leave'
-  const leave = resolveCap(s, { role: 'customer', platform: 'mobile', key: leaveKey, groupId: g.id, userId: customerId })
+  const leave = resolveCap(s, { role: 'customer', key: leaveKey, groupId: g.id, userId: customerId })
   const mainLink = g.inviteLinks.find((l) => l.main && l.status === 'active')
   const myRole = groupRoleOf(g, 'customer', customerId)
   const total = g.memberSeatIds.length + g.memberCustomerIds.length + g.memberBotIds.length
@@ -101,7 +101,7 @@ export function GroupInfoScreen({ g, customerId, onBack, onLeft }: { g: ChatGrou
         </div>
         <div className="px-4 py-3">
           <DemoHint>
-            成员列表要「群设置 · 成员可见」与策略 group.view_members 同时为开；退出受 {leaveKey} 与官方群标记控制；本群覆盖来源：{PHONE_SOURCE_LABEL[resolveCap(s, { role: 'customer', platform: 'mobile', key: 'group.view_members', groupId: g.id, userId: customerId }).source]}。
+            成员列表要「群设置 · 成员可见」与策略 group.view_members 同时为开；退出受 {leaveKey} 与官方群标记控制；本群覆盖来源：{PHONE_SOURCE_LABEL[resolveCap(s, { role: 'customer', key: 'group.view_members', groupId: g.id, userId: customerId }).source]}。
           </DemoHint>
         </div>
       </div>

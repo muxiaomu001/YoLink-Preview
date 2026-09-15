@@ -1,36 +1,29 @@
 /**
- * 客户列表页（04 文档）：我的客户 / 全部客户两个标签、按 PRD 的表格列与排序、筛选器、
- * 保存分群（P1）、批量打标签（P1）/ 批量拉群、导出 CSV（P1）。
+ * 客户列表页（04 文档）：我的客户 / 全部客户两个标签、搜索、可折叠的高级筛选、
+ * 按 PRD 的表格列与排序、批量打标签 / 批量拉群、一键群发入口、导出 CSV。
  */
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Save } from 'lucide-react'
+import { Download, Search, Send, SlidersHorizontal } from 'lucide-react'
 import type { Customer } from '@/domain/types'
 import { fmtAgo, fmtDate } from '@/domain/time'
 import { activeCustomers, customersOfSeat, primarySeatOfCustomer, staffById } from '@/store/selectors'
-import { Button, Field, Input, Select } from '@/ui/primitives'
-import { Avatar, Card, Note, PageHeader, Pill, SeatAvatar, Table, Tabs, TagChip, TitleChip } from '@/ui/display'
-import { Modal, toast } from '@/ui/overlay'
+import { Button, Input } from '@/ui/primitives'
+import { Avatar, Card, Note, Pill, SeatAvatar, Table, Tabs, TagChip, TitleChip } from '@/ui/display'
+import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { useWorkbench } from '../useWorkbench'
-import { BulkGroupModal, BulkTagModal, EMPTY_FILTER, FilterPanel, SortHeader, applyFilter, exportCustomersCsv, isFilterActive, sortCustomers, type CustomerFilter, type SortState } from './CustomersPage.parts'
-
-interface Segment {
-  id: string
-  name: string
-  filter: CustomerFilter
-}
+import { BulkGroupModal, BulkTagModal, EMPTY_FILTER, FilterPanel, SortHeader, advancedFilterCount, applyFilter, exportCustomersCsv, isFilterActive, sortCustomers, type CustomerFilter, type SortState } from './CustomersPage.parts'
 
 export function CustomersPage() {
   const { s, staff, seat, can } = useWorkbench()
   const nav = useNavigate()
   const [tab, setTab] = useState<'mine' | 'all'>('mine')
   const [filter, setFilter] = useState<CustomerFilter>(EMPTY_FILTER)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const [sort, setSort] = useState<SortState>({ key: 'lastActiveAt', dir: 'desc' })
   const [selected, setSelected] = useState<string[]>([])
   const [bulk, setBulk] = useState<'tag' | 'group' | null>(null)
-  const [segments, setSegments] = useState<Segment[]>([])
-  const [segName, setSegName] = useState<string | null>(null)
 
   const mine = useMemo(() => (seat ? customersOfSeat(s, seat.id).filter((c) => !c.deletedAt) : []), [s, seat])
   const base = tab === 'mine' ? mine : activeCustomers(s)
@@ -38,6 +31,8 @@ export function CustomersPage() {
   const products = useMemo(() => Array.from(new Set(base.flatMap((c) => c.purchases.map((p) => p.product)))), [base])
   const roles = useMemo(() => Array.from(new Set(base.map((c) => c.roleLabel).filter((r): r is string => !!r))), [base])
   const allChecked = rows.length > 0 && rows.every((c) => selected.includes(c.id))
+  const advancedCount = advancedFilterCount(filter)
+  const canBroadcast = can('broadcast') && s.enterprise.modules.broadcast
 
   /** 聊天：优先本坐席与该客户的私聊；不是本坐席的客户则切到主归属坐席（须本人持有） */
   const openChat = (c: Customer) => {
@@ -59,64 +54,54 @@ export function CustomersPage() {
     s.setCustomerBlacklist(c.id, on, staff.id)
     toast(on ? '已拉黑' : '已解除拉黑')
   }
-  const saveSegment = () => {
-    if (!segName?.trim()) return
-    setSegments((l) => [...l, { id: `seg_${Date.now()}`, name: segName.trim(), filter }])
-    toast(`已保存分群「${segName.trim()}」（演示存在页面内，正式版落库）`)
-    setSegName(null)
-  }
 
   return (
     <div className="thin-scroll h-full overflow-y-auto p-5">
-      <PageHeader
-        title="客户"
-        desc={seat ? `「我的客户」＝ 当前坐席身份「${seat.displayName}」主归属的客户。切换顶部坐席身份，这一页跟着切。已注销的客户不再出现。` : ''}
-        extra={
-          <>
-            {segments.length > 0 && (
-              <Select className="h-8 w-40 text-xs" value="" onChange={(e) => e.target.value && setFilter(segments.find((x) => x.id === e.target.value)!.filter)}>
-                <option value="">套用已保存分群…</option>
-                {segments.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.name}
-                  </option>
-                ))}
-              </Select>
-            )}
-            <Button size="sm" disabled={!isFilterActive(filter)} title={isFilterActive(filter) ? '把当前筛选存为分群' : '先设置筛选条件'} onClick={() => setSegName('')}>
-              <Save size={13} /> 保存分群 <Pill>P1</Pill>
+      <div className="mb-3 flex items-center justify-between gap-3 border-b border-zinc-200">
+        <Tabs
+          className="-mb-px"
+          value={tab}
+          onChange={(t) => {
+            setTab(t)
+            setSelected([])
+          }}
+          items={[
+            { key: 'mine', label: '我的客户', count: mine.length },
+            { key: 'all', label: can('view_all_customers') ? '全部客户' : '全部客户（无权限）', count: can('view_all_customers') ? activeCustomers(s).length : undefined },
+          ]}
+        />
+        <div className="flex items-center gap-2 pb-1.5">
+          <div className="relative">
+            <Search size={13} className="pointer-events-none absolute top-2.5 left-2.5 text-zinc-400" />
+            <Input value={filter.q} onChange={(e) => setFilter({ ...filter, q: e.target.value })} placeholder="搜昵称、账号 ID" className="w-52 pl-7" />
+          </div>
+          <Button size="sm" className={advancedCount > 0 ? 'border-brand-300 text-brand-700' : ''} title="展开 / 收起高级筛选" onClick={() => setAdvancedOpen((v) => !v)}>
+            <SlidersHorizontal size={13} /> 高级筛选
+            {advancedCount > 0 && <span className="rounded-full bg-brand-600 px-1.5 text-[11px] leading-4 text-white tabular-nums">{advancedCount}</span>}
+          </Button>
+          {canBroadcast && (
+            <Button size="sm" variant="primary" title={`给「${seat?.displayName ?? ''}」的全部好友发一条私聊`} onClick={() => nav('/workbench/broadcast?target=friends')}>
+              <Send size={13} /> 一键群发
             </Button>
-            <Button size="sm" disabled={!can('export_customers') || rows.length === 0} title={can('export_customers') ? '导出当前筛选结果' : '需员工角色能力 export_customers'} onClick={() => staff && exportCustomersCsv(s, rows, staff.id)}>
-              <Download size={13} /> 导出 CSV <Pill>P1</Pill>
-            </Button>
-          </>
-        }
-      />
-      <Tabs
-        value={tab}
-        onChange={(t) => {
-          setTab(t)
-          setSelected([])
-        }}
-        className="mb-3"
-        items={[
-          { key: 'mine', label: '我的客户', count: mine.length },
-          { key: 'all', label: can('view_all_customers') ? '全部客户' : '全部客户（无权限）', count: can('view_all_customers') ? activeCustomers(s).length : undefined },
-        ]}
-      />
+          )}
+          <Button size="sm" disabled={!can('export_customers') || rows.length === 0} title={can('export_customers') ? '导出当前筛选结果' : '需员工角色能力 export_customers'} onClick={() => staff && exportCustomersCsv(s, rows, staff.id)}>
+            <Download size={13} /> 导出 CSV
+          </Button>
+        </div>
+      </div>
       {tab === 'all' && !can('view_all_customers') ? (
         <Note tone="amber">当前员工角色没有 view_all_customers 能力，只能看自己持有坐席主归属的客户。管理员在「员工角色」里改。</Note>
       ) : (
         <>
-          <FilterPanel f={filter} onChange={setFilter} products={products} roles={roles} />
+          {advancedOpen && <FilterPanel f={filter} onChange={setFilter} products={products} roles={roles} />}
           {selected.length > 0 && (
-            <div className="mb-2 flex items-center gap-2 rounded-md border border-brand-100 bg-brand-50/60 px-3 py-1.5 text-xs text-brand-900">
+            <div className="mb-2 flex items-center gap-2 rounded-md border border-brand-100 bg-brand-50/60 px-3 py-1.5 text-[12px] text-brand-900">
               已选 {selected.length} 人
               <Button size="sm" onClick={() => setBulk('group')}>
                 批量拉群
               </Button>
               <Button size="sm" onClick={() => setBulk('tag')}>
-                批量打标签 <Pill>P1</Pill>
+                批量打标签
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
                 取消选择
@@ -164,7 +149,7 @@ export function CustomersPage() {
                   title: '主头衔',
                   render: (c) => {
                     const t = c.primaryTitleId ? s.titles.find((x) => x.id === c.primaryTitleId && x.enabled) : undefined
-                    return t ? <TitleChip title={t} size="xs" /> : <span className="text-zinc-300">-</span>
+                    return t ? <TitleChip title={t} /> : <span className="text-zinc-300">-</span>
                   },
                 },
                 { key: 'reg', title: <SortHeader label="注册时间" k="registeredAt" sort={sort} onChange={setSort} />, render: (c) => <span className="tabular-nums text-zinc-500">{fmtDate(c.registeredAt)}</span> },
@@ -207,27 +192,6 @@ export function CustomersPage() {
 
       {bulk === 'tag' && <BulkTagModal ids={selected} onClose={() => setBulk(null)} />}
       {bulk === 'group' && <BulkGroupModal ids={selected} onClose={() => setBulk(null)} />}
-      <Modal
-        open={segName !== null}
-        onClose={() => setSegName(null)}
-        title="保存分群"
-        width={400}
-        footer={
-          <>
-            <Button onClick={() => setSegName(null)}>取消</Button>
-            <Button variant="primary" disabled={!segName?.trim()} onClick={saveSegment}>
-              保存
-            </Button>
-          </>
-        }
-      >
-        <Field label="分群名称" required>
-          <Input value={segName ?? ''} maxLength={20} onChange={(e) => setSegName(e.target.value)} placeholder="如：买过年卡的活跃客户" />
-        </Field>
-        <div className="mt-3">
-          <Note>P1：分群保存的是筛选条件，不是名单快照，每次套用都按当前数据重算。演示存在页面内，正式版落库并可在群发目标里选。</Note>
-        </div>
-      </Modal>
     </div>
   )
 }

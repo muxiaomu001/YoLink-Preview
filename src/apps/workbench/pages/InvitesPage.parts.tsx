@@ -7,7 +7,7 @@ import { useState } from 'react'
 import type { ChatGroup, DemoState, InviteLink } from '@/domain/types'
 import { fmtDate } from '@/domain/time'
 import { Button, Checkbox, Field, Input, Select } from '@/ui/primitives'
-import { Note, Pill } from '@/ui/display'
+import { Pill } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
 
@@ -38,7 +38,7 @@ export function AttachedActionsCell({ s, link }: { s: DemoState; link: Pick<Invi
       {list.map(({ group, layer }) => (
         <span key={group.id} className="inline-flex items-center gap-0.5 rounded-md border border-zinc-200 px-1 text-[11px] leading-5 text-zinc-700" title={`${group.kind === 'channel' ? '频道' : '群'} · 来源：${LAYER_LABEL[layer]}`}>
           {group.name}
-          <Pill tone={LAYER_TONE[layer]} className="ml-0.5 !px-1 !text-[10px] !leading-4">
+          <Pill tone={LAYER_TONE[layer]} className="ml-0.5 !px-1 !leading-4">
             {LAYER_LABEL[layer]}
           </Pill>
         </span>
@@ -119,7 +119,7 @@ export function InviteCreateModal({ open, onClose }: { open: boolean; onClose: (
             ))}
           </Select>
         </Field>
-        <Field label="附带动作" hint="通过本链接注册的客户额外自动加入">
+        <Field label="附带动作" hint="通过本链接注册的客户额外自动加入；已被企业默认或邀请组覆盖的群打勾禁用">
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 rounded-md border border-zinc-200 px-3 py-2">
             {s.chatGroups.map((g) => {
               const covered = coveredBy(g.id)
@@ -132,7 +132,7 @@ export function InviteCreateModal({ open, onClose }: { open: boolean; onClose: (
                   label={
                     <span>
                       {g.name}
-                      {covered && <span className="ml-1 text-[10px] text-zinc-400">（{LAYER_LABEL[covered]}已覆盖）</span>}
+                      {covered && <span className="ml-1 text-[11px] text-zinc-400">（{LAYER_LABEL[covered]}已覆盖）</span>}
                     </span>
                   }
                 />
@@ -160,8 +160,8 @@ export function InviteCreateModal({ open, onClose }: { open: boolean; onClose: (
             <Input type="date" min={today} value={form.customDate} onChange={(e) => patch({ customDate: e.target.value })} />
           </Field>
         )}
-        {error && <div className="text-xs text-red-600">{error}</div>}
-        <Note>生成后链接与 6 位邀请码同时可用。这条链接是所选邀请组下的渠道码，落点与组的邀请码相同，只是注册数分开统计。</Note>
+        {error && <div className="text-[12px] text-red-600">{error}</div>}
+        <p className="text-[11px] text-zinc-400">生成后链接与 6 位邀请码同时可用，落点与所选邀请组相同，注册数分开统计。</p>
       </div>
     </Modal>
   )

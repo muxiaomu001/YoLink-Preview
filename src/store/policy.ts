@@ -6,12 +6,11 @@
  */
 import type { BotAccount, ChatGroup, DemoState, GroupAdminPerm, GroupMemberKind, Message, PolicyCol } from '@/domain/types'
 
+/** 客户只有手机 App，坐席只有桌面工作台：矩阵按角色分两列，不按端拆 */
 export type PolicyRole = 'customer' | 'staff'
-export type PolicyPlatform = 'mobile' | 'desktop'
 
 export interface CapQuery {
   role: PolicyRole
-  platform: PolicyPlatform
   key: string
   /** 群级覆盖：客户在这个群里 */
   groupId?: string | null
@@ -30,7 +29,7 @@ export function resolveCap(s: DemoState, q: CapQuery): CapResult {
   const item = s.policyItems.find((p) => p.key === q.key)
   if (!item) return { allowed: true, source: 'unknown' }
   if (item.module && !s.enterprise.modules[item.module]) return { allowed: false, source: 'module_off' }
-  const col = `${q.role}_${q.platform}` as PolicyCol
+  const col: PolicyCol = q.role
   let allowed = s.policyMatrix[q.key]?.[col] ?? true
   let source: CapResult['source'] = 'default'
   if (q.groupId && q.role === 'customer') {
@@ -56,12 +55,12 @@ export function resolveCap(s: DemoState, q: CapQuery): CapResult {
 
 /** 客户在手机上能不能 */
 export function customerCan(s: DemoState, customerId: string | null | undefined, key: string, groupId?: string | null): boolean {
-  return resolveCap(s, { role: 'customer', platform: 'mobile', key, groupId, userId: customerId }).allowed
+  return resolveCap(s, { role: 'customer', key, groupId, userId: customerId }).allowed
 }
 
 /** 坐席在工作台上能不能（聊天层能力判坐席，不判员工） */
 export function seatCan(s: DemoState, seatId: string | null | undefined, key: string, groupId?: string | null): boolean {
-  return resolveCap(s, { role: 'staff', platform: 'desktop', key, groupId, userId: seatId }).allowed
+  return resolveCap(s, { role: 'staff', key, groupId, userId: seatId }).allowed
 }
 
 /** 客户的能力快照：登录后服务端下发的那张键值表 */

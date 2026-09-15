@@ -8,7 +8,7 @@ import { fmtDate } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { groupCapacity } from '@/store/policy'
 import { activeCustomers, customersOfSeat } from '@/store/selectors'
-import { Avatar, Note, Pill, TagChip, TitleChip } from '@/ui/display'
+import { Avatar, Pill, TagChip, TitleChip } from '@/ui/display'
 import { Button, Checkbox, Field, Input, Select } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
 import { isRestrictionActive, type GroupPanelProps } from './shared'
@@ -108,14 +108,14 @@ export function GroupBulkAddModal({ group: g, actor, canViewAll, onClose }: Pick
               <Input type="date" value={regTo} onChange={(e) => setRegTo(e.target.value)} />
             </div>
           </Field>
-          <Field label="最近活跃" hint="P1">
+          <Field label="最近活跃">
             <div className="flex items-center gap-1">
               <Input type="date" value={actFrom} onChange={(e) => setActFrom(e.target.value)} />
               <span className="text-zinc-400">~</span>
               <Input type="date" value={actTo} onChange={(e) => setActTo(e.target.value)} />
             </div>
           </Field>
-          <Note>跳过规则：已在群、被封禁、不满足入群头衔、群已满。{g.requiredTitleId ? `本群要求头衔「${s.titles.find((t) => t.id === g.requiredTitleId)?.name}」。` : ''}</Note>
+          <p className="text-[11px] leading-relaxed text-zinc-400">跳过规则：已在群、被封禁、不满足入群头衔、群已满。{g.requiredTitleId ? `本群要求头衔「${s.titles.find((t) => t.id === g.requiredTitleId)?.name}」。` : ''}</p>
         </div>
         <div className="min-w-0">
           <div className="mb-1.5 flex items-center justify-between text-[11px] text-zinc-500">
@@ -133,7 +133,7 @@ export function GroupBulkAddModal({ group: g, actor, canViewAll, onClose }: Pick
                   <Avatar text={c.nickname} size={24} />
                   <span className="min-w-0 flex-1 truncate font-medium text-zinc-800">{c.nickname}</span>
                   {t && <TitleChip title={t} size="xs" />}
-                  <span className="text-[10px] tabular-nums text-zinc-400">注册 {fmtDate(c.registeredAt)}</span>
+                  <span className="text-[11px] tabular-nums text-zinc-400">注册 {fmtDate(c.registeredAt)}</span>
                   {r ? <Pill tone="zinc">{r}</Pill> : <Pill tone="green">可拉入</Pill>}
                 </li>
               )

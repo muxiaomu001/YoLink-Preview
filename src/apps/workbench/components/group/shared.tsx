@@ -5,7 +5,7 @@
  */
 import { useState, type ReactNode } from 'react'
 import { clsx } from 'clsx'
-import { ChevronDown, ChevronRight, Lock } from 'lucide-react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { ChatGroup, GroupAdminPerm, GroupRestriction } from '@/domain/types'
 import type { Actor } from '@/store/actions/groups'
 import { fmtDateTime } from '@/domain/time'
@@ -32,7 +32,7 @@ export const PERM_META: { key: GroupAdminPerm; label: string; desc: string; chan
 
 export const PERM_LABEL: Record<GroupAdminPerm, string> = Object.fromEntries(PERM_META.map((p) => [p.key, p.label])) as Record<GroupAdminPerm, string>
 
-export const GROUP_KIND_TEXT: Record<ChatGroup['kind'], string> = { group: '普通群', supergroup: '大群', channel: '频道' }
+export const GROUP_KIND_TEXT: Record<ChatGroup['kind'], string> = { group: '群', channel: '频道' }
 
 /** 慢速模式六档 + 跟随企业策略（12 文档，P2） */
 export const SLOW_MODE_OPTIONS: { value: string; label: string }[] = [
@@ -101,16 +101,14 @@ export async function copyText(text: string): Promise<boolean> {
 }
 
 /**
- * 折叠面板：工作台里是右栏的一段，管理后台里是一张卡。
- * locked 时折叠并说明没有哪项权限。
+ * 折叠面板：工作台里是右栏的一段，管理后台与群管理弹窗里是一张卡。
+ * 没有权限的面板由调用方决定不渲染，这里不再做"上锁"状态。
  */
 export function Section({
   id,
   title,
   hint,
   extra,
-  locked,
-  lockedReason,
   defaultOpen = true,
   compact,
   children,
@@ -119,25 +117,22 @@ export function Section({
   title: string
   hint?: ReactNode
   extra?: ReactNode
-  locked?: boolean
-  lockedReason?: string
   defaultOpen?: boolean
   compact?: boolean
   children: ReactNode
 }) {
-  const [open, setOpen] = useState(defaultOpen && !locked)
+  const [open, setOpen] = useState(defaultOpen)
   return (
     <section id={id} className={clsx(compact ? 'border-b border-zinc-100' : 'rounded-lg border border-zinc-200 bg-white')}>
       <div className={clsx('flex items-center gap-2', compact ? 'px-4 py-2.5' : 'border-b border-zinc-100 px-4 py-2.5')}>
-        <button type="button" onClick={() => !locked && setOpen((v) => !v)} className={clsx('flex min-w-0 flex-1 items-center gap-1.5 text-left', locked && 'cursor-default')}>
-          {locked ? <Lock size={12} className="shrink-0 text-zinc-400" /> : open ? <ChevronDown size={12} className="shrink-0 text-zinc-400" /> : <ChevronRight size={12} className="shrink-0 text-zinc-400" />}
-          <span className={clsx('font-semibold', compact ? 'text-[11px] tracking-wide text-zinc-500' : 'text-[13px] text-zinc-800')}>{title}</span>
-          {hint && <span className="ml-1 truncate text-[10px] text-zinc-400">{hint}</span>}
+        <button type="button" onClick={() => setOpen((v) => !v)} className="flex min-w-0 flex-1 items-center gap-1.5 text-left" aria-expanded={open}>
+          {open ? <ChevronDown size={12} className="shrink-0 text-zinc-400" /> : <ChevronRight size={12} className="shrink-0 text-zinc-400" />}
+          <span className={clsx('font-semibold', compact ? 'text-[12px] text-zinc-600' : 'text-[13px] text-zinc-800')}>{title}</span>
+          {hint && <span className="ml-1 truncate text-[11px] text-zinc-400">{hint}</span>}
         </button>
-        {!locked && extra}
+        {extra}
       </div>
-      {locked && <div className={clsx('pb-3 text-[11px] text-zinc-400', compact ? 'px-4' : 'px-4 pt-3')}>{lockedReason ?? '没有相应权限，面板已折叠'}</div>}
-      {!locked && open && <div className={clsx(compact ? 'px-4 pb-3' : 'p-4')}>{children}</div>}
+      {open && <div className={clsx(compact ? 'px-4 pb-3' : 'p-4')}>{children}</div>}
     </section>
   )
 }

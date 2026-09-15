@@ -15,7 +15,7 @@ export function DemoPanel({ onSwitch }: { onSwitch: () => void }) {
   const off = snapshot
     ? s.policyItems
         .filter((p) => !p.staffOnly && snapshot[p.key] === false)
-        .map((p) => ({ item: p, source: resolveCap(s, { role: 'customer', platform: 'mobile', key: p.key, userId: customer!.id }).source }))
+        .map((p) => ({ item: p, source: resolveCap(s, { role: 'customer', key: p.key, userId: customer!.id }).source }))
     : []
   const mutedAll = customer?.mutedAllUntil && customer.mutedAllUntil > new Date().toISOString()
 

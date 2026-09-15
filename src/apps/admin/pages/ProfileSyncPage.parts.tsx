@@ -230,8 +230,8 @@ function AutomationModal({ rule, onClose }: { rule?: AutomationRule; onClose: ()
         <Field label="条件" required hint="示例：单笔金额 ≥ 10,000 美元 / 风险等级 = 进取型">
           <Input value={form.condition} maxLength={128} onChange={(e) => set('condition', e.target.value)} placeholder="单笔金额 ≥ 10,000 美元" />
         </Field>
-        <Field label="动作" required hint="示例：挂头衔：认证投资者 / 打内部标签：需回访 / 提醒主归属坐席的实操员工">
-          <Input value={form.action} maxLength={128} onChange={(e) => set('action', e.target.value)} placeholder="挂头衔：认证投资者" />
+        <Field label="动作" required hint="示例：挂头衔：认证推荐人 / 打内部标签：需回访 / 提醒主归属坐席的实操员工">
+          <Input value={form.action} maxLength={128} onChange={(e) => set('action', e.target.value)} placeholder="挂头衔：认证推荐人" />
         </Field>
         <div className="flex items-center justify-between rounded-md border border-zinc-200 px-3 py-2 text-xs">
           <span className="font-medium text-zinc-800">创建后立即启用</span>

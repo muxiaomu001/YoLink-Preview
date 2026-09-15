@@ -24,14 +24,14 @@ export function GroupPinned({ group: g, actor, perm, compact }: GroupPanelProps)
 
   return (
     <Section title={`置顶消息（${list.length}）`} compact={compact} hint={canPin ? '在聊天区悬停消息可置顶' : '取消置顶需要「置顶消息」权限'}>
-      {!list.length && <div className="text-[11px] text-zinc-400">还没有置顶消息。置顶数量不限，置顶时可选是否通知成员。</div>}
+      {!list.length && <div className="text-[12px] text-zinc-400">还没有置顶消息。置顶数量不限，置顶时可选是否通知成员。</div>}
       <ul className="space-y-1.5">
         {list.map((m) => (
           <li key={m.id} className="flex items-start gap-2 rounded-md border border-zinc-200 px-2.5 py-1.5">
             <Pin size={11} className="mt-0.5 shrink-0 text-amber-600" />
             <button type="button" className="min-w-0 flex-1 text-left" onClick={() => jump(m.id)} title="跳转到该消息">
-              <div className="truncate text-[11px] text-zinc-800">{visibleText(m, 'staff')}</div>
-              <div className="text-[10px] text-zinc-400">{senderName(s, m)} · {fmtDateTime(m.at)}</div>
+              <div className="truncate text-[12px] text-zinc-800">{visibleText(m, 'staff')}</div>
+              <div className="text-[11px] text-zinc-400">{senderName(s, m)} · {fmtDateTime(m.at)}</div>
             </button>
             {canPin && (
               <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => unpin(m.id)}>

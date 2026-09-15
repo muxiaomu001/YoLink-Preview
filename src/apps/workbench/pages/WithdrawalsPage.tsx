@@ -10,7 +10,8 @@ import { fmtDateTime } from '@/domain/time'
 import { customerById } from '@/store/selectors'
 import { confirm } from '@/ui/confirm'
 import { Button, Checkbox, Input, Select } from '@/ui/primitives'
-import { Card, Note, PageHeader, Pill, Stat, Table } from '@/ui/display'
+import { Card, Note, PageHeader, Stat, Table } from '@/ui/display'
+import { HelpTip } from '@/ui/help'
 import { toast } from '@/ui/overlay'
 import { CustomerCell } from '@/apps/admin/pages/WalletPage.parts'
 import { useWorkbench } from '../useWorkbench'
@@ -57,7 +58,7 @@ export function WithdrawalsPage() {
 
   const approve = async (w: Withdrawal) => {
     const c = customerById(s, w.customerId)
-    const ok = await confirm({ title: `通过：${c?.nickname} · ${w.points.toLocaleString('zh-CN')} ${ws.unitName}`, body: twoLevel ? '两级审核：通过后进入管理员复核（演示模型未建"待复核"状态，直接进待打款）。' : '单级审核：通过后状态变"待打款"，财务标记打款后才算完成。', okText: '通过' })
+    const ok = await confirm({ title: `通过：${c?.nickname} · ${w.points.toLocaleString('zh-CN')} ${ws.unitName}`, body: twoLevel ? '两级审核：通过后进入管理员复核，再进待打款。' : '单级审核：通过后状态变"待打款"，财务标记打款后才算完成。', okText: '通过' })
     if (!ok) return
     s.reviewWithdrawalDetailed({ id: w.id, action: 'approve' }, staffId)
     toast(`已通过「${c?.nickname}」的提现，等待打款 ${moneyOf(s, w.points)}；审核人 ${staff?.name}`)
@@ -95,8 +96,13 @@ export function WithdrawalsPage() {
     <div className="thin-scroll h-full overflow-y-auto p-5">
       <PageHeader
         title="提现审核"
-        desc={<><Pill tone="amber" className="mr-1.5">P2，钱包模块启用时显示</Pill>客户提交后积分冻结；员工通过 / 驳回，驳回必填原因且积分退回；通过后待财务打款。每一步记审计、客户收系统通知。</>}
-        extra={<Button size="sm" onClick={exportCsv} disabled={rows.length === 0}><Download size={13} /> 导出 CSV <span className="text-[10px] opacity-70">P1</span></Button>}
+        desc={
+          <span className="inline-flex items-center gap-1.5">
+            客户提交后积分冻结；通过后待财务打款，驳回须填原因且积分退回。
+            <HelpTip text={<span>两级审核对应两个员工能力：review_withdrawal（通过 / 驳回）与 mark_paid（财务确认已打款）。当前审核层级：{twoLevel ? '两级（批量通过不可用）' : '单级'}。折算口径 {ws.rate.toLocaleString('zh-CN')} {ws.unitName} = 1 {ws.currency}，手续费 {ws.fee || '0'}。每一步记审计、客户收系统通知。</span>} />
+          </span>
+        }
+        extra={<Button size="sm" onClick={exportCsv} disabled={rows.length === 0}><Download size={13} /> 导出 CSV</Button>}
       />
       <div className="mb-4 grid grid-cols-4 gap-3">
         <Stat label="待审核" value={counts('pending')} tone={counts('pending') ? 'warn' : 'default'} sub="等我处理" />
@@ -116,10 +122,10 @@ export function WithdrawalsPage() {
               ))}
             </Select>
             <Input type="number" min={0} className="w-24" value={minMoney} onChange={(e) => setMinMoney(e.target.value)} placeholder={`最小 ${ws.currency}`} />
-            <span className="text-xs text-zinc-400">到</span>
+            <span className="text-[12px] text-zinc-400">到</span>
             <Input type="number" min={0} className="w-24" value={maxMoney} onChange={(e) => setMaxMoney(e.target.value)} placeholder={`最大 ${ws.currency}`} />
             <Input type="date" className="w-36" value={from} onChange={(e) => setFrom(e.target.value)} />
-            <span className="text-xs text-zinc-400">至</span>
+            <span className="text-[12px] text-zinc-400">至</span>
             <Input type="date" className="w-36" value={to} onChange={(e) => setTo(e.target.value)} />
             <Button size="sm" variant="primary" disabled={selectedIds.length === 0 || twoLevel} title={twoLevel ? '批量通过限单级审核' : undefined} onClick={() => void batchApprove()}>
               批量通过{selectedIds.length ? `（${selectedIds.length}）` : ''}
@@ -141,7 +147,7 @@ export function WithdrawalsPage() {
             { key: 'user', title: '客户', render: (w) => <CustomerCell c={customerById(s, w.customerId)} /> },
             { key: 'points', title: `积分数量（${ws.unitName}）`, align: 'right', render: (w) => <span className="tabular-nums font-medium">{w.points.toLocaleString('zh-CN')}</span> },
             { key: 'money', title: '折算金额', align: 'right', render: (w) => <span className="tabular-nums">{moneyOf(s, w.points)}</span> },
-            { key: 'account', title: '收款账户', render: (w) => <span className="text-xs text-zinc-600">{accountSummary(w.account)}</span> },
+            { key: 'account', title: '收款账户', render: (w) => <span className="text-[12px] text-zinc-600">{accountSummary(w.account)}</span> },
             { key: 'at', title: '提交时间', render: (w) => <span className="tabular-nums text-zinc-600">{fmtDateTime(w.at)}</span> },
             { key: 'status', title: '状态', render: (w) => <StatusPill status={w.status} /> },
             {
@@ -169,11 +175,6 @@ export function WithdrawalsPage() {
           ]}
         />
       </Card>
-      <div className="mt-4">
-        <Note>
-          两级审核对应两个员工能力：<b>review_withdrawal</b>（通过 / 驳回）与 <b>mark_paid</b>（财务确认已打款）。当前审核层级：{twoLevel ? '两级（批量通过不可用）' : '单级'}。折算口径 {ws.rate.toLocaleString('zh-CN')} {ws.unitName} = 1 {ws.currency}，手续费 {ws.fee || '0'}。
-        </Note>
-      </div>
       {detail && <WithdrawalDetailModal s={s} w={detail} onClose={() => setDetail(null)} />}
       {noteFor && <NoteModal kind={noteFor.kind} w={noteFor.w} s={s} onClose={() => setNoteFor(null)} onSubmit={submitNote} />}
     </div>

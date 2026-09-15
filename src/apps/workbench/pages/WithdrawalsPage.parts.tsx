@@ -7,7 +7,7 @@ import { fmtDateTime } from '@/domain/time'
 import { walletBalance } from '@/store/actions/modules'
 import { customerById } from '@/store/selectors'
 import { Button, Field, Textarea } from '@/ui/primitives'
-import { Avatar, KV, Note, Pill, Table } from '@/ui/display'
+import { Avatar, KV, Pill, Table } from '@/ui/display'
 import { Modal } from '@/ui/overlay'
 import { CustomerCell } from '@/apps/admin/pages/WalletPage.parts'
 import { WD_STATUS_LABEL, WD_STATUS_TONE, frozenOf, moneyOf, reviewInfoOf } from './WithdrawalsPage.shared'
@@ -56,13 +56,13 @@ export function WithdrawalDetailModal({ s, w, onClose }: { s: DemoState; w: With
           />
         </div>
         <div>
-          <div className="mb-1 text-xs font-medium text-zinc-700">收款账户（详情页显示全文，列表脱敏）</div>
+          <div className="mb-1 text-[12px] font-medium text-zinc-700">收款账户</div>
           <div className="rounded-md bg-zinc-50 p-2">
             <KV items={Object.entries(w.account).map(([k, v]) => ({ k, v }))} />
           </div>
         </div>
         <div>
-          <div className="mb-1 text-xs font-medium text-zinc-700">最近流水</div>
+          <div className="mb-1 text-[12px] font-medium text-zinc-700">最近流水</div>
           <Table
             rows={txs}
             rowKey={(t) => t.id}
@@ -77,7 +77,7 @@ export function WithdrawalDetailModal({ s, w, onClose }: { s: DemoState; w: With
           />
         </div>
         <div>
-          <div className="mb-1 text-xs font-medium text-zinc-700">历史提现</div>
+          <div className="mb-1 text-[12px] font-medium text-zinc-700">历史提现</div>
           <Table
             rows={history}
             rowKey={(x) => x.id}
@@ -115,14 +115,13 @@ export function NoteModal({ kind, w, s, onClose, onSubmit }: { kind: 'reject' | 
       }
     >
       <div className="space-y-3">
-        <Note tone={isReject ? 'amber' : 'blue'}>
-          {c?.nickname} · {w.points.toLocaleString('zh-CN')} {s.walletSettings.unitName} ≈ {moneyOf(s, w.points)}。
-          {isReject ? '驳回后冻结积分立即退回客户余额，客户收到系统通知。' : '打款在系统外完成；标记后冻结清零、写一条 withdraw_paid 流水，不可撤销。'}
-        </Note>
-        <Field label={isReject ? '驳回原因' : '打款凭证号 / 备注'} required={isReject} hint="记入审计日志">
+        <div className="rounded-md bg-zinc-50 px-3 py-2 text-[13px] text-zinc-800">
+          {c?.nickname} · <span className="tabular-nums">{w.points.toLocaleString('zh-CN')} {s.walletSettings.unitName} ≈ {moneyOf(s, w.points)}</span>
+        </div>
+        <Field label={isReject ? '驳回原因' : '打款凭证号 / 备注'} required={isReject} hint={isReject ? '记入审计日志；驳回后冻结积分立即退回客户余额，客户收到系统通知' : '记入审计日志；标记后冻结清零，不可撤销'}>
           <Textarea rows={2} maxLength={120} value={note} onChange={(e) => setNote(e.target.value)} placeholder={isReject ? '如：收款户名与实名不一致' : '如：HSBC 流水号 2026091500123'} />
         </Field>
-        {error && note.length === 0 && <p className="text-xs text-red-600">{error}</p>}
+        {error && note.length === 0 && <p className="text-[12px] text-red-600">{error}</p>}
       </div>
     </Modal>
   )

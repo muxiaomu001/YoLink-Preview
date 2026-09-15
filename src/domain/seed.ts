@@ -282,14 +282,17 @@ export const HANDOVERS: SeatHandover[] = [
 
 // ---------- 头衔与内部标签 ----------
 
+/** 头衔：官方授予、对外可见的身份（用户 2026-09-15：「官方讲师」「认证团队长」这类，彰显角色或权益；内部判断走标签） */
 export const TITLES: Title[] = [
   { id: 't_vip', name: '私享会员', color: '#b45309', icon: 'crown', desc: '年度私享服务会员，享专属策略与线下活动', enabled: true },
-  { id: 't_verified', name: '认证投资者', color: '#1d4ed8', icon: 'shield-check', desc: '已完成资产证明与风险测评', enabled: true },
-  { id: 't_new', name: '新客', color: '#15803d', desc: '注册 30 天内', enabled: true },
-  { id: 't_guest', name: '活动嘉宾', color: '#7e22ce', icon: 'star', desc: '受邀参加线下策略会', enabled: true },
+  { id: 't_lecturer', name: '官方讲师', color: '#1d4ed8', icon: 'shield-check', desc: '受恒信邀请在群里讲课的外部讲师', enabled: true },
+  { id: 't_leader', name: '认证团队长', color: '#7e22ce', icon: 'star', desc: '带团队的推荐人，团队人数 ≥ 30', enabled: true },
+  { id: 't_referrer', name: '认证推荐人', color: '#15803d', desc: '直接邀请 ≥ 10 人', enabled: true },
 ]
 
 export const TAGS: Tag[] = [
+  { id: 'tag_new', name: '新客', color: '#0f766e', source: 'admin' },
+  { id: 'tag_guest', name: '活动嘉宾', color: '#7e22ce', source: 'admin' },
   { id: 'tag_hnw', name: '高净值', color: '#b45309', source: 'admin' },
   { id: 'tag_funded', name: '已入金', color: '#15803d', source: 'admin' },
   { id: 'tag_watch', name: '观望中', color: '#6b7280', source: 'admin' },
@@ -655,15 +658,16 @@ function buildCustomers() {
       c.primaryTitleId = 't_vip'
       c.tagIds.push('tag_hnw')
     }
-    if (s === 'risk_survey_done' || s === 'active_investor') {
-      c.titleIds.push('t_verified')
-      c.primaryTitleId ??= 't_verified'
-      c.tagIds.push(chance(0.5) ? 'tag_aggr' : 'tag_cons')
+    if (s === 'risk_survey_done' || s === 'active_investor') c.tagIds.push(chance(0.5) ? 'tag_aggr' : 'tag_cons')
+    // 头衔是对外身份：带人的客户挂「认证推荐人」，其中团队大的挂「认证团队长」
+    if (s === 'referral_intro' || (s === 'active_investor' && chance(0.3))) {
+      c.inviteCount = between(10, 40)
+      c.teamCount = c.inviteCount + between(0, 60)
+      const title = c.teamCount >= 30 ? 't_leader' : 't_referrer'
+      c.titleIds.push(title)
+      c.primaryTitleId ??= title
     }
-    if (plan.daysAgo <= 30 && !c.titleIds.length) {
-      c.titleIds.push('t_new')
-      c.primaryTitleId = 't_new'
-    }
+    if (plan.daysAgo <= 30) c.tagIds.push('tag_new')
     if (s === 'onboarding_pending' || s === 'quiet_long') c.tagIds.push('tag_watch')
     if (s === 'complaint_refund') {
       c.tagIds.push('tag_refund', 'tag_funded')
@@ -675,7 +679,7 @@ function buildCustomers() {
       c.tagIds.push('tag_callback')
     }
     if (s === 'renewal') c.note = '会员到期前两周提醒；偏好电话沟通，工作日 19 点后。'
-    if (c.purchases.length > 1) {
+    if (c.purchases.length > 1 && !c.inviteCount) {
       c.inviteCount = between(0, 4)
       c.teamCount = c.inviteCount + between(0, 6)
       if (c.inviteCount >= 3) c.roleLabel = '推荐大使'
@@ -892,7 +896,7 @@ function buildAudit(): AuditEvent[] {
     { id: sid('au'), at: ago(40), actorStaffId: 'st_admin', type: 'invite_group.create', detail: '创建邀请组「林顾问专属码」，成员：林顾问；主归属：林顾问' },
     { id: sid('au'), at: ago(35), actorStaffId: 'st_lin', type: 'invite_link.create', detail: '在「林顾问专属码」下创建邀请链接「林薇 · 老客户转介绍」' },
     { id: sid('au'), at: ago(30), actorStaffId: 'st_zhao', type: 'invite_link.create', detail: '在「默认组」下创建邀请链接「小红书投放」' },
-    { id: sid('au'), at: ago(20), actorStaffId: 'st_admin', type: 'title.library', detail: '头衔库新增「活动嘉宾」' },
+    { id: sid('au'), at: ago(20), actorStaffId: 'st_admin', type: 'title.library', detail: '头衔库新增「官方讲师」' },
     { id: sid('au'), at: ago(14), actorStaffId: 'st_lin', type: 'invite_link.create', detail: '在「直播间组」下创建邀请链接「抖音直播 · 9 月」' },
     { id: sid('au'), at: ago(9, 4), actorStaffId: 'st_chen', type: 'broadcast.send', detail: '以「客户服务」身份群发「开户资料提醒」，目标：内部标签 = 观望中，8 人' },
     { id: sid('au'), at: ago(5, 1), actorStaffId: 'st_lin', type: 'broadcast.send', detail: '以「林顾问」身份群发「策略会报名」，目标：我的客户，22 人' },

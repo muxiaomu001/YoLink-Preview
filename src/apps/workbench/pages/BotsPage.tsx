@@ -7,6 +7,7 @@ import { Pause, Play } from 'lucide-react'
 import { seatCan } from '@/store/policy'
 import { Button } from '@/ui/primitives'
 import { Note, PageHeader, Stat, Tabs } from '@/ui/display'
+import { HelpTip } from '@/ui/help'
 import { toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
 import { BotsTab, ScriptsTab } from './BotsPage.parts'
@@ -39,14 +40,19 @@ export function BotsPage() {
   return (
     <div className="thin-scroll h-full overflow-y-auto p-5">
       {paused && (
-        <div className="mb-3 flex items-center justify-between rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-xs text-amber-900">
+        <div className="mb-3 flex items-center justify-between rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-[12px] text-amber-900">
           <span>全部群活跃助手已暂停：所有规则触发都会跳过并记入运行记录，手动发言也建议先恢复。</span>
           <Button size="sm" onClick={togglePause}><Play size={12} /> 恢复</Button>
         </div>
       )}
       <PageHeader
         title="群活跃助手"
-        desc="机器人账号按剧本或 AI 在群里发言，把气氛带起来。客户看不出区别，员工与管理员看到「机器人」标记，消息审计可按机器人筛选。"
+        desc={
+          <span className="inline-flex items-center gap-1.5">
+            机器人账号按剧本或 AI 在群里发言，员工与管理员看到「机器人」标记。
+            <HelpTip text="边界：不 @ 真实客户、不做交易承诺、不回复真实客户的直接提问（转给其主归属坐席的实操员工）；群全员禁言、机器人被禁言、发言限流未到间隔、群已暂停、模块停用或未授权时一律不发，只记一条跳过记录；敏感词规则同样适用。" />
+          </span>
+        }
         extra={
           <Button variant={paused ? 'primary' : 'danger'} onClick={togglePause}>
             {paused ? <><Play size={13} /> 恢复全部</> : <><Pause size={13} /> 一键暂停全部</>}
@@ -75,12 +81,6 @@ export function BotsPage() {
       </div>
       <div className="mt-6">
         <ReviewAndRuns />
-      </div>
-      <div className="mt-4">
-        <Note>
-          边界（14 文档模块 D）：不 @ 真实客户、不做交易承诺、不回复真实客户的直接提问（客户在群里提问会转给其主归属坐席的实操员工）；
-          群全员禁言、机器人被禁言、发言限流未到间隔、群已暂停、模块停用或未授权时一律不发，只记一条跳过记录；敏感词规则同样适用。
-        </Note>
       </div>
     </div>
   )

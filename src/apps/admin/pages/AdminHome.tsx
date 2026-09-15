@@ -16,6 +16,7 @@ function useTodos() {
     { n: s.webhookLogs.filter((l) => l.httpStatus >= 400 && Date.now() - new Date(l.at).getTime() < 86400000).length, label: '24 小时内 Webhook 失败', to: '/admin/webhooks' },
     { n: licenseDays <= 30 ? 1 : 0, label: `许可 ${licenseDays} 天后到期`, to: '/admin/license' },
     { n: s.botRuns.filter((r) => r.status === 'pending_review').length, label: '群活跃助手待审发言', to: '/admin/ai' },
+    { n: s.broadcasts.filter((b) => b.status === 'scheduled').length, label: '待发送的定时群发', to: '/admin/broadcasts' },
   ]
   return items.filter((it) => it.n > 0)
 }
