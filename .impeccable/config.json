@@ -1,0 +1,16 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/apps/phone/screens/ChatScreen.parts.tsx"
+        ],
+        "createdAt": "2026-09-15T08:05:40.266Z"
+      }
+    ]
+  }
+}
