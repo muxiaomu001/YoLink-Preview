@@ -8,7 +8,7 @@
 
 [Vercel 在线演示](https://yo-link-preview.vercel.app/) · [代码仓库](https://github.com/muxiaomu001/YoLink-Preview)
 
-实际发布链路：GitHub `muxiaomu001/YoLink-Preview` 的 main → Vercel `yo-link-preview` 自动构建与发布。GitHub 只托管代码，GitHub Pages 不作为发布入口，其历史工作流已停用。
+实际发布链路：GitHub `muxiaomu001/YoLink-Preview` 的 main → Vercel `yo-link-preview` 自动构建与发布。GitHub 只托管代码，仓库不配置 GitHub Pages 发布工作流。
 
 浏览器演示数据只保存在访问者自己的浏览器；不上传 PRD 文档。发布后先检查 Vercel 对应提交的部署状态，再验证以上固定域名，不因仓库存在其他部署脚本而另建站点。
 
