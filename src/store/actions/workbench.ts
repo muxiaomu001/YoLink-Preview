@@ -74,10 +74,10 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
       const body = text.trim()
       if ((!body && !m.media) || body.length > (m.media ? 1024 : 4096)) return '内容不能为空或超过长度上限'
       if (body === m.text) return null
-      const mentions = mentionsIn(s, m.convId, body)
+      const mentions = mentionsIn(s, m.convId, body, { mentionSeatIds: m.mentionSeatIds ?? [], mentionCustomerIds: m.mentionCustomerIds ?? [] })
       if (mentions.mentionAll && !seatCan(s, m.seatId, 'group.mention_all')) return '当前策略不允许 @所有人'
       const at = now()
-      set({ messages: s.messages.map((x) => x.id === m.id ? { ...x, text: body, editedAt: at, editHistory: [...(x.editHistory ?? []), { text: x.text, at, operatorId: byStaffId }], ...mentionsIn(s, x.convId, body) } : x), audit: withAudit(s.audit, 'message.edit', `编辑消息 ${m.id}，修改前的内容已保留`, byStaffId) })
+      set({ messages: s.messages.map((x) => x.id === m.id ? { ...x, text: body, editedAt: at, editHistory: [...(x.editHistory ?? []), { text: x.text, at, operatorId: byStaffId }], ...mentions } : x), audit: withAudit(s.audit, 'message.edit', `编辑消息 ${m.id}，修改前的内容已保留`, byStaffId) })
       return null
     },
 
@@ -197,10 +197,10 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
       const body = text.trim()
       if ((!body && !m.media) || body.length > (m.media ? 1024 : 4096)) return '内容不能为空或超过长度上限'
       if (body === m.text) return null
-      const mentions = mentionsIn(s, m.convId, body)
+      const mentions = mentionsIn(s, m.convId, body, { mentionSeatIds: m.mentionSeatIds ?? [], mentionCustomerIds: m.mentionCustomerIds ?? [] })
       if (mentions.mentionAll && !customerCan(s, customerId, 'group.mention_all', conv?.chatGroupId)) return '当前策略不允许 @所有人'
       const at = now()
-      set({ messages: s.messages.map((x) => x.id === m.id ? { ...x, text: body, editedAt: at, editHistory: [...(x.editHistory ?? []), { text: x.text, at, operatorId: customerId }], ...mentionsIn(s, x.convId, body) } : x), audit: withAudit(s.audit, 'message.edit', `客户编辑消息 ${m.id}，修改前的内容已保留`, null) })
+      set({ messages: s.messages.map((x) => x.id === m.id ? { ...x, text: body, editedAt: at, editHistory: [...(x.editHistory ?? []), { text: x.text, at, operatorId: customerId }], ...mentions } : x), audit: withAudit(s.audit, 'message.edit', `客户编辑消息 ${m.id}，修改前的内容已保留`, null) })
       return null
     },
 
