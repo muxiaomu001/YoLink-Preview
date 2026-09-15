@@ -1,8 +1,8 @@
 /**
  * 单条消息：系统消息灰色居中；文本 URL 自动成链接；图片消息显示缩略图（点开大图）、文件消息显示文件卡，说明文字在下方；
- * 引用条可跳转；撤回 / 删除用占位；机器人、群发、转发、AI 草稿、欢迎语小标；悬停操作按权限显示（引用、撤回、删除、转发、复制、置顶）。
+ * 引用条可跳转；撤回 / 删除用占位；机器人、群发、转发、AI 草稿、欢迎语小标；文字菜单按权限显示（引用、撤回、删除、转发、复制、置顶）。
  */
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { clsx } from 'clsx'
 import { Bot, Copy, Forward, MoreHorizontal, Pencil, Pin, Reply, Trash2, Undo2 } from 'lucide-react'
 import type { ChatGroup, Message, Seat } from '@/domain/types'
@@ -17,6 +17,7 @@ import { MessageReceipt } from '@/ui/MessageReceipt'
 import { Button, Textarea } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
+import { MessageActionMenu, type MessageMenuAction } from './MessageActionMenu'
 import { useWorkbench } from '../useWorkbench'
 import { copyText, jumpToMessage } from './group/groupRules'
 
@@ -44,15 +45,8 @@ export function MessageItem({
   const { s, staff, can } = useWorkbench()
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ left: 0, top: 0 })
-  useEffect(() => {
-    if (!menuOpen) return
-    const close = (e: MouseEvent) => { if (!(e.target as Element).closest(`[data-message-id="${m.id}"]`)) setMenuOpen(false) }
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
-    window.addEventListener('mousedown', close)
-    window.addEventListener('keydown', key)
-    return () => { window.removeEventListener('mousedown', close); window.removeEventListener('keydown', key) }
-  }, [menuOpen, m.id])
-  const positionMenu = (x: number, y: number) => setMenuPosition({ left: Math.max(8, Math.min(x, window.innerWidth - 240)), top: Math.min(y, window.innerHeight - 48) })
+  const closeMenu = useCallback(() => setMenuOpen(false), [])
+  const positionMenu = (left: number, top: number) => setMenuPosition({ left, top })
   const [editing, setEditing] = useState(false)
   const [renderedAt] = useState(Date.now)
   const isGroup = !!group
@@ -92,6 +86,16 @@ export function MessageItem({
   }
   const copy = async () => toast((await copyText(m.text)) ? '已复制' : '复制失败：浏览器不允许访问剪贴板', 'info')
 
+  const actions: MessageMenuAction[] = [
+    { label: '回复', icon: Reply, section: 0, onSelect: () => onReply(m) },
+    ...(mine && seatCan(s, seat.id, 'dm.edit') ? [{ label: '编辑消息', icon: Pencil, section: 0, onSelect: () => setEditing(true) }] : []),
+    ...(m.text ? [{ label: '拷贝文本', icon: Copy, section: 0, onSelect: () => void copy() }] : []),
+    ...(showPin ? [{ label: '置顶消息', icon: Pin, section: 1, onSelect: () => onPin(m) }] : []),
+    ...(showForward ? [{ label: '转发', icon: Forward, section: 1, opensPicker: true, onSelect: () => onForward(m) }] : []),
+    ...(showRecall ? [{ label: '撤回消息', icon: Undo2, section: 2, danger: true, disabled: recallExpired, hint: recallExpired ? '已超过撤回时限' : timeLimitLabel(recallLimit), onSelect: () => void recall() }] : []),
+    ...(showDelete ? [{ label: '删除消息', icon: Trash2, section: 2, danger: true, hint: '管理员删除，对方也不可见', onSelect: () => void del() }] : []),
+  ]
+
   if (m.senderKind === 'system') {
     return (
       <div id={`msg-${m.id}`} data-message-id={m.id} className="my-2 rounded-md text-center">
@@ -104,7 +108,7 @@ export function MessageItem({
   return (
     <div id={`msg-${m.id}`} data-message-id={m.id} className={clsx('rounded-md transition-shadow', current && 'ring-2 ring-amber-300')}>
       {showDate && <div className="my-3 text-center text-[11px] text-zinc-400">{fmtDateTime(m.at).slice(0, 10)}</div>}
-      <div onContextMenu={(e) => { e.preventDefault(); positionMenu(e.clientX, e.clientY); setMenuOpen(true) }} className={clsx('group relative mb-3.5 flex gap-2.5', mine && 'flex-row-reverse')}>
+      <div onContextMenu={(e) => { e.preventDefault(); if (gone) return; positionMenu(e.clientX, e.clientY); setMenuOpen(true) }} className={clsx('group relative mb-3.5 flex gap-2.5', mine && 'flex-row-reverse')}>
         {mine ? <SeatAvatar seat={seat} size={30} /> : otherSeat ? <SeatAvatar seat={otherSeat} size={30} /> : bot ? <Avatar text={bot.nickname} size={30} color={bot.avatarColor} /> : <Avatar text={customer?.nickname ?? '?'} size={30} />}
         <div className={clsx('max-w-[70%]', mine && 'items-end text-right')}>
           {!mine && (isGroup || bot) && (
@@ -151,31 +155,13 @@ export function MessageItem({
             {bot && m.operatorId && can('view_seat_operator') && <span title="客户看不到这个">手动：{staffById(s, m.operatorId)?.name}</span>}
           </div>
         </div>
-        {!gone && <button type="button" aria-label="更多消息操作" title="更多消息操作（也可右键消息）" className="self-start rounded p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700" onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); positionMenu(rect.left, rect.bottom + 4); setMenuOpen((v) => !v) }}><MoreHorizontal size={16} /></button>}
-        {/* 悬停、键盘焦点、点击更多或右键都能打开操作。 */}
-        <div style={menuOpen ? { position: 'fixed', ...menuPosition, bottom: 'auto', right: 'auto' } : undefined} className={clsx('absolute bottom-full mb-1 z-20 flex items-center gap-0.5 rounded-md border border-zinc-200 bg-white px-1 py-0.5 shadow-sm', menuOpen ? 'opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100', mine ? 'right-10' : 'left-10')}>
-          {!gone && <Act icon={Reply} label="引用回复" onClick={() => onReply(m)} />}
-          {mine && !gone && seatCan(s, seat.id, 'dm.edit') && <Act icon={Pencil} label="编辑消息" onClick={() => { setEditing(true); setMenuOpen(false) }} />}
-          {showRecall && <Act icon={Undo2} label={recallExpired ? '已超过后台设置的撤回时限' : `撤回（${timeLimitLabel(recallLimit)}）`} disabled={recallExpired} onClick={() => void recall()} />}
-          {showDelete && <Act icon={Trash2} label={isGroup ? '删除他人消息（群内权限）' : '删除客户消息（员工能力）'} danger onClick={() => void del()} />}
-          {showForward && <Act icon={Forward} label="转发到其他会话" onClick={() => onForward(m)} />}
-          {!gone && <Act icon={Copy} label="复制文本" onClick={() => void copy()} />}
-          {showPin && <Act icon={Pin} label="置顶（群内权限）" onClick={() => onPin(m)} />}
-        </div>
+        {!gone && <button type="button" id={`menu-trigger-${m.id}`} aria-label="更多消息操作" aria-haspopup="menu" aria-expanded={menuOpen} title="更多消息操作（也可右键消息）" className="self-start rounded p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700" onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); positionMenu(rect.left, rect.bottom + 4); setMenuOpen((v) => !v) }}><MoreHorizontal size={16} /></button>}
+        {menuOpen && !gone && <MessageActionMenu triggerId={`menu-trigger-${m.id}`} actions={actions} position={menuPosition} onClose={closeMenu} />}
       </div>
       {editing && <EditMessage message={m} onClose={() => setEditing(false)} />}
     </div>
   )
 }
-
-function Act({ icon: Icon, label, onClick, danger, disabled }: { icon: typeof Reply; label: string; onClick: () => void; danger?: boolean; disabled?: boolean }) {
-  return (
-    <button type="button" aria-label={label} title={label} disabled={disabled} onClick={onClick} className={clsx('rounded p-1 text-zinc-500 hover:bg-zinc-100', disabled ? 'cursor-not-allowed text-zinc-300' : danger ? 'hover:text-red-700' : 'hover:text-brand-700')}>
-      <Icon size={14} />
-    </button>
-  )
-}
-
 
 function EditMessage({ message, onClose }: { message: Message; onClose: () => void }) {
   const { s, staff } = useWorkbench()
