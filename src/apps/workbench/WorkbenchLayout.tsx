@@ -4,7 +4,7 @@
  * 未读汇总：标签页标题显示当前坐席未读总数；新未读到达时发桌面通知（不支持 / 未授权时退回 toast）。
  */
 import { useEffect, useMemo, useRef } from 'react'
-import { Outlet, useNavigate } from 'react-router-dom'
+import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { Bell, BellOff, Bot, Link2, MessageSquare, Send, Settings, Users, Wallet } from 'lucide-react'
 import { useStore } from '@/store/store'
 import { conversationsForSeat, seatsOfStaff, staffById, staffHasCap } from '@/store/selectors'
@@ -18,6 +18,7 @@ const TITLE_BASE = 'YoLink 工作台'
 
 export function WorkbenchLayout() {
   const s = useStore()
+  const location = useLocation()
   const nav = useNavigate()
   const staff = staffById(s, s.session.workbenchStaffId)
   const roleName = s.roles.find((r) => r.id === staff?.roleId)?.name ?? '-'
@@ -98,7 +99,7 @@ export function WorkbenchLayout() {
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-700 text-[12px] font-bold text-white">{s.enterprise.name.slice(0, 1)}</span>
             <span className="text-[13px] font-semibold text-zinc-900">{s.enterprise.name}</span>
-            <span className="text-[11px] text-zinc-400">工作台</span>
+            <span className="text-[11px] text-zinc-400">工作台 · 演示</span>
           </div>
           <SeatSwitcher seats={mySeats} active={activeSeat} unreadBySeat={unreadBySeat} onPick={(id) => s.setSession({ workbenchSeatId: id })} />
           <div className="ml-auto flex items-center">
@@ -107,6 +108,8 @@ export function WorkbenchLayout() {
             </span>
           </div>
         </header>
+        {location.pathname === '/workbench/withdrawals' && <div className="shrink-0 bg-amber-50 px-4 py-2 text-xs text-amber-800">P2 · 提现审核为后续功能演示，不属于第一版交付承诺。</div>}
+        {location.pathname === '/workbench/bots' && <div className="shrink-0 bg-amber-50 px-4 py-2 text-xs text-amber-800">群活跃助手 · 保留演示供讨论，首版细节待确认。</div>}
         <main className="min-h-0 flex-1">
           <Outlet />
         </main>

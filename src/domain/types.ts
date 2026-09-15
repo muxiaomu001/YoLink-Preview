@@ -688,6 +688,9 @@ export interface QuickReply {
 }
 
 export interface KnowledgeItem {
+  /** 兼容已有演示数据：缺省时按 enabled 判断发布状态。 */
+  status?: 'draft' | 'published' | 'offline'
+  version?: number
   id: string
   title: string
   body: string

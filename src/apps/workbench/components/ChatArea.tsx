@@ -36,7 +36,7 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
   const [forwardMsg, setForwardMsg] = useState<Message | null>(null)
   const [pinMsg, setPinMsg] = useState<Message | null>(null)
   // 手动生成的 AI 草稿；自动弹出被关掉时记住是针对哪条客户消息关的，下一条再弹
-  const [manualDrafts, setManualDrafts] = useState<AiDraft[] | null>(null)
+  const [manualDrafts, setManualDrafts] = useState<{ items: AiDraft[]; context: string } | null>(null)
   const [dismissedFor, setDismissedFor] = useState<string | null>(null)
   const isDm = row.conv.kind === 'dm'
   const customer = row.customer
@@ -75,17 +75,20 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
   }, [hits, hitIdx])
 
   // AI 推荐：策略允许才有入口；自动弹出要求私聊、客户在等、员工偏好开着
-  const canAi = seatCan(s, seat.id, 'ai.suggest')
+  const canAi = seatCan(s, seat.id, 'ai.suggest') && s.license.modules.some((m) => m.key === 'ai' && m.enabled)
   const lastCustomerMsg = [...msgs].reverse().find((m) => m.senderKind === 'customer')
   const aiAuto = canAi && isDm && !!customer && !!row.waitingSince && !!lastCustomerMsg && !!staff?.prefs?.aiSuggest && dismissedFor !== lastCustomerMsg.id
   const autoDrafts = aiAuto && customer && lastCustomerMsg ? draftsFor({ lastCustomerText: lastCustomerMsg.text, customer, seat, knowledge: s.knowledge }) : []
-  const drafts = manualDrafts ?? autoDrafts
+  const aiContext = JSON.stringify([msgs.at(-1)?.id, s.knowledge])
+  const drafts = canAi && !disabledReason ? (manualDrafts?.context === aiContext ? manualDrafts.items : autoDrafts) : []
 
   const aiSuggest = () => {
     if (!lastCustomerMsg) return toast('还没有客户消息可参考', 'info')
     const from = isDm ? customer : customerById(s, lastCustomerMsg.senderId)
     if (!from) return toast('还没有客户消息可参考', 'info')
-    setManualDrafts(draftsFor({ lastCustomerText: lastCustomerMsg.text, customer: from, seat, knowledge: s.knowledge }))
+    const items = draftsFor({ lastCustomerText: lastCustomerMsg.text, customer: from, seat, knowledge: s.knowledge })
+    setManualDrafts({ items, context: aiContext })
+    if (!items.length) toast('未找到已发布的相关知识，请人工核对后回复', 'info')
   }
   const closeAi = () => {
     setManualDrafts(null)
@@ -93,9 +96,9 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
   }
 
   const send = (body: string, mentionAll: boolean) => {
-    if (!staff) return
+    if (!staff || disabledReason) return
     s.seatSendRich({ convId: row.conv.id, seatId: seat.id, operatorId: staff.id, text: body, replyToId: replyTo?.id, mentionAll: mentionAll || undefined, aiDraftUsed: draftFrom === 'ai' || undefined })
-    if (draftFrom === 'ai') s.recordAi(staff.id, row.conv.id, 'adopted')
+    if (draftFrom === 'ai') s.recordAi(staff.id, row.conv.id, 'edited')
     setText('')
     setDraftFrom(null)
     setReplyTo(undefined)
@@ -106,6 +109,7 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
     if (!staff || disabledReason) return
     s.seatSendRich({ convId: row.conv.id, seatId: seat.id, operatorId: staff.id, kind, media, text: body, replyToId: replyTo?.id })
     setReplyTo(undefined)
+    closeAi()
   }
   /** 右栏面板「填入」：追加到输入框并聚焦 */
   const insertText = (body: string) => {
@@ -119,11 +123,12 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
       if (!staff || disabledReason) return
       s.seatSendRich({ convId: row.conv.id, seatId: seat.id, operatorId: staff.id, text: body, replyToId: replyTo?.id })
       setReplyTo(undefined)
+      closeAi()
     },
     sendMedia,
   }))
   const aiSend = (d: AiDraft) => {
-    if (!staff) return
+    if (!staff || disabledReason) return
     s.seatSendRich({ convId: row.conv.id, seatId: seat.id, operatorId: staff.id, text: d.text, aiDraftUsed: true })
     s.recordAi(staff.id, row.conv.id, 'adopted')
     setManualDrafts(null)
@@ -131,7 +136,6 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
   const aiEdit = (d: AiDraft) => {
     setText(d.text)
     setDraftFrom('ai')
-    if (staff) s.recordAi(staff.id, row.conv.id, 'edited')
   }
 
   return (

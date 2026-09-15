@@ -60,11 +60,11 @@ function ServiceTab() {
     s.updateAiSettings(patch, admin)
     setChangingKey(false)
     setNewKey('')
-    toast(changingKey && newKey ? 'AI 服务设置已保存，新密钥已写入（不可再读出）' : 'AI 服务设置已保存')
+    toast(changingKey && newKey ? '演示配置已保存；未保存或使用真实密钥' : 'AI 服务设置已保存')
   }
   const test = () => {
     const ok = s.testAiConnection()
-    toast(ok ? '连接成功：模型可用' : '连接失败：请检查服务地址与密钥', ok ? 'ok' : 'warn')
+    toast(ok ? '演示检查通过：配置项已填写，未连接真实模型' : '演示检查未通过：请填写示例配置', ok ? 'ok' : 'warn')
   }
 
   return (
@@ -74,10 +74,10 @@ function ServiceTab() {
           <Field label="服务地址" required hint="OpenAI 兼容接口地址">
             <Input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder="https://" />
           </Field>
-          <Field label="密钥" required hint="只写不读：保存后后台不再显示">
+          <Field label="密钥" required hint="演示仅记录已配置状态，不保存密钥，请勿输入真实凭据">
             {changingKey ? (
               <div className="flex gap-2">
-                <Input type="password" value={newKey} onChange={(e) => setNewKey(e.target.value)} placeholder="粘贴新密钥" autoComplete="off" />
+                <Input type="password" value={newKey} onChange={(e) => setNewKey(e.target.value)} placeholder="请输入虚构示例，不要填真实密钥" autoComplete="off" />
                 {ai.keyConfigured && (
                   <Button onClick={() => { setChangingKey(false); setNewKey('') }}>取消</Button>
                 )}
@@ -100,15 +100,15 @@ function ServiceTab() {
           {error && <p className="text-xs text-red-600">{error}</p>}
         </div>
       </Card>
-      <Card title="测试连接" extra={<Button size="sm" onClick={test}><Plug size={13} /> 测试连接</Button>}>
+      <Card title="模拟配置检查" extra={<Button size="sm" onClick={test}><Plug size={13} /> 模拟配置检查</Button>}>
         <KV
           items={[
             { k: '最近测试', v: ai.lastTestAt ? fmtDateTime(ai.lastTestAt) : '从未测试' },
-            { k: '结果', v: ai.lastTestOk === null ? '-' : ai.lastTestOk ? <Pill tone="green">成功</Pill> : <Pill tone="red">失败</Pill> },
+            { k: '结果', v: ai.lastTestOk === null ? '-' : ai.lastTestOk ? <Pill tone="green">模拟通过</Pill> : <Pill tone="red">失败</Pill> },
             { k: '密钥', v: ai.keyConfigured ? <Pill tone="green">已配置</Pill> : <Pill tone="red">未配置</Pill> },
           ]}
         />
-        <p className="mt-3 text-[11px] text-zinc-400">测试会用当前已保存的地址与密钥发一条最短请求，不消耗业务配额。</p>
+        <p className="mt-3 text-[11px] text-zinc-400">这里只检查演示配置是否填写，不发出网络请求，不证明模型可用。</p>
       </Card>
     </div>
   )
@@ -174,6 +174,7 @@ function GroupTab() {
   }
   return (
     <div className="space-y-4">
+      <Note tone="amber">群活跃助手为产品讨论稿：保留当前演示，首版的触发、节奏和审核细节待确认。</Note>
       <div className="grid grid-cols-3 gap-3">
         <Stat label="授权机器人账号数" value={botLimit} sub="来自许可证 AI 模块" />
         <Stat label="已用" value={botUsed} sub={`剩余 ${Math.max(0, botLimit - botUsed)} 个可绑定到群`} tone={botUsed >= botLimit ? 'warn' : 'default'} />

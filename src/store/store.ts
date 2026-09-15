@@ -169,11 +169,12 @@ export const useStore = create<DemoStore>()(
         const customerSeats: CustomerSeat[] = []
         const conversations: Conversation[] = []
         const messages: Message[] = []
-        usable.forEach((seatId, i) => {
+        usable.forEach((seatId) => {
           const seat = seatById[seatId]
           customerSeats.push({ customerId: customer.id, seatId, primary: seatId === primarySeatId, addedAt: at, source: 'register' })
           const conv: Conversation = { id: newId('conv'), kind: 'dm', customerId: customer.id, seatId, lastMessageAt: at }
-          const welcomeAt = iso(Date.now() + (i + 1) * 800)
+          // 欢迎语在注册时已产生，不能标成未来时间压过客户随后的提问。
+          const welcomeAt = at
           conv.lastMessageAt = welcomeAt
           conversations.push(conv)
           messages.push({

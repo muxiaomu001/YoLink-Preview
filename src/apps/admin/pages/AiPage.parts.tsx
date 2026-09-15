@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Download, Plus } from 'lucide-react'
 import type { AiEvent, KnowledgeItem } from '@/domain/types'
+import { knowledgeStatus } from '@/domain/ai'
 import { newId } from '@/domain/ids'
 import { useStore } from '@/store/store'
 import { staffById } from '@/store/selectors'
 import { confirm } from '@/ui/confirm'
-import { Button, Field, Input, Switch, Textarea } from '@/ui/primitives'
+import { Button, Field, Input, Select, Textarea } from '@/ui/primitives'
 import { Card, Note, Pill, Stat, Table } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 
@@ -23,7 +24,7 @@ export function KnowledgeTab() {
   }
   return (
     <div className="space-y-4">
-      <Note>正式版支持「对话式录入」：在工作台把一段客户问答直接存成知识条目。演示用表单录入。关掉「生效」的条目保留但不参与推荐。</Note>
+      <Note>当前用表单演示知识发布：草稿不参与推荐，发布后生效，修改后使用新版本，下线后停止引用。正式产品的对话式知识整理尚未在此演示。</Note>
       <Card
         title="知识库条目"
         padded={false}
@@ -50,7 +51,7 @@ export function KnowledgeTab() {
                 </div>
               ),
             },
-            { key: 'enabled', title: '生效', render: (k) => <Switch checked={k.enabled} onChange={(v) => s.saveKnowledge({ ...k, enabled: v }, admin)} /> },
+            { key: 'enabled', title: '状态', render: (k) => <Select aria-label={`${k.title}发布状态`} value={knowledgeStatus(k)} onChange={(e) => { const status = e.target.value as 'draft' | 'published' | 'offline'; s.saveKnowledge({ ...k, status, enabled: status === 'published' }, admin) }}><option value="draft">草稿</option><option value="published">已发布</option><option value="offline">已下线</option></Select> },
             {
               key: 'ops',
               title: '操作',
@@ -77,7 +78,7 @@ function KnowledgeModal({ item, onClose }: { item?: KnowledgeItem; onClose: () =
   const [title, setTitle] = useState(item?.title ?? '')
   const [body, setBody] = useState(item?.body ?? '')
   const [tags, setTags] = useState(item?.tags.join(', ') ?? '')
-  const [enabled, setEnabled] = useState(item?.enabled ?? true)
+  const [status, setStatus] = useState<'draft' | 'published' | 'offline'>(item ? knowledgeStatus(item) : 'draft')
   const error = !title.trim() ? '标题不能为空' : title.length > 64 ? '标题最多 64 字' : !body.trim() ? '正文不能为空' : body.length > 2000 ? '正文最多 2000 字' : ''
   const submit = () => {
     if (error) return
@@ -86,7 +87,8 @@ function KnowledgeModal({ item, onClose }: { item?: KnowledgeItem; onClose: () =
       title: title.trim(),
       body: body.trim(),
       tags: tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean),
-      enabled,
+      status,
+      enabled: status === 'published',
     }
     s.saveKnowledge(next, admin)
     toast(item ? `条目「${next.title}」已更新` : `条目「${next.title}」已加入知识库`)
@@ -116,8 +118,8 @@ function KnowledgeModal({ item, onClose }: { item?: KnowledgeItem; onClose: () =
           <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="如：赎回, 到账, 常见问题" />
         </Field>
         <div className="flex items-center justify-between rounded-md border border-zinc-200 px-3 py-2 text-xs">
-          <span className="font-medium text-zinc-800">生效</span>
-          <Switch checked={enabled} onChange={setEnabled} />
+          <span className="font-medium text-zinc-800">发布状态</span>
+          <Select aria-label="发布状态" value={status} onChange={(e) => setStatus(e.target.value as typeof status)}><option value="draft">草稿</option><option value="published">已发布</option><option value="offline">已下线</option></Select>
         </div>
         {error && title && <p className="text-xs text-red-600">{error}</p>}
       </div>

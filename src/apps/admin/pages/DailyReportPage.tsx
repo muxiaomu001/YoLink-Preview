@@ -24,16 +24,16 @@ export function DailyReportPage() {
       return
     }
     s.sendDailyReportNow()
-    toast(`已发送给 ${recipients.map((r) => r.name).join('、')}，记录见下方`)
+    toast(`已生成模拟发送记录，示例接收人：${recipients.map((r) => r.name).join('、')}，记录见下方`)
   }
   return (
     <div>
       <PageHeader
         title="日报与提醒"
-        desc="每天早上把经营首页的六个数推到老板手机上；事实提醒在超过阈值时当天就推。"
+        desc="展示日报预览和模拟记录；当前没有真实 App、企微或飞书推送。"
         extra={
           <Button variant="primary" onClick={send}>
-            <Send size={14} /> 立即发送一次
+            <Send size={14} /> 模拟发送一次
           </Button>
         }
       />
@@ -147,7 +147,7 @@ function RecordsCard() {
         columns={[
           { key: 'date', title: '日期', width: '110px', render: (r) => <span className="tabular-nums text-zinc-700">{r.date}</span> },
           { key: 'to', title: '发送对象', render: (r) => <span className="text-zinc-700">{r.sentTo.join('、')}</span> },
-          { key: 'status', title: '状态', width: '80px', render: (r) => (r.status === 'sent' ? <Pill tone="green">已发送</Pill> : <Pill tone="red">失败</Pill>) },
+          { key: 'status', title: '状态', width: '80px', render: (r) => (r.status === 'sent' ? <Pill tone="green">模拟发送</Pill> : <Pill tone="red">失败</Pill>) },
           { key: 'summary', title: '摘要', render: (r) => <span className={r.status === 'failed' ? 'text-red-700' : 'text-zinc-600'}>{r.summary}</span> },
         ]}
       />

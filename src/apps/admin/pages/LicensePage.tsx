@@ -34,14 +34,14 @@ export function LicensePage() {
     })
     if (!ok) return
     s.uploadLicense(admin)
-    toast('新许可已生效：到期日延长一年，全部模块授权即时生效')
+    toast('已模拟续期：示例到期日延长一年；不代表正式续费规则')
   }
 
   return (
     <div>
       <PageHeader
         title="版本与许可"
-        desc="当前实例的版本、许可类型与模块授权。上传新许可文件即时生效。"
+        desc="展示版本、授权与到期状态。订阅到期如何限制使用尚未决定；此页续期仅模拟，不上传或校验真实许可。"
         extra={
           <Button variant="primary" onClick={() => void upload()}>
             <Upload size={14} /> 上传新许可文件
@@ -50,7 +50,7 @@ export function LicensePage() {
       />
       {expiringSoon && (
         <div className="mb-4">
-          <Note tone="amber">许可将在 {left} 天后到期（{fmtDate(lic.expiresAt)}）。到期后客户端仍可登录，但管理后台只读，请提前续期。</Note>
+          <Note tone="amber">许可将在 {left} 天后到期（{fmtDate(lic.expiresAt)}）。到期后的聊天、查询、模块停用与宽限期规则待产品确认。</Note>
         </div>
       )}
       <div className="grid grid-cols-[360px_1fr] gap-4">

@@ -57,9 +57,11 @@ export function integrationActions(set: Set, get: Get): IntegrationActions {
 
     saveKnowledge: (item, byStaffId) =>
       set((s) => {
-        const exists = s.knowledge.some((k) => k.id === item.id)
+        const previous = s.knowledge.find((k) => k.id === item.id)
+        const exists = !!previous
+        const saved = { ...item, version: previous ? (previous.version ?? 1) + 1 : 1 }
         return {
-          knowledge: exists ? s.knowledge.map((k) => (k.id === item.id ? item : k)) : [...s.knowledge, item],
+          knowledge: exists ? s.knowledge.map((k) => (k.id === item.id ? saved : k)) : [...s.knowledge, saved],
           audit: withAudit(s.audit, 'knowledge.update', `${exists ? '修改' : '新增'}知识库条目「${item.title}」`, byStaffId),
         }
       }),

@@ -40,10 +40,10 @@ export function PhoneApp() {
   }
 
   return (
-    <div className="flex h-full items-center justify-center bg-zinc-200 p-6">
-      <div className="flex items-start gap-6">
+    <div className="flex h-full overflow-auto items-start justify-center bg-zinc-200 p-2 sm:p-6">
+      <div className="flex flex-col items-center gap-4 lg:flex-row lg:items-start lg:gap-6">
         {/* 手机 */}
-        <div className="relative h-[780px] w-[380px] overflow-hidden rounded-[40px] border-[10px] border-zinc-900 bg-white shadow-2xl">
+        <div className="relative h-[min(780px,90dvh)] w-[min(380px,calc(100vw-16px))] overflow-hidden rounded-[40px] border-[10px] border-zinc-900 bg-white shadow-2xl">
           <div className="absolute top-0 left-1/2 z-10 h-6 w-28 -translate-x-1/2 rounded-b-2xl bg-zinc-900" />
           <div className="relative flex h-full flex-col pt-6">
             {!loggedIn ? (

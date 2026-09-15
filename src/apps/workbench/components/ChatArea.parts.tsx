@@ -185,12 +185,13 @@ export function PinModal({ message, group, onClose }: { message: Message; group:
 }
 
 export function AiPanel({ drafts, onSend, onEdit, onClose }: { drafts: AiDraft[]; onSend: (d: AiDraft) => void; onEdit: (d: AiDraft) => void; onClose: () => void }) {
+  const [source, setSource] = useState<AiDraft | null>(null)
   if (!drafts.length) return null
   return (
     <div className="border-t border-violet-100 bg-violet-50/60 px-4 py-2">
       <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-medium text-violet-700">
-        <Sparkles size={13} /> AI 回复推荐
-        <HelpTip text="依据客户最后一句、资料卡与知识库生成 2 到 3 条草稿；金额字段按角色隐藏，不传给 AI。「设置」里可关闭自动弹出，改为点输入栏的「AI 推荐」按钮手动生成。" />
+        <Sparkles size={13} /> AI 回复推荐 <span className="text-[10px] font-normal">知识匹配演示</span>
+        <HelpTip text="当前仅按客户最后一句匹配已发布知识，返回原文供核对，不调用真实模型。默认手动，个人设置可开启自动弹出。" />
         <button type="button" onClick={onClose} className="ml-auto rounded p-0.5 text-violet-400 hover:bg-violet-100 hover:text-violet-800" aria-label="关闭 AI 推荐" title="关闭">
           <X size={14} />
         </button>
@@ -200,13 +201,14 @@ export function AiPanel({ drafts, onSend, onEdit, onClose }: { drafts: AiDraft[]
           <div key={i} className="flex items-start gap-2 rounded-md border border-violet-100 bg-white px-2.5 py-1.5">
             <div className="min-w-0 flex-1">
               <div className="text-[13px] leading-relaxed text-zinc-800">{d.text}</div>
-              <div className="mt-0.5 text-[11px] text-zinc-400">依据：{d.basis}</div>
+              <button type="button" onClick={() => setSource(d)} className="mt-0.5 text-left text-[11px] text-violet-700 hover:underline">依据：{d.basis} · 查看原文</button>
             </div>
             <Button size="sm" variant="primary" onClick={() => onSend(d)}>一键发出</Button>
             <Button size="sm" onClick={() => onEdit(d)}>改后发</Button>
           </div>
         ))}
       </div>
+      {source && <Modal open title={source.basis} onClose={() => setSource(null)} width={560}><p className="whitespace-pre-wrap text-sm leading-relaxed">{source.sourceBody}</p></Modal>}
     </div>
   )
 }

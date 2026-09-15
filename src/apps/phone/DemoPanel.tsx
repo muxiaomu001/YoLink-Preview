@@ -22,7 +22,7 @@ export function DemoPanel({ onSwitch }: { onSwitch: () => void }) {
   return (
     <aside className="thin-scroll max-h-[780px] w-72 overflow-y-auto rounded-lg border border-dashed border-zinc-400 bg-white/70 p-4 text-xs">
       <div className="mb-2 font-semibold text-zinc-700">演示控制</div>
-      <p className="mb-3 leading-relaxed text-zinc-500">这块不是产品的一部分。左边是客户在 App 里看到的一切：只有坐席，没有员工；每个入口都按策略快照显示或隐藏。</p>
+      <p className="mb-3 leading-relaxed text-zinc-500">这块不是产品的一部分。手机屏演示注册、聊天、联系人和我的。网站栏目、发现、经营等入口尚未覆盖；手机导航待单独确认。客户看到官方身份，不显示实操员工。</p>
       <label className="mb-1 block text-[11px] text-zinc-500">以哪位客户的视角查看</label>
       <Select
         value={customer?.id ?? ''}

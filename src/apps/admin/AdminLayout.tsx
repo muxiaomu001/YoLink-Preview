@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import { NavLink, Outlet, Link } from 'react-router-dom'
+import { NavLink, Outlet, Link, useLocation } from 'react-router-dom'
 import { ExternalLink, FileSearch } from 'lucide-react'
 import { useStore } from '@/store/store'
 import { staffById } from '@/store/selectors'
@@ -7,6 +7,8 @@ import { Avatar } from '@/ui/display'
 import { ADMIN_NAV } from './nav'
 
 export function AdminLayout() {
+  const location = useLocation()
+  const currentItem = ADMIN_NAV.flatMap((g) => g.items).find((it) => it.to === location.pathname)
   const enterprise = useStore((s) => s.enterprise)
   const admin = useStore((s) => staffById(s, s.session.adminStaffId))
   const pending = useStore((s) => s.reports.filter((r) => r.status === 'pending').length + s.withdrawals.filter((w) => w.status === 'pending').length)
@@ -19,7 +21,7 @@ export function AdminLayout() {
           </span>
           <div className="min-w-0">
             <div className="truncate text-[13px] font-semibold text-zinc-900">{enterprise.name}</div>
-            <div className="text-[10px] text-zinc-400">管理后台 · 完整版</div>
+            <div className="text-[10px] text-zinc-400">管理后台 · 产品演示</div>
           </div>
         </div>
         <nav className="thin-scroll flex-1 overflow-y-auto px-2 py-2">
@@ -71,6 +73,7 @@ export function AdminLayout() {
           </div>
         </header>
         <main className="thin-scroll flex-1 overflow-y-auto p-5">
+          <div className="mb-4 rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">{currentItem?.level ? `${currentItem.level} · 后续功能演示，不属于第一版交付承诺。` : '产品交互演示 · 数据为虚构样例，AI、外部连接与发送结果均为模拟。'}</div>
           <Outlet />
         </main>
       </div>

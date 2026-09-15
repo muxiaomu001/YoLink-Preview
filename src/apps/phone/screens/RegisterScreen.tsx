@@ -100,7 +100,7 @@ export function RegisterScreen({ onDone }: { onDone: (added: JustAdded) => void 
           <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+852" className="h-10" />
         </div>
         <div>
-          <div className="mb-1 text-[11px] text-zinc-500">密码</div>
+          <div className="mb-1 text-[11px] text-zinc-500">示例密码（演示不校验）</div>
           <Input type="password" defaultValue="demo1234" className="h-10" />
         </div>
         <div>
