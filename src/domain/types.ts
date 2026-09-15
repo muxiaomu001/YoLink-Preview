@@ -106,6 +106,8 @@ export interface Enterprise {
   broadcastPerStaffPerDay: number
   /** 群发频控：每客户每天最多收到的群发条数（跨坐席、跨任务合并） */
   broadcastPerCustomerPerDay: number
+  /** 是否允许员工在工作台建个人话术（企业话术库始终可用） */
+  allowPersonalQuickReply: boolean
 }
 
 /** 员工个人设置：跟人走，不跟坐席走 */
@@ -116,6 +118,8 @@ export interface StaffPrefs {
   language: Language
   /** AI 推荐是否在客户来消息后自动弹出草稿；关时只能点输入栏的「AI 推荐」按钮 */
   aiSuggest: boolean
+  /** 打字时按关键词自动匹配话术并浮出候选；关了只能用 `/` 或话术面板 */
+  quickMatch: boolean
 }
 
 // ---------- 员工、角色、坐席 ----------
@@ -431,7 +435,18 @@ export interface Conversation {
 }
 
 export type SenderKind = 'customer' | 'seat' | 'bot' | 'system'
-export type MessageKind = 'text' | 'image' | 'system'
+export type MessageKind = 'text' | 'image' | 'file' | 'system'
+
+/** 图片 / 文件消息的附件：演示里 url 是 public 下的静态文件或本机上传后的 data URL */
+export interface MessageMedia {
+  url: string
+  name: string
+  /** 字节数 */
+  size: number
+  mime?: string
+  width?: number
+  height?: number
+}
 
 export interface Message {
   id: string
@@ -444,7 +459,10 @@ export interface Message {
   /** 坐席发的消息：当时真正打字的员工；机器人手动发言时也记 */
   operatorId?: string
   kind: MessageKind
+  /** 文字消息的正文；图片 / 文件消息里是说明文字（可空） */
   text: string
+  /** kind 为 image / file 时的附件 */
+  media?: MessageMedia
   at: ISODate
   mentionSeatIds?: string[]
   mentionAll?: boolean
@@ -506,6 +524,7 @@ export type AuditType =
   | 'customer.reassign'
   | 'customer.delete'
   | 'broadcast.send'
+  | 'quick_reply.library'
   | 'message.delete'
   | 'report.handle'
   | 'sensitive.update'
@@ -618,8 +637,10 @@ export interface Broadcast {
   operatorId: string
   targetKind: BroadcastTargetKind
   targetDesc: string
-  contentKind: 'text' | 'image'
+  contentKind: 'text' | 'image' | 'file'
   text: string
+  /** 图片 / 文件群发的附件（可从话术库选） */
+  media?: MessageMedia
   sentAt: ISODate
   /** P1：定时发送 */
   scheduledAt?: ISODate | null
@@ -630,13 +651,41 @@ export interface Broadcast {
   readCount: number
 }
 
+// ---------- 话术库（易歪歪式：分类 + 文字 / 图片 / 文件 + 关键词匹配） ----------
+
+export type QuickReplyScope = 'enterprise' | 'personal'
+export type QuickReplyKind = 'text' | 'image' | 'file'
+
+/** 话术分类：企业分类由后台维护，个人分类由员工自己在工作台建 */
+export interface QuickReplyCategory {
+  id: string
+  scope: QuickReplyScope
+  /** 个人分类的主人 */
+  staffId?: string
+  name: string
+  sortOrder: number
+}
+
+/**
+ * 一条话术。文字话术 text 为正文（支持变量）；图片 / 文件话术 media 为附件，text 是随附说明（可空）。
+ * keywords 用于打字自动匹配：标题、关键词、正文都参与，命中顺序 标题 > 关键词 > 正文。
+ */
 export interface QuickReply {
   id: string
-  scope: 'enterprise' | 'personal'
-  /** 个人快捷回复的主人 */
+  scope: QuickReplyScope
+  /** 个人话术的主人 */
   staffId?: string
+  /** 所属分类；空为「未分类」 */
+  categoryId: string | null
+  kind: QuickReplyKind
   title: string
   text: string
+  keywords: string[]
+  media?: MessageMedia
+  /** 企业话术可停用：停用后工作台不可见，后台保留 */
+  enabled: boolean
+  useCount: number
+  lastUsedAt?: ISODate
 }
 
 export interface KnowledgeItem {
@@ -1131,6 +1180,7 @@ export interface DemoState {
   sensitiveWords: SensitiveWord[]
   sensitiveHits: SensitiveHit[]
   broadcasts: Broadcast[]
+  quickReplyCategories: QuickReplyCategory[]
   quickReplies: QuickReply[]
   knowledge: KnowledgeItem[]
   policyItems: PolicyItem[]

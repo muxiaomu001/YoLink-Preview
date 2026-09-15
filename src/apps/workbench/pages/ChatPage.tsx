@@ -1,23 +1,34 @@
 /**
- * 会话页：左侧三个视图 + 搜索 / 筛选 + 会话列表（右键菜单、快捷键），中间聊天区，右侧客户资料卡 / 群信息卡。
- * 左右两栏可拖宽、右栏可收起，宽度与收起状态记在本机（useLocalPref）。打开会话自动标已读。
+ * 会话页：左侧三个视图 + 搜索 / 筛选 + 会话列表（右键菜单、快捷键），中间聊天区，右侧两个页签「资料」（客户资料卡 / 群信息卡）「话术」（话术库面板）。
+ * 左右两栏可拖宽、右栏可收起，宽度、收起状态与右栏页签记在本机（useLocalPref）。打开会话自动标已读。
+ * 话术面板的发送 / 填入通过 ChatArea 的 ref（ChatAreaHandle）作用到当前会话。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { clsx } from 'clsx'
+import { UserRound, Zap } from 'lucide-react'
 import { seatGroupPerm } from '@/store/policy'
 import { applyView, conversationsForSeat, type WorkbenchView } from '@/store/selectors'
 import { Empty } from '@/ui/display'
 import { useWorkbench } from '../useWorkbench'
 import { useLocalPref } from '../useLocalPref'
-import { ChatArea } from '../components/ChatArea'
+import { ChatArea, type ChatAreaHandle } from '../components/ChatArea'
+import { sendBlockReason } from '../components/ChatArea.parts'
 import { CustomerCard } from '../components/CustomerCard'
 import { GroupCard } from '../components/group/GroupCard'
 import { ResizeHandle } from '../components/layout/ResizeHandle'
+import { QuickReplyPanel } from '../components/quick-replies/QuickReplyPanel'
+import type { QuickReplyTarget } from '../components/quick-replies/shared'
 import { activeFilterCount, applyFilters, ContextMenu, ConvItem, EMPTY_FILTERS, FilterBar, VIEWS, type Filters } from './ChatPage.parts'
 
 const LEFT = { def: 320, min: 260, max: 420 }
 const RIGHT = { def: 340, min: 300, max: 480 }
+
+type RightTab = 'profile' | 'quick'
+const RIGHT_TABS: { key: RightTab; label: string; icon: typeof UserRound; hint: string }[] = [
+  { key: 'profile', label: '资料', icon: UserRound, hint: '客户资料卡 / 群信息' },
+  { key: 'quick', label: '话术', icon: Zap, hint: '话术库：搜索、发送、填入；个人话术在这里新建' },
+]
 
 export function ChatPage() {
   const { s, staff, seat, can } = useWorkbench()
@@ -29,12 +40,14 @@ export function ChatPage() {
   const [hidden, setHidden] = useState<Record<string, string>>({})
   const [menu, setMenu] = useState<{ x: number; y: number; convId: string } | null>(null)
   const searchRef = useRef<HTMLDivElement>(null)
+  const chatRef = useRef<ChatAreaHandle>(null)
   const idleDays = s.policyNumbers.idleDays
 
   // 本机界面偏好：左右栏宽、右栏是否收起
   const [leftW, setLeftW] = useLocalPref('chat.leftWidth', LEFT.def)
   const [rightW, setRightW] = useLocalPref('chat.rightWidth', RIGHT.def)
   const [rightOpen, setRightOpen] = useLocalPref('chat.rightOpen', true)
+  const [rightTab, setRightTab] = useLocalPref<RightTab>('chat.rightTab', 'profile')
 
   const rows = useMemo(() => (seat ? conversationsForSeat(s, seat.id) : []), [s, seat])
   const counts = useMemo(() => Object.fromEntries(VIEWS.map((v) => [v.key, applyView(rows, v.key).length])), [rows])
@@ -81,17 +94,27 @@ export function ChatPage() {
 
   const closeMenu = useCallback(() => setMenu(null), [])
   const toggleRight = useCallback(() => setRightOpen((v) => !v), [setRightOpen])
-  /** 群顶栏「N 位成员」：右栏收起时先展开，再滚到顶部 */
+  /** 群顶栏「N 位成员」：右栏收起时先展开并切到「资料」，再滚到顶部 */
   const showGroupInfo = useCallback(() => {
     setRightOpen(true)
+    setRightTab('profile')
     window.setTimeout(() => document.getElementById('wb-right-panel')?.scrollTo({ top: 0, behavior: 'smooth' }), 0)
-  }, [setRightOpen])
+  }, [setRightOpen, setRightTab])
 
   if (!seat || !staff) {
     return <Empty className="h-full" text="当前员工没有持有任何坐席。让管理员在「坐席」页把一个坐席交接给他，这里就会出现会话。" />
   }
   const currentGroup = current && current.conv.kind !== 'dm' ? s.chatGroups.find((g) => g.id === current.conv.chatGroupId) : undefined
   const noFilter = activeFilterCount(filters) === 0 && !filters.q.trim()
+  // 话术面板对当前会话的发送能力：能不能发、为什么不能，以及三个动作（转交给聊天区）
+  const quickTarget: QuickReplyTarget = {
+    active: !!current,
+    blockReason: current ? sendBlockReason(s, current, seat, staff.id) : undefined,
+    customerName: current?.customer?.nickname,
+    sendText: (t) => chatRef.current?.sendText(t),
+    sendMedia: (k, m, t) => chatRef.current?.sendMedia(k, m, t),
+    insertText: (t) => chatRef.current?.insertText(t),
+  }
 
   return (
     <div className="flex h-full">
@@ -134,24 +157,45 @@ export function ChatPage() {
 
       {/* 中：聊天区 */}
       <section className="flex min-w-0 flex-1 flex-col bg-zinc-50">
-        {current ? <ChatArea key={current.conv.id} row={current} seat={seat} rightOpen={rightOpen} onToggleRight={toggleRight} onGroupInfo={showGroupInfo} /> : <Empty className="h-full" text="选择一条会话" />}
+        {current ? <ChatArea key={current.conv.id} ref={chatRef} row={current} seat={seat} rightOpen={rightOpen} onToggleRight={toggleRight} onGroupInfo={showGroupInfo} /> : <Empty className="h-full" text="选择一条会话" />}
       </section>
 
-      {/* 右：资料卡（可收起） */}
+      {/* 右：资料 / 话术两个页签（可收起） */}
       {rightOpen && (
         <>
           <ResizeHandle side="right" width={rightW} min={RIGHT.min} max={RIGHT.max} onResize={setRightW} />
-          <aside id="wb-right-panel" className="thin-scroll shrink-0 overflow-y-auto border-l border-zinc-200 bg-white" style={{ width: rightW }}>
-            {current?.conv.kind === 'dm' && current.customer && <CustomerCard customerId={current.customer.id} />}
-            {currentGroup && (
-              <GroupCard
-                group={currentGroup}
-                actor={{ seatId: seat.id, staffId: staff.id }}
-                perm={(p) => seatGroupPerm(s, currentGroup, seat.id, staff.id, p)}
-                compact
-                officialEditable={can('manage_groups')}
-                canViewAllCustomers={can('view_all_customers')}
-              />
+          <aside className="flex shrink-0 flex-col border-l border-zinc-200 bg-white" style={{ width: rightW }}>
+            <div className="grid shrink-0 grid-cols-2 border-b border-zinc-200">
+              {RIGHT_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  title={tab.hint}
+                  onClick={() => setRightTab(tab.key)}
+                  className={clsx('flex items-center justify-center gap-1.5 border-b-2 py-2.5 text-[12px]', rightTab === tab.key ? 'border-brand-700 font-medium text-brand-800' : 'border-transparent text-zinc-500 hover:text-zinc-800')}
+                >
+                  <tab.icon size={14} />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            {rightTab === 'quick' ? (
+              <QuickReplyPanel target={quickTarget} />
+            ) : (
+              <div id="wb-right-panel" className="thin-scroll min-h-0 flex-1 overflow-y-auto">
+                {!current && <Empty className="h-full" text="选择一条会话后显示资料" />}
+                {current?.conv.kind === 'dm' && current.customer && <CustomerCard customerId={current.customer.id} />}
+                {currentGroup && (
+                  <GroupCard
+                    group={currentGroup}
+                    actor={{ seatId: seat.id, staffId: staff.id }}
+                    perm={(p) => seatGroupPerm(s, currentGroup, seat.id, staff.id, p)}
+                    compact
+                    officialEditable={can('manage_groups')}
+                    canViewAllCustomers={can('view_all_customers')}
+                  />
+                )}
+              </div>
             )}
           </aside>
         </>

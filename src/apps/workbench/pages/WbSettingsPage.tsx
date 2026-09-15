@@ -1,5 +1,5 @@
 /**
- * 工作台设置页：个人设置、快捷键、我的欢迎语（坐席属性）、个人快捷回复、我持有的坐席、企业设置入口（仅有 manage_settings 的角色可见）。
+ * 工作台设置页：个人设置、快捷键、我的欢迎语（坐席属性）、我的话术、我持有的坐席、企业设置入口（仅有 manage_settings 的角色可见）。
  */
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -9,7 +9,7 @@ import { Card, PageHeader, SeatAvatar } from '@/ui/display'
 import { HelpTip } from '@/ui/help'
 import { toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
-import { PrefsCard, QuickRepliesCard, ShortcutsCard } from './WbSettingsPage.parts'
+import { MyQuickRepliesCard, PrefsCard, ShortcutsCard } from './WbSettingsPage.parts'
 
 export function WbSettingsPage() {
   const { s, staff, seat, mySeats, can } = useWorkbench()
@@ -51,7 +51,7 @@ export function WbSettingsPage() {
           <ShortcutsCard />
         </div>
         <div className="space-y-4">
-          <QuickRepliesCard />
+          <MyQuickRepliesCard />
           <Card title="我持有的坐席">
             <ul className="space-y-2">
               {mySeats.map((x) => (

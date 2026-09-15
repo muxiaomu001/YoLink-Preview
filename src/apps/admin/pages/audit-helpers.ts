@@ -21,11 +21,12 @@ export function convName(s: DemoState, convId: string): string {
   return s.chatGroups.find((g) => g.id === conv.chatGroupId)?.name ?? '（群不存在）'
 }
 
-/** 消息在审计表格里的文本：删除的显示占位，媒体显示类型 */
+/** 消息在审计表格里的文本：删除的显示占位，图片 / 文件显示类型（文件带文件名），随附说明跟在后面 */
 export function messageText(m: Message): string {
   if (m.deletedAt) return '[已删除]'
   if (m.recalledAt) return '[已撤回]'
-  if (m.kind === 'image') return '[图片]'
+  if (m.kind === 'image') return m.text ? `[图片] ${m.text}` : '[图片]'
+  if (m.kind === 'file') return `[文件] ${m.media?.name ?? ''}${m.text ? ` ${m.text}` : ''}`.trim()
   return m.text
 }
 

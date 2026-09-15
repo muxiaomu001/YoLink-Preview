@@ -1,21 +1,22 @@
 /**
  * 群发页（04 文档）：默认目标「全部好友」（一键群发），也可按主归属 / 标签 / 购买 / 角色 / 指定群；
- * 内容类型、立即或定时发送；频控读企业设置；记录表按 PRD 列。
+ * 内容类型（文本 / 图片 / 文件，可从话术库选）、立即或定时发送；频控读企业设置；记录表按 PRD 列。
  * 支持 ?target=friends 直达：自动选中全部好友并把光标放到内容框。
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Send, Sparkles, Users } from 'lucide-react'
-import type { Broadcast, BroadcastTargetKind } from '@/domain/types'
+import { BookOpenText, Send, Sparkles, Upload, Users } from 'lucide-react'
+import type { Broadcast, BroadcastTargetKind, MessageMedia, QuickReply } from '@/domain/types'
 import { customersOfSeat, friendsOfSeat } from '@/store/selectors'
 import { Button, Checkbox, Field, Input, Select, Textarea } from '@/ui/primitives'
 import { Card, Note, SeatAvatar } from '@/ui/display'
 import { HelpTip } from '@/ui/help'
 import { toast } from '@/ui/overlay'
+import { FileCard, ImageThumb, readFileAsMedia } from '@/ui/media'
 import { useWorkbench } from '../useWorkbench'
-import { BroadcastDetailModal, BroadcastRecords, DELIVERY_RULES, TARGET_LABEL, renderVars } from './BroadcastPage.parts'
+import { BroadcastDetailModal, BroadcastRecords, DELIVERY_RULES, QuickReplyPickerModal, TARGET_LABEL, renderVars } from './BroadcastPage.parts'
 
-type ContentKind = 'text' | 'image' | 'card'
+type ContentKind = Broadcast['contentKind']
 type SendMode = 'now' | 'scheduled'
 
 const TARGET_KINDS: BroadcastTargetKind[] = ['friends', 'mine', 'tag', 'purchase', 'role', 'group']
@@ -36,6 +37,10 @@ export function BroadcastPage() {
   const [groupId, setGroupId] = useState('')
   const [contentKind, setContentKind] = useState<ContentKind>('text')
   const [text, setText] = useState('')
+  /** 图片 / 文件群发的附件：从话术库选或本机上传 */
+  const [media, setMedia] = useState<MessageMedia | undefined>(undefined)
+  const [picking, setPicking] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
   const [mode, setMode] = useState<SendMode>('now')
   const [scheduledAt, setScheduledAt] = useState('')
   const [detail, setDetail] = useState<Broadcast | null>(null)
@@ -96,9 +101,10 @@ export function BroadcastPage() {
               : `群「${group?.name ?? '未选'}」`
   const targetOk = targetKind === 'group' ? !!group : targets.length > 0 && (targetKind !== 'tag' || tagIds.length > 0) && (targetKind !== 'role' || !!role)
   const scheduleOk = mode === 'now' || (!!scheduledAt && new Date(scheduledAt).getTime() > Date.now())
-  const contentOk = contentKind !== 'card' && !!text.trim()
+  const needMedia = contentKind !== 'text'
+  const contentOk = needMedia ? !!media : !!text.trim()
   const canSend = !overLimit && !!name.trim() && contentOk && targetOk && scheduleOk
-  const reason = overLimit ? `今日群发任务已达上限（${perStaff} 个）` : !name.trim() ? '填任务名称' : contentKind === 'card' ? '自定义卡片未开放' : !text.trim() ? '填内容' : !targetOk ? '目标没有命中任何人' : !scheduleOk ? '定时时间要晚于现在' : ''
+  const reason = overLimit ? `今日群发任务已达上限（${perStaff} 个）` : !name.trim() ? '填任务名称' : needMedia && !media ? (contentKind === 'image' ? '选一张图片' : '选一个文件') : !needMedia && !text.trim() ? '填内容' : !targetOk ? '目标没有命中任何人' : !scheduleOk ? '定时时间要晚于现在' : ''
 
   const pickTarget = (k: BroadcastTargetKind) => {
     setTargetKind(k)
@@ -112,15 +118,40 @@ export function BroadcastPage() {
     focusText()
   }
 
+  /** 切内容类型：文本不带附件；图片类型下非图片附件清掉 */
+  const pickKind = (k: ContentKind) => {
+    setContentKind(k)
+    if (k === 'text' || (k === 'image' && media && !media.mime?.startsWith('image/'))) setMedia(undefined)
+  }
+  /** 从话术库选：文字填正文；图片 / 文件跟着改类型并带上附件与随附说明 */
+  const pickQuickReply = (q: QuickReply) => {
+    setPicking(false)
+    setContentKind(q.kind)
+    setText(q.text)
+    setMedia(q.kind === 'text' ? undefined : q.media)
+    s.touchQuickReply(q.id)
+    toast(`已填入话术「${q.title}」`, 'info')
+    if (q.kind === 'text') focusText()
+  }
+  const uploadFile = async (file: File | undefined) => {
+    if (!file) return
+    const r = await readFileAsMedia(file)
+    if (!r.ok) return toast(r.error, 'warn')
+    if (contentKind === 'image' && !r.media.mime?.startsWith('image/')) return toast('请选择图片文件', 'warn')
+    setMedia(r.media)
+  }
+
   const send = () => {
     if (!seat || !staff || !canSend) return
-    const r = s.sendBroadcast({ name: name.trim(), seatId: seat.id, operatorId: staff.id, targetKind, targetDesc, contentKind: contentKind === 'image' ? 'image' : 'text', text: text.trim(), customerIds: targets.map((c) => c.id), chatGroupId: targetKind === 'group' ? groupId : undefined, scheduledAt: mode === 'scheduled' ? new Date(scheduledAt).toISOString() : null })
+    const r = s.sendBroadcast({ name: name.trim(), seatId: seat.id, operatorId: staff.id, targetKind, targetDesc, contentKind, media: needMedia ? media : undefined, text: text.trim(), customerIds: targets.map((c) => c.id), chatGroupId: targetKind === 'group' ? groupId : undefined, scheduledAt: mode === 'scheduled' ? new Date(scheduledAt).toISOString() : null })
     if (!r) return toast(`超过频控：每个实操员工每天 ${perStaff} 个任务，明天再发`, 'warn')
     if (mode === 'scheduled') toast('已创建定时任务，到点按当时人群发送', 'info')
     else if (targetKind === 'group') toast(r.sent ? `已以「${seat.displayName}」身份往群「${group?.name}」发了一条群消息` : '群会话不存在，未发送', r.sent ? 'ok' : 'warn')
     else toast(`已以「${seat.displayName}」身份发给 ${r.sent} 位客户${r.skipped ? `，跳过 ${r.skipped} 位（注销 / 拉黑 / 屏蔽 / 频控）` : ''}`)
     setName('')
     setText('')
+    setMedia(undefined)
+    setContentKind('text')
   }
 
   if (!can('broadcast')) return <div className="p-5"><Note tone="amber">当前员工角色没有 broadcast 能力。</Note></div>
@@ -218,12 +249,10 @@ export function BroadcastPage() {
               )}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="内容类型">
-                  <Select value={contentKind} onChange={(e) => setContentKind(e.target.value as ContentKind)}>
+                  <Select value={contentKind} onChange={(e) => pickKind(e.target.value as ContentKind)}>
                     <option value="text">文本</option>
                     <option value="image">图片</option>
-                    <option value="card" disabled>
-                      自定义卡片（未开放）
-                    </option>
+                    <option value="file">文件</option>
                   </Select>
                 </Field>
                 <Field label="发送方式">
@@ -238,23 +267,46 @@ export function BroadcastPage() {
                   <Input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
                 </Field>
               )}
-              <Field label={contentKind === 'image' ? '图片说明' : '文本内容'} required hint="支持 {{customer.nickname}}，发送时逐人替换">
+              {needMedia && (
+                <Field label={contentKind === 'image' ? '图片' : '文件'} required hint="从话术库选，或本机上传">
+                  <input ref={fileRef} type="file" className="hidden" accept={contentKind === 'image' ? 'image/*' : undefined} onChange={(e) => void uploadFile(e.target.files?.[0])} />
+                  <div className="flex items-start gap-3">
+                    {media ? contentKind === 'image' ? <ImageThumb media={media} maxWidth={160} /> : <FileCard media={media} /> : <span className="text-[12px] text-zinc-400">还没选附件</span>}
+                    <div className="flex shrink-0 gap-1.5">
+                      <Button size="sm" onClick={() => setPicking(true)}>
+                        <BookOpenText size={13} /> 从话术库选
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => fileRef.current?.click()}>
+                        <Upload size={13} /> {media ? '换一个' : '本机上传'}
+                      </Button>
+                    </div>
+                  </div>
+                </Field>
+              )}
+              <Field label={needMedia ? '随附说明' : '文本内容'} required={!needMedia} hint={needMedia ? '可空；和附件一起发出' : '支持 {{customer.nickname}}，发送时逐人替换'}>
                 <div ref={textWrapRef}>
-                  <Textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder={contentKind === 'image' ? '用一句文字描述图片' : ''} />
+                  <Textarea rows={needMedia ? 3 : 5} value={text} onChange={(e) => setText(e.target.value)} placeholder={needMedia ? '一句说明，可不填' : ''} />
                 </div>
               </Field>
               {text.includes('{{customer.nickname}}') && targets[0] && <div className="text-[11px] text-zinc-500">预览（以「{targets[0].nickname}」为例）：{renderVars(text, targets[0].nickname).slice(0, 80)}</div>}
               <div className="flex items-center justify-between">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setText(AI_SAMPLE)
-                    toast('AI 已按「本周观点、稳健语气、中等长度」写好文案', 'info')
-                  }}
-                >
-                  <Sparkles size={13} /> AI 写文案
-                </Button>
+                <div className="flex items-center gap-1">
+                  {!needMedia && (
+                    <Button size="sm" variant="ghost" onClick={() => setPicking(true)}>
+                      <BookOpenText size={13} /> 从话术库选
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setText(AI_SAMPLE)
+                      toast('AI 已按「本周观点、稳健语气、中等长度」写好文案', 'info')
+                    }}
+                  >
+                    <Sparkles size={13} /> AI 写文案
+                  </Button>
+                </div>
                 <div className="flex items-center gap-3">
                   <span className="text-[12px] text-zinc-500">
                     命中 <b className="text-zinc-900">{targetKind === 'group' ? (group?.memberCustomerIds.length ?? 0) : targets.length}</b> 人
@@ -268,7 +320,7 @@ export function BroadcastPage() {
               {reason && (
                 <div className={`text-[12px] ${overLimit ? 'text-amber-700' : 'text-zinc-400'}`}>
                   {reason}
-                  {overLimit && <span className="ml-1">· 在管理后台「企业设置 › 群发频控」里改</span>}
+                  {overLimit && <span className="ml-1">· 在管理后台「企业设置 › 群发与话术」里改</span>}
                 </div>
               )}
             </div>
@@ -279,6 +331,7 @@ export function BroadcastPage() {
         </Card>
       </div>
       {detail && <BroadcastDetailModal b={detail} onClose={() => setDetail(null)} />}
+      {picking && <QuickReplyPickerModal onPick={pickQuickReply} onClose={() => setPicking(false)} />}
     </div>
   )
 }

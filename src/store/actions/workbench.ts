@@ -1,15 +1,15 @@
 /**
  * 工作台动作：消息操作（撤回、引用、转发、坐席删群消息）、会话操作（已读、置顶、静音）、
- * 客户操作（重置密码、拉黑、全群禁言）、个人设置与个人快捷回复、客户手机端的社交动作。
+ * 客户操作（重置密码、拉黑、全群禁言）、个人设置、客户手机端的社交动作。话术库见 quickReplies.ts。
  */
-import type { Message, QuickReply, StaffPrefs } from '@/domain/types'
+import type { Message, MessageMedia, StaffPrefs } from '@/domain/types'
 import { newId } from '@/domain/ids'
 import { DEFAULT_STAFF_PREFS } from '@/domain/seed-groups'
 import { type Get, type Set, now, randomPassword, withAudit } from './helpers'
 
 export interface WorkbenchActions {
   /** 坐席发消息（带引用 / @ / 群发标记之外的扩展参数） */
-  seatSendRich: (input: { convId: string; seatId: string; operatorId: string; text: string; replyToId?: string; mentionAll?: boolean; kind?: 'text' | 'image'; aiDraftUsed?: boolean }) => void
+  seatSendRich: (input: { convId: string; seatId: string; operatorId: string; text: string; replyToId?: string; mentionAll?: boolean; kind?: 'text' | 'image' | 'file'; media?: MessageMedia; aiDraftUsed?: boolean }) => void
   /** 撤回自己的消息：时限内可用，返回是否成功 */
   recallMessage: (messageId: string, byStaffId: string) => boolean
   /** 坐席（群主或有 can_delete_messages 的管理员）删除群里别人的消息 */
@@ -25,8 +25,6 @@ export interface WorkbenchActions {
   /** 所有群禁言；hours 为 null 表示永久，0 表示解除 */
   muteCustomerAll: (customerId: string, hours: number | null, byStaffId: string) => void
   updateStaffPrefs: (staffId: string, patch: Partial<StaffPrefs>) => void
-  savePersonalQuickReply: (staffId: string, input: { id?: string; title: string; text: string }) => void
-  deletePersonalQuickReply: (staffId: string, id: string) => void
   // 客户手机端
   customerRecall: (messageId: string) => boolean
   customerSendIn: (convId: string, customerId: string, text: string, replyToId?: string) => { ok: boolean; reason?: string }
@@ -37,7 +35,7 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
     seatSendRich: (input) => {
       const at = now()
       set((s) => ({
-        messages: [...s.messages, { id: newId('msg'), convId: input.convId, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.kind ?? 'text', text: input.text, at, replyToId: input.replyToId, mentionAll: input.mentionAll, aiDraftUsed: input.aiDraftUsed }],
+        messages: [...s.messages, { id: newId('msg'), convId: input.convId, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.kind ?? 'text', text: input.text, media: input.media, at, replyToId: input.replyToId, mentionAll: input.mentionAll, aiDraftUsed: input.aiDraftUsed }],
         conversations: s.conversations.map((c) => (c.id === input.convId ? { ...c, lastMessageAt: at, readAtBySeat: { ...(c.readAtBySeat ?? {}), [input.seatId]: at }, unreadMarkBySeatIds: (c.unreadMarkBySeatIds ?? []).filter((id) => id !== input.seatId) } : c)),
       }))
     },
@@ -139,15 +137,6 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
         staff: s.staff.map((st) => (st.id === staffId ? { ...st, prefs: { ...(st.prefs ?? DEFAULT_STAFF_PREFS), ...patch } } : st)),
         audit: withAudit(s.audit, 'staff.prefs', `修改个人设置：${Object.keys(patch).join('、')}`, staffId),
       })),
-
-    savePersonalQuickReply: (staffId, input) =>
-      set((s) => {
-        if (input.id) return { quickReplies: s.quickReplies.map((q) => (q.id === input.id && q.staffId === staffId ? { ...q, title: input.title, text: input.text } : q)) }
-        const q: QuickReply = { id: newId('qr'), scope: 'personal', staffId, title: input.title, text: input.text }
-        return { quickReplies: [...s.quickReplies, q], audit: withAudit(s.audit, 'quick_reply.update', `新建个人快捷回复「${input.title}」`, staffId) }
-      }),
-
-    deletePersonalQuickReply: (staffId, id) => set((s) => ({ quickReplies: s.quickReplies.filter((q) => !(q.id === id && q.staffId === staffId)) })),
 
     customerRecall: (messageId) => {
       const s = get()

@@ -41,12 +41,13 @@ export function activeFilterCount(f: Filters): number {
   return (f.type !== 'all' ? 1 : 0) + (f.tagIds.length ? 1 : 0) + (f.idle ? 1 : 0)
 }
 
-/** 最后消息预览：撤回 / 删除占位，媒体显示 [图片] */
+/** 最后消息预览：撤回 / 删除占位，图片显示 [图片]，文件显示 [文件] 文件名 */
 export function previewOf(m: Message | undefined): string {
   if (!m) return ''
   if (m.recalledAt) return '[已撤回]'
   if (m.deletedAt) return '[已删除]'
   if (m.kind === 'image') return '[图片]'
+  if (m.kind === 'file') return `[文件] ${m.media?.name ?? ''}`.trim()
   return m.text
 }
 

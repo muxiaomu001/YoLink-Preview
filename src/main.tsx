@@ -4,6 +4,7 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import './index.css'
 import { Toaster } from '@/ui/overlay'
 import { Confirmer } from '@/ui/confirm'
+import { Lightbox } from '@/ui/media'
 import { Landing } from '@/apps/landing/Landing'
 import { AdminLayout } from '@/apps/admin/AdminLayout'
 import { AdminHome } from '@/apps/admin/pages/AdminHome'
@@ -18,6 +19,7 @@ import { SeatGroupsPage } from '@/apps/admin/pages/SeatGroupsPage'
 import { InviteGroupsPage } from '@/apps/admin/pages/InviteGroupsPage'
 import { InviteLinksPage } from '@/apps/admin/pages/InviteLinksPage'
 import { BroadcastsAdminPage } from '@/apps/admin/pages/BroadcastsAdminPage'
+import { QuickRepliesPage } from '@/apps/admin/pages/QuickRepliesPage'
 import { AssignSettingsPage } from '@/apps/admin/pages/AssignSettingsPage'
 import { TitlesPage } from '@/apps/admin/pages/TitlesPage'
 import { TagsPage } from '@/apps/admin/pages/TagsPage'
@@ -78,6 +80,7 @@ const router = createBrowserRouter([
       { path: 'invite-groups', element: <InviteGroupsPage /> },
       { path: 'invite-links', element: <InviteLinksPage /> },
       { path: 'broadcasts', element: <BroadcastsAdminPage /> },
+      { path: 'quick-replies', element: <QuickRepliesPage /> },
       { path: 'assign-settings', element: <AssignSettingsPage /> },
       // 内部标签与头衔
       { path: 'titles', element: <TitlesPage /> },
@@ -140,5 +143,6 @@ createRoot(document.getElementById('root')!).render(
     <RouterProvider router={router} />
     <Toaster />
     <Confirmer />
+    <Lightbox />
   </StrictMode>,
 )

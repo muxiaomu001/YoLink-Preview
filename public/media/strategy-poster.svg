@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800">
+<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f3b73"/><stop offset="1" stop-color="#0d1b3a"/></linearGradient></defs>
+<rect width="600" height="800" fill="url(#g)"/>
+<circle cx="500" cy="120" r="160" fill="#2f56ad" opacity="0.35"/>
+<circle cx="90" cy="700" r="120" fill="#c9a24d" opacity="0.25"/>
+<text x="60" y="160" font-size="22" fill="#c9a24d" letter-spacing="6" font-family="PingFang SC, Microsoft YaHei, sans-serif">恒信财富 · 线下策略会</text>
+<text x="60" y="260" font-size="56" font-weight="700" fill="#ffffff" font-family="PingFang SC, Microsoft YaHei, sans-serif">四季度</text>
+<text x="60" y="330" font-size="56" font-weight="700" fill="#ffffff" font-family="PingFang SC, Microsoft YaHei, sans-serif">全球配置展望</text>
+<rect x="60" y="380" width="120" height="4" fill="#c9a24d"/>
+<text x="60" y="460" font-size="24" fill="#dbe3f5" font-family="PingFang SC, Microsoft YaHei, sans-serif">10 月 12 日（周日）14:00</text>
+<text x="60" y="500" font-size="24" fill="#dbe3f5" font-family="PingFang SC, Microsoft YaHei, sans-serif">上海 · 恒信财富中心 3 楼</text>
+<text x="60" y="580" font-size="20" fill="#9fb0d6" font-family="PingFang SC, Microsoft YaHei, sans-serif">回复「报名」由您的顾问登记席位</text>
+<rect x="60" y="640" width="220" height="56" rx="28" fill="#c9a24d"/>
+<text x="170" y="676" font-size="22" font-weight="600" fill="#1f2a44" text-anchor="middle" font-family="PingFang SC, Microsoft YaHei, sans-serif">席位有限</text>
+<text x="60" y="760" font-size="13" fill="#7f8db0" font-family="PingFang SC, Microsoft YaHei, sans-serif">本活动不构成投资建议 · 投资有风险</text>
+</svg>

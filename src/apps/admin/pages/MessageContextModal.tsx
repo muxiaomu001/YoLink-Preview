@@ -8,6 +8,7 @@ import { useStore } from '@/store/store'
 import { customerById, messagesOf, seatById, staffById } from '@/store/selectors'
 import { Pill } from '@/ui/display'
 import { Modal } from '@/ui/overlay'
+import { FileCard, ImageThumb } from '@/ui/media'
 import { convName, fmtDateTimeSec, messageText } from './audit-helpers'
 
 const CONTEXT_SIZE = 20
@@ -68,7 +69,14 @@ export function MessageContextModal({ messageId, onClose }: { messageId: string;
                 {m.senderKind === 'system' && <Pill>系统</Pill>}
                 {isTarget && <Pill tone="amber">目标消息</Pill>}
               </div>
-              <div className={clsx('mt-1 whitespace-pre-wrap break-words', m.deletedAt ? 'italic text-zinc-400' : 'text-zinc-800')}>{messageText(m)}</div>
+              {m.media && !m.deletedAt && !m.recalledAt && (m.kind === 'image' || m.kind === 'file') ? (
+                <div className="mt-1 space-y-1">
+                  {m.kind === 'image' ? <ImageThumb media={m.media} maxWidth={200} /> : <FileCard media={m.media} />}
+                  {m.text && <div className="whitespace-pre-wrap break-words text-zinc-800">{m.text}</div>}
+                </div>
+              ) : (
+                <div className={clsx('mt-1 whitespace-pre-wrap break-words', m.deletedAt ? 'italic text-zinc-400' : 'text-zinc-800')}>{messageText(m)}</div>
+              )}
             </div>
           )
         })}

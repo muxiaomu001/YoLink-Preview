@@ -5,9 +5,9 @@ import { useState } from 'react'
 import { clsx } from 'clsx'
 import { ChevronDown, ChevronUp, PanelRightClose, PanelRightOpen, Pin, Search, Sparkles, X } from 'lucide-react'
 import type { AiDraft } from '@/domain/ai'
-import type { ChatGroup, Message, Seat } from '@/domain/types'
+import type { ChatGroup, DemoState, Message, Seat } from '@/domain/types'
 import { fmtAgo } from '@/domain/time'
-import { senderName, visibleText } from '@/store/policy'
+import { seatGroupPerm, senderName, visibleText } from '@/store/policy'
 import { conversationsForSeat, type ConvRow } from '@/store/selectors'
 import { Avatar, Pill, TitleChip } from '@/ui/display'
 import { HelpTip } from '@/ui/help'
@@ -17,6 +17,14 @@ import { useWorkbench } from '../useWorkbench'
 import { jumpToMessage, memberTotal } from './group/shared'
 
 const ONLINE_WINDOW_MS = 5 * 60 * 1000
+
+/** 当前会话为什么发不出去：拉黑的私聊、没有「频道发布」权限的频道；能发返回 undefined。聊天区与右栏话术面板共用 */
+export function sendBlockReason(s: DemoState, row: ConvRow, seat: Seat, staffId: string | null): string | undefined {
+  if (row.customer?.blockedSeatIds.includes(seat.id)) return `对方已拉黑「${seat.displayName}」，发不出去`
+  const group = row.conv.kind !== 'dm' ? s.chatGroups.find((g) => g.id === row.conv.chatGroupId) : undefined
+  if (group?.kind === 'channel' && !seatGroupPerm(s, group, seat.id, staffId, 'can_post_messages')) return '没有「频道发布」权限，不能发布'
+  return undefined
+}
 
 function HeaderBtn({ title, onClick, children }: { title: string; onClick: () => void; children: React.ReactNode }) {
   return (

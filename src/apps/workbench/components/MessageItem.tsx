@@ -1,6 +1,6 @@
 /**
- * 单条消息：系统消息灰色居中；文本 URL 自动成链接；引用条可跳转；撤回 / 删除用占位；
- * 机器人、群发、转发、AI 草稿、欢迎语小标；悬停操作按权限显示（引用、撤回、删除、转发、复制、置顶）。
+ * 单条消息：系统消息灰色居中；文本 URL 自动成链接；图片消息显示缩略图（点开大图）、文件消息显示文件卡，说明文字在下方；
+ * 引用条可跳转；撤回 / 删除用占位；机器人、群发、转发、AI 草稿、欢迎语小标；悬停操作按权限显示（引用、撤回、删除、转发、复制、置顶）。
  */
 import { clsx } from 'clsx'
 import { Bot, Copy, Forward, Pin, Reply, Trash2, Undo2 } from 'lucide-react'
@@ -9,6 +9,7 @@ import { fmtDateTime, fmtTime } from '@/domain/time'
 import { botById, seatCan, seatGroupPerm, senderName, visibleText } from '@/store/policy'
 import { customerById, seatById, staffById } from '@/store/selectors'
 import { Avatar, Pill, SeatAvatar, TitleChip } from '@/ui/display'
+import { FileCard, ImageThumb } from '@/ui/media'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { useWorkbench } from '../useWorkbench'
@@ -63,6 +64,8 @@ export function MessageItem({
   const senderTitle = customer?.primaryTitleId ? s.titles.find((t) => t.id === customer.primaryTitleId && t.enabled) : undefined
   const replyTo = m.replyToId ? s.messages.find((x) => x.id === m.replyToId) : undefined
   const pinned = !!group?.pinnedMessageIds.includes(m.id)
+  const hasMedia = (m.kind === 'image' || m.kind === 'file') && !!m.media
+  const bubbleCls = mine ? 'bg-brand-700 text-white' : otherSeat ? 'bg-brand-50 text-brand-900' : bot ? 'bg-purple-50 text-purple-950' : 'bg-white text-zinc-800 shadow-sm'
 
   // 操作权限
   const recallLimit = s.policyNumbers.recallSeconds
@@ -121,10 +124,19 @@ export function MessageItem({
               {senderName(s, replyTo)}：{visibleText(replyTo, 'staff').slice(0, 40)}
             </button>
           )}
-          <div className={clsx('inline-block rounded-lg px-3 py-2 text-left text-[13px] leading-relaxed whitespace-pre-wrap', gone ? 'bg-zinc-100 text-zinc-400 italic' : mine ? 'bg-brand-700 text-white' : otherSeat ? 'bg-brand-50 text-brand-900' : bot ? 'bg-purple-50 text-purple-950' : 'bg-white text-zinc-800 shadow-sm')}>
-            {m.forwardedFrom && <div className={clsx('mb-0.5 text-[11px]', mine ? 'text-brand-100' : 'text-zinc-400')}>转发的消息</div>}
-            {gone ? visibleText(m, 'staff') : m.kind === 'image' ? `[图片] ${m.text}` : renderText(m.text, highlight)}
-          </div>
+          {!gone && hasMedia ? (
+            // 图片 / 文件消息：附件不包在气泡里，说明文字单独一个小气泡
+            <div className={clsx('inline-flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
+              {m.forwardedFrom && <div className="text-[11px] text-zinc-400">转发的消息</div>}
+              {m.kind === 'image' ? <ImageThumb media={m.media!} maxWidth={240} className="shadow-sm" /> : <FileCard media={m.media!} />}
+              {m.text && <div className={clsx('rounded-lg px-3 py-1.5 text-left text-[13px] leading-relaxed whitespace-pre-wrap', bubbleCls)}>{renderText(m.text, highlight)}</div>}
+            </div>
+          ) : (
+            <div className={clsx('inline-block rounded-lg px-3 py-2 text-left text-[13px] leading-relaxed whitespace-pre-wrap', gone ? 'bg-zinc-100 text-zinc-400 italic' : bubbleCls)}>
+              {m.forwardedFrom && <div className={clsx('mb-0.5 text-[11px]', mine ? 'text-brand-100' : 'text-zinc-400')}>转发的消息</div>}
+              {gone ? visibleText(m, 'staff') : renderText(m.text, highlight)}
+            </div>
+          )}
           <div className={clsx('mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400', mine && 'justify-end')}>
             <span className="tabular-nums">{fmtTime(m.at)}</span>
             {pinned && <span className="inline-flex items-center gap-0.5 text-amber-600"><Pin size={10} />已置顶</span>}

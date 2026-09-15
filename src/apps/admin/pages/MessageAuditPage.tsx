@@ -44,7 +44,7 @@ export function MessageAuditPage() {
       .filter((m) => !convFilter || m.convId === convFilter)
       .filter((m) => !senderKind || m.senderKind === senderKind)
       .filter((m) => inDateRange(m.at, from, to))
-      .filter((m) => !kw || m.text.includes(kw))
+      .filter((m) => !kw || m.text.includes(kw) || !!m.media?.name.includes(kw))
       .sort((a, b) => b.at.localeCompare(a.at))
   }, [s, q, customerFilter, convFilter, senderKind, from, to])
   const rows = filtered.slice(0, MAX_ROWS)

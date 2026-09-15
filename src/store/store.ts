@@ -16,6 +16,7 @@ import type {
   InviteGroup,
   InviteLink,
   Message,
+  MessageMedia,
   Seat,
   Staff,
   Tag,
@@ -36,9 +37,10 @@ import { workbenchActions, type WorkbenchActions } from './actions/workbench'
 import { botActions, type BotActions } from './actions/bots'
 import { aExtraActions, type AExtraActions } from './actions/A-extra'
 import { dExtraActions, type DExtraActions } from './actions/D-extra'
+import { quickReplyActions, type QuickReplyActions } from './actions/quickReplies'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
-export const STORAGE_KEY = 'yolink-demo-v4'
+export const STORAGE_KEY = 'yolink-demo-v5'
 
 const now = () => iso(Date.now())
 
@@ -82,7 +84,7 @@ export interface CoreActions {
   setNote: (customerId: string, note: string) => void
   updateSeatWelcome: (seatId: string, welcome: string) => void
   /** 群发：返回实际发送数与因频控/拉黑/注销跳过数；频控超限返回 null（按钮应禁用） */
-  sendBroadcast: (input: { name: string; seatId: string; operatorId: string; targetKind: BroadcastTargetKind; targetDesc: string; contentKind?: 'text' | 'image'; text: string; customerIds: string[]; chatGroupId?: string; scheduledAt?: string | null }) => { sent: number; skipped: number } | null
+  sendBroadcast: (input: { name: string; seatId: string; operatorId: string; targetKind: BroadcastTargetKind; targetDesc: string; contentKind?: 'text' | 'image' | 'file'; media?: MessageMedia; text: string; customerIds: string[]; chatGroupId?: string; scheduledAt?: string | null }) => { sent: number; skipped: number } | null
   createInviteLink: (input: { name: string; inviteGroupId: string; creatorStaffId: string; expiresAt: string | null; maxUses: number | null; chatGroupIds?: string[] }) => InviteLink
   revokeInviteLink: (id: string, byStaffId: string) => void
   // 管理后台
@@ -101,7 +103,7 @@ export interface CoreActions {
   updateTitle: (id: string, patch: Partial<Title>, byStaffId: string) => void
 }
 
-export type DemoActions = CoreActions & SettingsActions & PeopleActions & PolicyActions & ContentActions & ModuleActions & IntegrationActions & GroupActions & WorkbenchActions & BotActions & AExtraActions & DExtraActions
+export type DemoActions = CoreActions & SettingsActions & PeopleActions & PolicyActions & ContentActions & ModuleActions & IntegrationActions & GroupActions & WorkbenchActions & BotActions & AExtraActions & DExtraActions & QuickReplyActions
 
 export type DemoStore = DemoState & DemoActions
 
@@ -301,7 +303,7 @@ export const useStore = create<DemoStore>()(
           const conv = convs.find((c) => c.kind !== 'dm' && c.chatGroupId === input.chatGroupId)
           if (conv) {
             conv.lastMessageAt = at
-            newMsgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.contentKind ?? 'text', text: input.text, at })
+            newMsgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.contentKind ?? 'text', text: input.text, media: input.media, at })
           }
         } else {
           // 频控二：每客户每天最多收到的群发条数，跨坐席、跨任务合并
@@ -325,7 +327,7 @@ export const useStore = create<DemoStore>()(
             conv.lastMessageAt = at
             // 变量逐人替换：客户收到的是带自己昵称的私聊
             const text = input.text.replaceAll('{{customer.nickname}}', c.nickname).replaceAll('{{staff.name}}', seatName).replaceAll('{{company.name}}', s.enterprise.name)
-            newMsgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.contentKind ?? 'text', text, at, isBroadcast: true })
+            newMsgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.contentKind ?? 'text', text, media: input.media, at, isBroadcast: true })
           })
         }
         const record: Broadcast = {
@@ -337,6 +339,7 @@ export const useStore = create<DemoStore>()(
           targetDesc: input.targetDesc,
           contentKind: input.contentKind ?? 'text',
           text: input.text,
+          media: input.media,
           sentAt: at,
           scheduledAt: input.scheduledAt ?? null,
           status: input.scheduledAt ? 'scheduled' : 'done',
@@ -534,6 +537,7 @@ export const useStore = create<DemoStore>()(
       ...botActions(set, get),
       ...aExtraActions(set, get),
       ...dExtraActions(set, get),
+      ...quickReplyActions(set, get),
     }),
     {
       name: STORAGE_KEY,

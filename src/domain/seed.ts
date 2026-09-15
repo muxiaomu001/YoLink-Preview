@@ -16,7 +16,7 @@ import type {
   InviteLink,
   KnowledgeItem,
   Message,
-  QuickReply,
+  MessageMedia,
   Role,
   Seat,
   SeatHandover,
@@ -27,6 +27,7 @@ import type {
 } from './types'
 import { ago, agoMs, iso } from './time'
 import { buildAdminSeed } from './seed-admin'
+import { MEDIA, QUICK_REPLIES, QUICK_REPLY_CATEGORIES } from './seed-quick-replies'
 import { BOTS, BOT_RULES, BOT_SCRIPTS, DEFAULT_STAFF_PREFS, GROUP_EXTRAS, botMessagesFor, buildBotRuns, buildGroupLogs, groupDefaults } from './seed-groups'
 
 /** 确定性伪随机，保证每次重置出来的数据一样 */
@@ -83,6 +84,7 @@ export const ENTERPRISE: Enterprise = {
   defaultChatGroupIds: ['cg_strategy', 'cg_community'],
   modules: { customers: true, invite: true, wallet: true, checkin: true, referral: true, broadcast: true, banner: true, content: true },
   broadcastPerStaffPerDay: 3,
+  allowPersonalQuickReply: true,
   broadcastPerCustomerPerDay: 2,
 }
 
@@ -474,12 +476,16 @@ type ScenarioKey =
   | 'active_investor'
 
 /** 对话脚本：c = 客户，s = 主归属坐席。最后一条是 c 的会落在"待我回复" */
-const SCENARIOS: Record<ScenarioKey, { from: 'c' | 's'; text: string; gapMin: number }[]> = {
+type ScriptLine = { from: 'c' | 's'; text: string; gapMin: number; kind?: 'image' | 'file'; media?: MessageMedia }
+
+const SCENARIOS: Record<ScenarioKey, ScriptLine[]> = {
   onboarding_pending: [
     { from: 'c', text: '你好，我在直播里看到你们的美元资产配置，想了解一下', gapMin: 0 },
     { from: 's', text: '您好！先问一下，这笔资金大概计划放多久？一年以内还是三年以上？这决定我们从哪类产品聊起。', gapMin: 6 },
     { from: 'c', text: '三年左右吧，主要是想分散一下，不想全放在国内', gapMin: 40 },
     { from: 's', text: '明白。三年期比较适合"均衡组合 + 一部分美元短债"的搭配，波动可控。我发您一份简版说明，您看完我们再约个时间过一遍。', gapMin: 5 },
+    { from: 's', kind: 'file', media: MEDIA.productGuide, text: '这是产品说明书，重点看第二部分的配置区间。', gapMin: 1 },
+    { from: 's', kind: 'image', media: MEDIA.feeTable, text: '', gapMin: 1 },
     { from: 'c', text: '好的，那开户需要准备什么材料？', gapMin: 120 },
   ],
   us_market_question: [
@@ -497,6 +503,7 @@ const SCENARIOS: Record<ScenarioKey, { from: 'c' | 's'; text: string; gapMin: nu
   ],
   risk_survey_done: [
     { from: 's', text: '您的风险测评结果出来了，是"稳健型"。按这个结果，权益类资产建议控制在四成以内，剩下放固收和现金管理。', gapMin: 0 },
+    { from: 's', kind: 'image', media: MEDIA.riskLevels, text: '', gapMin: 1 },
     { from: 'c', text: '四成会不会太保守了，我朋友都是七成以上', gapMin: 50 },
     { from: 's', text: '每个人的情况不一样。测评看的是您能承受多大回撤，不是您想赚多少。真要提高权益比例也可以，但我建议先按四成跑三个月，看看实际波动您是不是舒服，再往上调。', gapMin: 6 },
     { from: 'c', text: '行，那先按你说的来', gapMin: 20 },
@@ -758,10 +765,11 @@ function buildCustomers() {
           senderId: isC ? c.id : seatId,
           seatId: isC ? undefined : seatId,
           operatorId: isC ? undefined : opAt(seatId, t),
-          kind: 'text',
+          kind: line.kind ?? 'text',
           text: line.text,
+          media: line.media,
           at: iso(t),
-          aiDraftUsed: !isC && chance(0.5),
+          aiDraftUsed: !isC && !line.kind && chance(0.5),
         })
         conv.lastMessageAt = iso(t)
         lastActivity = Math.max(lastActivity, t)
@@ -863,14 +871,6 @@ function buildGroupMessages(customers: Customer[], chatGroups: ChatGroup[]) {
 
 // ---------- 其他 ----------
 
-export const QUICK_REPLIES: QuickReply[] = [
-  { id: 'qr_1', scope: 'enterprise', title: '开户材料', text: '开户需要：身份证正反面、地址证明（近三个月水电或银行账单）、资金来源说明。上传后一个工作日内审核完成。' },
-  { id: 'qr_2', scope: 'enterprise', title: '入金时效', text: '跨境汇款一般 1 到 2 个工作日到账，到账后系统自动通知，我这边也会跟您确认。' },
-  { id: 'qr_3', scope: 'enterprise', title: '合规声明', text: '温馨提示：以上内容仅为信息分享，不构成投资建议。投资有风险，请根据自身风险承受能力谨慎决策。' },
-  { id: 'qr_4', scope: 'enterprise', title: '风险测评', text: '风险测评在 App"我的 → 风险测评"，大约 3 分钟。结果出来后我会结合您的情况给配置建议。' },
-  { id: 'qr_5', scope: 'personal', staffId: 'st_lin', title: '约时间', text: '您看明天下午 3 点或 5 点，哪个时间方便？我们电话过一遍，20 分钟左右。' },
-  { id: 'qr_6', scope: 'personal', staffId: 'st_lin', title: '赎回说明', text: '赎回随时可以提交，T+3 个工作日到账，不收赎回费。' },
-]
 
 export const KNOWLEDGE: KnowledgeItem[] = [
   { id: 'kb_1', title: '开户流程与材料', body: '身份证正反面、近三个月地址证明、资金来源说明；线上提交，一个工作日审核；审核通过后开通托管账户。', tags: ['开户'], enabled: true },
@@ -964,6 +964,7 @@ export function buildSeed(): DemoState {
     messages,
     audit: buildAudit(),
     broadcasts: buildBroadcasts(),
+    quickReplyCategories: QUICK_REPLY_CATEGORIES,
     quickReplies: QUICK_REPLIES,
     knowledge: KNOWLEDGE,
     aiEvents: buildAiEvents(conversations),

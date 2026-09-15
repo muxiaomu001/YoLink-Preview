@@ -9,7 +9,7 @@ import { useStore } from '@/store/store'
 import { Button, Checkbox, Field, Input, Select, Switch } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, Tabs } from '@/ui/display'
 import { toast } from '@/ui/overlay'
-import { BroadcastPane, PushPane, SmsPane, StoragePane } from './SettingsPage.parts'
+import { BroadcastPane, PushPane, QuickReplyPane, SmsPane, StoragePane } from './SettingsPage.parts'
 import { WebTabsPane } from './SettingsPage.webtabs'
 
 type TabKey = 'basic' | 'appearance' | 'register' | 'sms' | 'push' | 'storage' | 'webtabs' | 'broadcast'
@@ -22,7 +22,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'push', label: '推送配置' },
   { key: 'storage', label: '对象存储' },
   { key: 'webtabs', label: '网站栏目' },
-  { key: 'broadcast', label: '群发频控' },
+  { key: 'broadcast', label: '群发与话术' },
 ]
 
 const THEMES: ThemeKey[] = ['classic', 'dark', 'ocean', 'warm']
@@ -42,7 +42,12 @@ export function SettingsPage() {
       {tab === 'push' && <PushPane />}
       {tab === 'storage' && <StoragePane />}
       {tab === 'webtabs' && <WebTabsPane />}
-      {tab === 'broadcast' && <BroadcastPane />}
+      {tab === 'broadcast' && (
+        <>
+          <BroadcastPane />
+          <QuickReplyPane />
+        </>
+      )}
     </div>
   )
 }

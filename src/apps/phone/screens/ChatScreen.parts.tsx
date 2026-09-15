@@ -1,5 +1,5 @@
 /**
- * 聊天页零件：消息气泡（引用条、撤回占位、机器人不标）、置顶条、公告层、输入区。
+ * 聊天页零件：消息气泡（引用条、撤回占位、图片 / 文件附件、机器人不标）、置顶条、公告层、输入区。
  */
 import { useState } from 'react'
 import { clsx } from 'clsx'
@@ -10,8 +10,17 @@ import { useStore } from '@/store/store'
 import { customerById, seatById } from '@/store/selectors'
 import { botById, senderName, visibleText } from '@/store/policy'
 import { Avatar, SeatAvatar, TitleChip } from '@/ui/display'
+import { FileCard, ImageThumb } from '@/ui/media'
 import { Button, Input } from '@/ui/primitives'
 import { toast } from '@/ui/overlay'
+
+/** 客户视角的一行预览：会话列表、引用条、置顶条、回复条共用；图片 / 文件消息显示占位 */
+export function customerPreview(m: Message): string {
+  if (m.recalledAt || m.deletedAt) return visibleText(m, 'customer')
+  if (m.kind === 'image') return m.text ? `[图片] ${m.text}` : '[图片]'
+  if (m.kind === 'file') return `[文件] ${m.media?.name ?? m.text}`
+  return visibleText(m, 'customer')
+}
 
 /** 引用条：被引用消息的发送者与内容 */
 export function QuoteBar({ m, mine }: { m: Message | undefined; mine: boolean }) {
@@ -19,7 +28,22 @@ export function QuoteBar({ m, mine }: { m: Message | undefined; mine: boolean })
   if (!m) return <div className={clsx('mb-1 rounded border-l-2 px-2 py-0.5 text-[10px]', mine ? 'border-white/60 bg-white/15 text-white/80' : 'border-zinc-300 bg-zinc-100 text-zinc-500')}>原消息不存在</div>
   return (
     <div className={clsx('mb-1 truncate rounded border-l-2 px-2 py-0.5 text-[10px]', mine ? 'border-white/60 bg-white/15 text-white/80' : 'border-brand-300 bg-zinc-100 text-zinc-500')}>
-      {senderName(s, m)}：{visibleText(m, 'customer')}
+      {senderName(s, m)}：{customerPreview(m)}
+    </div>
+  )
+}
+
+/** 图片 / 文件消息的正文：不包深色气泡，附件 + 说明文字 + 「···」打开菜单 */
+function MediaBody({ m, mine, replyTo, onMenu }: { m: Message; mine: boolean; replyTo: Message | undefined; onMenu: () => void }) {
+  if (!m.media) return null
+  return (
+    <div className={clsx('inline-flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
+      {m.replyToId && <QuoteBar m={replyTo} mine={false} />}
+      {m.kind === 'image' ? <ImageThumb media={m.media} maxWidth={200} className="shadow-sm" /> : <FileCard media={m.media} className="shadow-sm" />}
+      {m.text && <div className={clsx('max-w-[200px] text-[12px] leading-relaxed whitespace-pre-wrap text-zinc-700', mine ? 'text-right' : 'text-left')}>{m.text}</div>}
+      <button type="button" onClick={onMenu} className="px-1 text-[11px] leading-none text-zinc-400 active:text-zinc-600" aria-label="消息菜单">
+        ···
+      </button>
     </div>
   )
 }
@@ -52,6 +76,7 @@ export function Bubble({ m, mine, inGroup, canRecall, onReply, onRecall }: { m: 
   const sCus = m.senderKind === 'customer' && !mine ? customerById(s, m.senderId) : undefined
   const title = sCus?.primaryTitleId ? s.titles.find((x) => x.id === sCus.primaryTitleId && x.enabled) : undefined
   const replyTo = m.replyToId ? s.messages.find((x) => x.id === m.replyToId) : undefined
+  const isMedia = !gone && (m.kind === 'image' || m.kind === 'file') && !!m.media
   return (
     <div id={`pm-${m.id}`} className={clsx('mb-2.5 flex gap-2', mine && 'flex-row-reverse')}>
       {!mine && <SenderAvatar m={m} />}
@@ -63,18 +88,22 @@ export function Bubble({ m, mine, inGroup, canRecall, onReply, onRecall }: { m: 
             {title && <TitleChip title={title} size="xs" />}
           </div>
         )}
-        <button
-          type="button"
-          onClick={() => !gone && setMenu((v) => !v)}
-          className={clsx(
-            'inline-block rounded-2xl px-3 py-2 text-left text-[13px] leading-relaxed whitespace-pre-wrap',
-            gone ? 'bg-zinc-100 text-zinc-400 italic' : mine ? 'rounded-tr-sm bg-brand-700 text-white' : 'rounded-tl-sm bg-white text-zinc-800 shadow-sm',
-          )}
-        >
-          {m.replyToId && !gone && <QuoteBar m={replyTo} mine={mine} />}
-          {m.mentionAll && !gone && <span className="mr-1 text-brand-200">@所有人</span>}
-          {m.kind === 'image' && !gone ? `[图片] ${m.text}` : visibleText(m, 'customer')}
-        </button>
+        {isMedia ? (
+          <MediaBody m={m} mine={mine} replyTo={replyTo} onMenu={() => setMenu((v) => !v)} />
+        ) : (
+          <button
+            type="button"
+            onClick={() => !gone && setMenu((v) => !v)}
+            className={clsx(
+              'inline-block rounded-2xl px-3 py-2 text-left text-[13px] leading-relaxed whitespace-pre-wrap',
+              gone ? 'bg-zinc-100 text-zinc-400 italic' : mine ? 'rounded-tr-sm bg-brand-700 text-white' : 'rounded-tl-sm bg-white text-zinc-800 shadow-sm',
+            )}
+          >
+            {m.replyToId && !gone && <QuoteBar m={replyTo} mine={mine} />}
+            {m.mentionAll && !gone && <span className="mr-1 text-brand-200">@所有人</span>}
+            {customerPreview(m)}
+          </button>
+        )}
         <div className="mt-0.5 text-[9px] text-zinc-400">{fmtTime(m.at)}</div>
         {menu && (
           <div className={clsx('absolute z-10 flex overflow-hidden rounded-md border border-zinc-200 bg-white text-[11px] shadow-md', mine ? 'right-0' : 'left-0', '-bottom-6')}>
@@ -115,7 +144,7 @@ export function PinnedBar({ m }: { m: Message }) {
       <Pin size={12} className="shrink-0 text-amber-600" />
       <span className="min-w-0 flex-1 truncate text-[11px] text-amber-900">
         <span className="text-amber-600">置顶 · {senderName(s, m)}：</span>
-        {visibleText(m, 'customer')}
+        {customerPreview(m)}
       </span>
     </button>
   )
@@ -161,7 +190,7 @@ export function InputBar({ placeholder, blockedReason, canMedia, canMentionAll, 
       {replyTo && (
         <div className="mb-1 flex items-center justify-between rounded bg-zinc-100 px-2 py-1 text-[10px] text-zinc-500">
           <span className="truncate">
-            回复 {senderName(s, replyTo)}：{visibleText(replyTo, 'customer')}
+            回复 {senderName(s, replyTo)}：{customerPreview(replyTo)}
           </span>
           <button type="button" onClick={onCancelReply} className="ml-2 shrink-0 text-zinc-400">
             取消

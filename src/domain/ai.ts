@@ -27,7 +27,7 @@ export function draftsFor(input: DraftInput): AiDraft[] {
     const k = kb('开户')
     return [
       { text: `${name}，开户需要三样：身份证正反面、近三个月地址证明、资金来源说明。在 App 里上传后一个工作日内审核完，通过后托管账户自动开通。需要我把清单发您一份吗？`, basis: `知识库「${k?.title ?? '开户流程与材料'}」` },
-      { text: `好的，开户材料我让客户服务同事发您一份清单，您准备好上传就行，一般三个工作日内全部办完。`, basis: '知识库「开户流程与材料」+ 快捷回复' },
+      { text: `好的，开户材料我让客户服务同事发您一份清单，您准备好上传就行，一般三个工作日内全部办完。`, basis: '知识库「开户流程与材料」+ 话术「开户材料」' },
     ]
   }
   if (/到账|汇款|入金|汇的/.test(t)) {
@@ -57,7 +57,7 @@ export function draftsFor(input: DraftInput): AiDraft[] {
   if (/发我|看看|发一下|发过来/.test(t)) {
     return [
       { text: `好的，我今天整理好发您，晚上前给到。`, basis: '会话上下文' },
-      { text: `${name}，资料我这就发您。看完有任何不清楚的，随时问我。`, basis: '快捷回复 + 客户资料' },
+      { text: `${name}，资料我这就发您。看完有任何不清楚的，随时问我。`, basis: '话术 + 客户资料' },
     ]
   }
   if (/续费|到期|会员/.test(t)) {
@@ -79,13 +79,13 @@ export function draftsFor(input: DraftInput): AiDraft[] {
   }
   if (/谢谢|辛苦|收到|好的|行|确认/.test(t) && t.length <= 8) {
     return [
-      { text: `不客气，有问题随时找我。`, basis: '快捷回复' },
+      { text: `不客气，有问题随时找我。`, basis: '话术库' },
       { text: `好的，${name}，我这边跟进，有进展第一时间告诉您。`, basis: '会话上下文' },
     ]
   }
   return [
     { text: `${name}，收到。我先了解一下您的情况：这笔资金大概计划放多久，一年以内还是三年以上？`, basis: '通用开场 + 客户资料' },
-    { text: `好的，我看一下再回您，大概 10 分钟。`, basis: '快捷回复' },
+    { text: `好的，我看一下再回您，大概 10 分钟。`, basis: '话术库' },
     { text: `${COMPLIANCE}`, basis: '知识库「合规口径」' },
   ]
 }

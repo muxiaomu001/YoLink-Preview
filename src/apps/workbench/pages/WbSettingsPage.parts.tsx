@@ -1,14 +1,14 @@
 /**
- * 工作台设置页的分块：个人设置（staff.prefs + 本机界面偏好重置）、快捷键说明、个人快捷回复（新建 / 编辑 / 删除）、企业共享话术只读。
+ * 工作台设置页的分块：个人设置（staff.prefs + 本机界面偏好重置）、快捷键说明、我的话术（只看 / 删，新建编辑在聊天页右栏）、企业话术只读。
  */
-import { useState } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
-import type { Language, QuickReply, StaffPrefs } from '@/domain/types'
+import { Link } from 'react-router-dom'
+import { ArrowRight, Trash2 } from 'lucide-react'
+import type { Language, QuickReply, QuickReplyKind, StaffPrefs } from '@/domain/types'
 import { DEFAULT_STAFF_PREFS } from '@/domain/seed-groups'
-import { Button, Field, Input, Select, Switch, Textarea } from '@/ui/primitives'
+import { Button, Select, Switch } from '@/ui/primitives'
 import { Card } from '@/ui/display'
 import { HelpTip } from '@/ui/help'
-import { Modal, toast } from '@/ui/overlay'
+import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { useWorkbench } from '../useWorkbench'
 import { notifyPermission, requestNotifyPermission } from '../components/layout/notify'
@@ -22,12 +22,16 @@ const THEME_OPTIONS: { value: StaffPrefs['theme']; label: string }[] = [
 /** 本机界面偏好（栏宽、折叠状态）的 localStorage 前缀，与 useLocalPref 一致 */
 const UI_PREF_PREFIX = 'yolink-wb-ui:'
 
+const KIND_LABEL: Record<QuickReplyKind, string> = { text: '文字', image: '图片', file: '文件' }
+
 const SHORTCUTS: { keys: string; desc: string }[] = [
   { keys: '⌘⌥↑ / ⌘⌥↓', desc: '切换上一条 / 下一条会话' },
   { keys: '⌘⇧F', desc: '搜索会话列表' },
   { keys: '⌘F', desc: '搜索当前会话内的消息' },
   { keys: '⌘⌥R', desc: '把当前会话标记为已读' },
   { keys: 'Enter / Shift+Enter', desc: '发送 / 换行' },
+  { keys: '/', desc: '在输入框浏览话术；@ 提及成员' },
+  { keys: 'Tab', desc: '选中打字自动匹配到的话术' },
   { keys: 'Esc', desc: '关闭弹层' },
 ]
 
@@ -103,6 +107,9 @@ export function PrefsCard() {
         <PrefRow title="AI 推荐自动弹出" desc="关闭后只在点输入栏的 AI 推荐按钮时生成">
           <Switch checked={prefs.aiSuggest} onChange={(v) => set({ aiSuggest: v }, v ? '已开启 AI 推荐自动弹出' : '已关闭自动弹出，可手动点输入栏的 AI 推荐')} />
         </PrefRow>
+        <PrefRow title="打字自动匹配话术" desc="输入满 2 个字在输入框上方浮出匹配的话术，Tab 选中；关闭后只能用「/」或右栏话术页签">
+          <Switch checked={prefs.quickMatch} onChange={(v) => set({ quickMatch: v }, v ? '已开启打字自动匹配话术' : '已关闭自动匹配，仍可输「/」或用右栏话术页签')} />
+        </PrefRow>
       </div>
     </Card>
   )
@@ -123,24 +130,17 @@ export function ShortcutsCard() {
   )
 }
 
-export function QuickRepliesCard() {
+export function MyQuickRepliesCard() {
   const { s, staff } = useWorkbench()
-  const [editing, setEditing] = useState<{ id?: string; title: string; text: string } | null>(null)
   if (!staff) return null
   const personal = s.quickReplies.filter((q) => q.scope === 'personal' && q.staffId === staff.id)
-  const shared = s.quickReplies.filter((q) => q.scope === 'enterprise')
-  const ok = !!editing?.title.trim() && !!editing?.text.trim()
+  const shared = s.quickReplies.filter((q) => q.scope === 'enterprise' && q.enabled)
+  const catName = (id: string | null) => (id && s.quickReplyCategories.find((c) => c.id === id)?.name) || '未分类'
 
-  const save = () => {
-    if (!editing || !ok) return
-    s.savePersonalQuickReply(staff.id, { id: editing.id, title: editing.title.trim(), text: editing.text.trim() })
-    toast(editing.id ? '已更新' : '已新建个人快捷回复')
-    setEditing(null)
-  }
   const remove = async (q: QuickReply) => {
-    const ok2 = await confirm({ title: `删除快捷回复「${q.title}」？`, okText: '删除', danger: true })
-    if (!ok2) return
-    s.deletePersonalQuickReply(staff.id, q.id)
+    const ok = await confirm({ title: `删除话术「${q.title}」？`, okText: '删除', danger: true })
+    if (!ok) return
+    s.deleteQuickReply('personal', q.id, staff.id)
     toast('已删除')
   }
 
@@ -148,70 +148,44 @@ export function QuickRepliesCard() {
     <Card
       title={
         <span className="inline-flex items-center gap-1.5">
-          快捷回复
-          <HelpTip text="聊天输入框里输「/」或点工具栏的闪电图标可以快速插入。企业共享话术在管理后台维护，工作台只能用不能改。" />
+          我的话术
+          <HelpTip text="只有你自己看得到。聊天输入框里打字满 2 个字会自动匹配（可在个人设置关闭），输「/」或点工具栏闪电图标可浏览全部。企业话术在管理后台维护，工作台只能用不能改。" />
         </span>
       }
       extra={
-        <Button size="sm" onClick={() => setEditing({ title: '', text: '' })}>
-          <Plus size={12} /> 新建
-        </Button>
+        <Link to="/workbench/chat" className="inline-flex items-center gap-1 text-[12px] font-medium text-brand-700 hover:underline">
+          去聊天页 <ArrowRight size={12} />
+        </Link>
       }
     >
-      <div className="mb-1 text-[11px] font-medium text-zinc-500">个人（只有你看得到，{personal.length} 条）</div>
+      <p className="mb-2 text-[12px] text-zinc-500">
+        {s.enterprise.allowPersonalQuickReply ? '在聊天页右栏「话术」页签里新建和编辑；这里只看和删。' : '企业已关闭「员工建个人话术」，只能用企业话术。'}
+      </p>
+      <div className="mb-1 text-[11px] font-medium text-zinc-500">个人（{personal.length} 条）</div>
       <ul className="space-y-1">
         {personal.map((q) => (
-          <li key={q.id} className="flex items-start gap-2 rounded-md border border-zinc-100 px-2 py-1.5 text-[12px]">
-            <div className="min-w-0 flex-1">
-              <b className="text-zinc-800">{q.title}</b>
-              <div className="truncate text-zinc-500" title={q.text}>
-                {q.text}
-              </div>
-            </div>
-            <button type="button" className="text-zinc-400 hover:text-brand-700" title="编辑" onClick={() => setEditing({ id: q.id, title: q.title, text: q.text })}>
-              <Pencil size={13} />
-            </button>
+          <li key={q.id} className="flex items-center gap-2 rounded-md border border-zinc-100 px-2 py-1.5 text-[12px]">
+            <span className="min-w-0 flex-1 truncate font-medium text-zinc-800" title={q.text || q.media?.name}>{q.title}</span>
+            <span className="shrink-0 text-zinc-500">{KIND_LABEL[q.kind]}</span>
+            <span className="shrink-0 text-zinc-400">{catName(q.categoryId)}</span>
+            <span className="shrink-0 text-zinc-400 tabular-nums" title="使用次数">用过 {q.useCount} 次</span>
             <button type="button" className="text-zinc-400 hover:text-red-700" title="删除" onClick={() => void remove(q)}>
               <Trash2 size={13} />
             </button>
           </li>
         ))}
-        {personal.length === 0 && <li className="text-[12px] text-zinc-400">还没有个人快捷回复</li>}
+        {personal.length === 0 && <li className="text-[12px] text-zinc-400">还没有个人话术</li>}
       </ul>
-      <div className="mt-3 mb-1 text-[11px] font-medium text-zinc-500">企业共享话术（只读，{shared.length} 条）</div>
-      <ul className="space-y-1">
+      <div className="mt-3 mb-1 text-[11px] font-medium text-zinc-500">企业话术（只读，{shared.length} 条）</div>
+      <ul className="space-y-0.5">
         {shared.map((q) => (
-          <li key={q.id} className="text-[12px]">
-            <b className="text-zinc-700">{q.title}</b>
-            <span className="ml-1 text-zinc-500">{q.text.slice(0, 40)}…</span>
+          <li key={q.id} className="flex items-center gap-2 text-[12px]">
+            <span className="min-w-0 flex-1 truncate text-zinc-700">{q.title}</span>
+            <span className="shrink-0 text-zinc-500">{KIND_LABEL[q.kind]}</span>
+            <span className="shrink-0 text-zinc-400">{catName(q.categoryId)}</span>
           </li>
         ))}
       </ul>
-      <Modal
-        open={!!editing}
-        onClose={() => setEditing(null)}
-        title={editing?.id ? '编辑快捷回复' : '新建个人快捷回复'}
-        width={460}
-        footer={
-          <>
-            <Button onClick={() => setEditing(null)}>取消</Button>
-            <Button variant="primary" disabled={!ok} onClick={save}>
-              保存
-            </Button>
-          </>
-        }
-      >
-        {editing && (
-          <div className="space-y-3">
-            <Field label="标题" required hint="1 到 20 字">
-              <Input value={editing.title} maxLength={20} onChange={(e) => setEditing({ ...editing, title: e.target.value })} placeholder="如：开户流程" />
-            </Field>
-            <Field label="内容" required hint="支持 {{customer.nickname}}">
-              <Textarea rows={4} value={editing.text} maxLength={500} onChange={(e) => setEditing({ ...editing, text: e.target.value })} />
-            </Field>
-          </div>
-        )}
-      </Modal>
     </Card>
   )
 }

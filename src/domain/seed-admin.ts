@@ -394,7 +394,7 @@ function buildWebhookLogs(): WebhookLog[] {
 export const APP_VERSIONS: AppVersion[] = [
   { platform: 'android', latest: '1.4.2', downloadUrl: 'https://dl.hxwm.example/app/android/1.4.2.apk', notes: '新增头衔展示；修复群消息偶发不同步', minVersion: '1.3.0' },
   { platform: 'ios', latest: '1.4.2', downloadUrl: 'https://apps.apple.com/app/id0000000000', notes: '新增头衔展示；修复群消息偶发不同步', minVersion: '1.3.0' },
-  { platform: 'windows', latest: '1.2.0', downloadUrl: 'https://dl.hxwm.example/workbench/1.2.0.exe', notes: '工作台：AI 回复推荐、快捷回复搜索', minVersion: '1.1.0' },
+  { platform: 'windows', latest: '1.2.0', downloadUrl: 'https://dl.hxwm.example/workbench/1.2.0.exe', notes: '工作台：AI 回复推荐、话术库与打字匹配', minVersion: '1.1.0' },
 ]
 
 export const LICENSE: License = {

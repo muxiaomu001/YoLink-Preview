@@ -5,10 +5,11 @@ import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useStore } from '@/store/store'
 import { conversationsForCustomer, messagesOf } from '@/store/selectors'
-import { customerCan, senderName, visibleText } from '@/store/policy'
+import { customerCan, senderName } from '@/store/policy'
 import { fmtRelative } from '@/domain/time'
 import { SeatAvatar } from '@/ui/display'
 import { GroupAvatar, TabTitle } from '../parts'
+import { customerPreview } from './ChatScreen.parts'
 import { SOCIAL_ACTIONS, SocialSheet, type SocialAction } from './SocialSheets'
 
 export function ChatsScreen({ customerId, onOpen }: { customerId: string; onOpen: (id: string) => void }) {
@@ -69,7 +70,7 @@ export function ChatsScreen({ customerId, onOpen }: { customerId: string; onOpen
                 <div className="flex items-center justify-between">
                   <span className="truncate text-xs text-zinc-500">
                     {prefix}
-                    {last ? visibleText(last, 'customer') : ''}
+                    {last ? customerPreview(last) : ''}
                   </span>
                   {unread > 0 && r.conv.kind === 'dm' && <span className="ml-2 shrink-0 rounded-full bg-red-500 px-1.5 text-[10px] leading-4 text-white">{unread}</span>}
                 </div>

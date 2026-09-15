@@ -1,24 +1,48 @@
 /**
- * 输入区：引用条 → 工具栏（表情 / 图片 / 文件 / 快捷回复 / @ 提及 / AI 推荐）→ 多行输入框 → 底部「发送」。
- * `@` 成员选择（坐席 + 客户成员 + 「所有人」按策略）、`/` 快捷回复（企业 + 本人个人，方向键选 Enter 插入）、
- * 变量 {{customer.nickname}} {{staff.name}} {{company.name}} 发送时替换；图片 / 文件按策略 canMedia 显示。
+ * 输入区：引用条 → 工具栏（表情 / 图片 / 文件 / 话术 / @ 提及 / AI 推荐）→ 多行输入框 → 底部「发送」。
+ * 三种候选浮层共用 CandidatePopover：
+ * - `@` 成员选择（坐席 + 客户成员 + 「所有人」按策略），Enter / Tab 插入
+ * - `/` 话术（matchQuickReplies），Enter / Tab 选中：文字插入光标处，图片 / 文件直接发出
+ * - 打字自动匹配（staff.prefs.quickMatch）：光标前最后一个词 ≥ 2 字就匹配；Tab / 点击选中，Enter 仍是发送，Esc 关闭后同一个词不再弹；
+ *   选中文字话术用正文替换整个输入框
+ * 变量 {{customer.nickname}} {{staff.name}} {{company.name}} 发送时替换；图片 / 文件按钮按策略 canMedia 显示，选本机文件后直接发出。
  */
 import { useMemo, useRef, useState } from 'react'
-import { clsx } from 'clsx'
 import { AtSign, Image, Paperclip, Send, Smile, Sparkles, X, Zap } from 'lucide-react'
-import type { ChatGroup, Customer, Message, Seat } from '@/domain/types'
+import type { ChatGroup, Customer, Message, MessageMedia, QuickReply, Seat } from '@/domain/types'
+import { DEFAULT_STAFF_PREFS } from '@/domain/seed-groups'
 import { seatCan, senderName, visibleText } from '@/store/policy'
-import { customerById, seatById } from '@/store/selectors'
+import { customerById, matchQuickReplies, renderQuickReplyVars, seatById } from '@/store/selectors'
 import { Avatar, SeatAvatar } from '@/ui/display'
 import { Button } from '@/ui/primitives'
+import { readFileAsMedia } from '@/ui/media'
 import { toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
+import { CandidatePopover, type CandidateBase } from './quick-replies/CandidatePopover'
+import { categoryName, KIND_META, previewLine } from './quick-replies/shared'
 
 const MENTION_ALL = '所有人'
 const MAX_CANDIDATES = 8
+/** 自动匹配：最多几条、至少几个字才匹配、最多取光标前多少个字当查询词 */
+const AUTO_MAX = 5
+const AUTO_MIN_CHARS = 2
+const AUTO_WORD_MAX = 12
 
-type Pop = { kind: 'mention' | 'quick'; query: string; start: number }
-type Candidate = { id: string; label: string; insert: string; avatar?: React.ReactNode; sub?: string }
+type PopKind = 'mention' | 'quick' | 'auto'
+type Pop = { kind: PopKind; query: string; start: number }
+type Candidate = CandidateBase & { insert: string; qr?: QuickReply }
+
+const POP_TITLE: Record<PopKind, string> = {
+  mention: '@ 提及成员 · ↑↓ 选择，Enter 插入',
+  quick: '话术 · ↑↓ 选择，Enter 选中；图片 / 文件直接发出',
+  auto: '匹配到的话术 · Tab 选中，Esc 关闭',
+}
+
+/** 光标前最后一个「词」：按空白切，取最后一段的末尾若干字 */
+function lastWord(before: string): string {
+  const seg = before.split(/\s+/).pop() ?? ''
+  return seg.slice(-AUTO_WORD_MAX)
+}
 
 export function ChatInput({
   seat,
@@ -30,6 +54,7 @@ export function ChatInput({
   onClearReply,
   disabledReason,
   onSend,
+  onSendMedia,
   onAiSuggest,
 }: {
   seat: Seat
@@ -41,6 +66,8 @@ export function ChatInput({
   onClearReply: () => void
   disabledReason?: string
   onSend: (text: string, mentionAll: boolean) => void
+  /** 图片 / 文件消息：工具栏选本机文件、话术里选到图片 / 文件时直接发出 */
+  onSendMedia: (kind: 'image' | 'file', media: MessageMedia, text: string) => void
   /** 不传则不显示「AI 推荐」按钮（策略不允许） */
   onAiSuggest?: () => void
 }) {
@@ -48,8 +75,12 @@ export function ChatInput({
   // Textarea 不透传 ref：从包裹层找 textarea
   const wrapRef = useRef<HTMLDivElement>(null)
   const ref = { get current() { return wrapRef.current?.querySelector('textarea') ?? null } }
+  const imageInput = useRef<HTMLInputElement>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
   const [pop, setPopRaw] = useState<Pop | null>(null)
   const [idx, setIdx] = useState(0)
+  /** 自动匹配被 Esc 关掉的词：同一个词不再弹，词变了才重新弹 */
+  const [dismissedWord, setDismissedWord] = useState<string | null>(null)
   /** 弹层内容变了就从第一项选起 */
   const setPop = (p: Pop | null) => {
     setPopRaw(p)
@@ -58,51 +89,69 @@ export function ChatInput({
   const isGroup = !!group
   const canMentionAll = isGroup && seatCan(s, seat.id, 'group.mention_all', group.id)
   const canMedia = seatCan(s, seat.id, isGroup ? 'group.send_media' : 'dm.send_media', group?.id)
+  const quickMatch = staff?.prefs?.quickMatch ?? DEFAULT_STAFF_PREFS.quickMatch
   const disabled = !!disabledReason
 
   const candidates: Candidate[] = useMemo(() => {
     if (!pop) return []
-    const q = pop.query.toLowerCase()
-    if (pop.kind === 'quick') {
-      return s.quickReplies
-        .filter((r) => r.scope === 'enterprise' || r.staffId === staff?.id)
-        .filter((r) => !q || r.title.toLowerCase().includes(q) || r.text.toLowerCase().includes(q))
-        .slice(0, MAX_CANDIDATES)
-        .map((r) => ({ id: r.id, label: r.title, insert: r.text, sub: `${r.scope === 'enterprise' ? '企业' : '个人'} · ${r.text.slice(0, 40)}` }))
+    if (pop.kind !== 'mention') {
+      return matchQuickReplies(s, staff?.id ?? null, pop.query, pop.kind === 'auto' ? AUTO_MAX : MAX_CANDIDATES).map(({ item }) => {
+        const Icon = KIND_META[item.kind].icon
+        return { id: item.id, label: item.title, insert: item.text, qr: item, icon: <Icon size={12} className="shrink-0 text-zinc-400" />, sub: `${categoryName(s, item.categoryId)} · ${previewLine(item)}` }
+      })
     }
+    const q = pop.query.toLowerCase()
     const list: Candidate[] = []
     if (canMentionAll && (!q || MENTION_ALL.includes(q))) list.push({ id: 'all', label: `@${MENTION_ALL}`, insert: `@${MENTION_ALL} `, sub: '通知群里每个人' })
     if (isGroup) {
       group.memberSeatIds.map((id) => seatById(s, id)).filter((x) => !!x).forEach((x) => {
-        if (!q || x.displayName.toLowerCase().includes(q)) list.push({ id: x.id, label: x.displayName, insert: `@${x.displayName} `, avatar: <SeatAvatar seat={x} size={18} />, sub: '坐席' })
+        if (!q || x.displayName.toLowerCase().includes(q)) list.push({ id: x.id, label: x.displayName, insert: `@${x.displayName} `, icon: <SeatAvatar seat={x} size={18} />, sub: '坐席' })
       })
       group.memberCustomerIds.map((id) => customerById(s, id)).filter((x) => !!x && !x.deletedAt).forEach((x) => {
-        if (list.length < MAX_CANDIDATES && (!q || x!.nickname.toLowerCase().includes(q))) list.push({ id: x!.id, label: x!.nickname, insert: `@${x!.nickname} `, avatar: <Avatar text={x!.nickname} size={18} />, sub: '客户' })
+        if (list.length < MAX_CANDIDATES && (!q || x!.nickname.toLowerCase().includes(q))) list.push({ id: x!.id, label: x!.nickname, insert: `@${x!.nickname} `, icon: <Avatar text={x!.nickname} size={18} />, sub: '客户' })
       })
     } else if (customer) {
-      list.push({ id: customer.id, label: customer.nickname, insert: `@${customer.nickname} `, avatar: <Avatar text={customer.nickname} size={18} />, sub: '客户' })
+      list.push({ id: customer.id, label: customer.nickname, insert: `@${customer.nickname} `, icon: <Avatar text={customer.nickname} size={18} />, sub: '客户' })
     }
     return list.slice(0, MAX_CANDIDATES)
   }, [pop, s, staff?.id, canMentionAll, isGroup, group, customer])
 
-  /** 光标前是不是 @xxx 或 /xxx */
+  /** 光标前是不是 @xxx 或 /xxx；都不是时按偏好做无触发字符的自动匹配 */
   const detect = (value: string, caret: number) => {
     const before = value.slice(0, caret)
     const m = /(^|\s)([@/])([^\s@/]*)$/.exec(before)
-    if (!m) return setPop(null)
-    setPop({ kind: m[2] === '@' ? 'mention' : 'quick', query: m[3], start: caret - m[3].length - 1 })
+    if (m) return setPop({ kind: m[2] === '@' ? 'mention' : 'quick', query: m[3], start: caret - m[3].length - 1 })
+    const word = quickMatch ? lastWord(before) : ''
+    if (word.length < AUTO_MIN_CHARS || /^[@/]/.test(word)) return setPop(null)
+    if (word === dismissedWord) return setPop(null)
+    if (dismissedWord) setDismissedWord(null)
+    setPop({ kind: 'auto', query: word, start: caret - word.length })
   }
+
+  const renderVars = (t: string) => renderQuickReplyVars(t, { customer: customer?.nickname, staff: seat.displayName, company: s.enterprise.name })
 
   const pick = (c: Candidate) => {
     const caret = ref.current?.selectionStart ?? text.length
-    const next = pop ? text.slice(0, pop.start) + c.insert + text.slice(caret) : text + c.insert
-    setText(next)
+    const q = c.qr
+    if (q) s.touchQuickReply(q.id)
+    if (q && q.kind !== 'text' && q.media) {
+      // 图片 / 文件话术：直接发出，把触发词从输入框里去掉
+      setText(pop ? text.slice(0, pop.start) + text.slice(caret) : text)
+      onSendMedia(q.kind, q.media, renderVars(q.text))
+      toast('已发送')
+    } else if (pop?.kind === 'auto') {
+      // 自动匹配：客服通常只打了两个字找话术，正文替换整个输入框
+      setText(c.insert)
+    } else {
+      setText(pop ? text.slice(0, pop.start) + c.insert + text.slice(caret) : text + c.insert)
+    }
     setPop(null)
+    setDismissedWord(null)
     window.setTimeout(() => ref.current?.focus(), 0)
   }
 
   /** 工具栏触发 @ / 斜杠：在文末追加触发字符并打开弹层 */
-  const openPop = (kind: Pop['kind']) => {
+  const openPop = (kind: 'mention' | 'quick') => {
     const trigger = kind === 'mention' ? '@' : '/'
     const prefix = text && !/\s$/.test(text) ? `${text} ` : text
     setText(`${prefix}${trigger}`)
@@ -110,7 +159,16 @@ export function ChatInput({
     ref.current?.focus()
   }
 
-  const renderVars = (t: string) => t.replace(/\{\{customer\.nickname\}\}/g, customer?.nickname ?? '各位').replace(/\{\{staff\.name\}\}/g, seat.displayName).replace(/\{\{company\.name\}\}/g, s.enterprise.name)
+  /** 工具栏选本机图片 / 文件：读成 media 后直接发出 */
+  const pickFile = async (kind: 'image' | 'file', e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const r = await readFileAsMedia(file)
+    if (!r.ok) return toast(r.error, 'warn')
+    onSendMedia(kind, r.media, '')
+    toast('已发送')
+  }
 
   const send = () => {
     const raw = text.trim()
@@ -119,14 +177,21 @@ export function ChatInput({
     if (mentionAll && !canMentionAll) return toast('策略不允许本坐席 @所有人', 'warn')
     onSend(renderVars(raw), mentionAll)
     setPop(null)
+    setDismissedWord(null)
   }
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (pop && candidates.length) {
+      const auto = pop.kind === 'auto'
       if (e.key === 'ArrowDown') { e.preventDefault(); return setIdx((i) => (i + 1) % candidates.length) }
       if (e.key === 'ArrowUp') { e.preventDefault(); return setIdx((i) => (i - 1 + candidates.length) % candidates.length) }
-      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); return pick(candidates[idx]) }
-      if (e.key === 'Escape') return setPop(null)
+      // 自动匹配不抢 Enter：Enter 仍然发送，只有 Tab / 点击选中
+      if (e.key === 'Tab' || (e.key === 'Enter' && !auto)) { e.preventDefault(); return pick(candidates[idx]) }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        if (auto) setDismissedWord(pop.query)
+        return setPop(null)
+      }
     }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -149,31 +214,22 @@ export function ChatInput({
       {/* 工具栏 */}
       <div className="flex items-center gap-0.5 px-2 pt-1.5">
         <Tool label="表情" onClick={() => toast('演示不含表情面板', 'info')} disabled={disabled}><Smile size={16} /></Tool>
-        {canMedia && <Tool label={`发送图片（${mediaHint}）`} onClick={() => toast(`演示不上传。${mediaHint}`, 'info')} disabled={disabled}><Image size={16} /></Tool>}
-        {canMedia && <Tool label={`发送文件（${mediaHint}）`} onClick={() => toast(`演示不上传。${mediaHint}`, 'info')} disabled={disabled}><Paperclip size={16} /></Tool>}
-        <Tool label="快捷回复（输入 / 也可打开）" onClick={() => openPop('quick')} disabled={disabled}><Zap size={16} /></Tool>
+        {canMedia && (
+          <>
+            <input ref={imageInput} type="file" accept="image/*" className="hidden" onChange={(e) => void pickFile('image', e)} />
+            <input ref={fileInput} type="file" className="hidden" onChange={(e) => void pickFile('file', e)} />
+            <Tool label={`发送图片（${mediaHint}）`} onClick={() => imageInput.current?.click()} disabled={disabled}><Image size={16} /></Tool>
+            <Tool label={`发送文件（${mediaHint}）`} onClick={() => fileInput.current?.click()} disabled={disabled}><Paperclip size={16} /></Tool>
+          </>
+        )}
+        <Tool label="话术（输入 / 也可打开；右栏「话术」页签可浏览全部）" onClick={() => openPop('quick')} disabled={disabled}><Zap size={16} /></Tool>
         <Tool label="@ 提及（输入 @ 也可打开）" onClick={() => openPop('mention')} disabled={disabled}><AtSign size={16} /></Tool>
         {onAiSuggest && <Tool label="AI 推荐：根据客户最后一句生成回复草稿" onClick={onAiSuggest} disabled={disabled}><Sparkles size={16} /></Tool>}
         {group?.kind === 'channel' && !disabledReason && <span className="ml-auto text-[11px] text-zinc-400">以坐席身份发布，客户只读</span>}
       </div>
 
-      <div className="relative px-3 pb-2" ref={wrapRef}>
-        {pop && candidates.length > 0 && (
-          <ul className="absolute bottom-full left-3 z-20 mb-1 w-80 rounded-md border border-zinc-200 bg-white py-1 shadow-lg">
-            <li className="px-2.5 py-1 text-[11px] text-zinc-400">{pop.kind === 'mention' ? '@ 提及成员 · ↑↓ 选择，Enter 插入' : '快捷回复 · ↑↓ 选择，Enter 插入；变量发送时替换'}</li>
-            {candidates.map((c, i) => (
-              <li key={c.id}>
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(c)} className={clsx('flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[12px]', i === idx ? 'bg-brand-50 text-brand-900' : 'text-zinc-700 hover:bg-zinc-50')}>
-                  {c.avatar ?? <Zap size={12} className="text-zinc-400" />}
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{c.label}</span>
-                    {c.sub && <span className="block truncate text-[11px] text-zinc-400">{c.sub}</span>}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+      <div id="wb-chat-input" className="relative px-3 pb-2" ref={wrapRef}>
+        {pop && candidates.length > 0 && <CandidatePopover title={POP_TITLE[pop.kind]} items={candidates} idx={idx} onPick={pick} onHover={setIdx} />}
         <textarea
           rows={3}
           value={text}

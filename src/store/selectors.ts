@@ -2,7 +2,7 @@
  * 派生数据：会话视图、未读、等待时长、客户的官方号等。
  * 全部是纯函数，输入是 DemoState，方便页面和测试复用。
  */
-import type { Conversation, Customer, DemoState, Message, Seat, Staff } from '@/domain/types'
+import type { Conversation, Customer, DemoState, Message, QuickReply, QuickReplyCategory, Seat, Staff } from '@/domain/types'
 import { daysSince } from '@/domain/time'
 import { senderName } from './policy'
 
@@ -245,4 +245,55 @@ export function dashboardNumbers(s: DemoState) {
     aiAdopted: adopted,
     aiPct: aiToday.length ? Math.round((adopted / aiToday.length) * 100) : 0,
   }
+}
+
+// ---------- 话术库 ----------
+
+/** 某员工在工作台能用的话术：启用的企业话术 + 本人个人话术 */
+export function quickRepliesForStaff(s: DemoState, staffId: string | null): QuickReply[] {
+  return s.quickReplies.filter((q) => (q.scope === 'enterprise' && q.enabled) || (q.scope === 'personal' && q.staffId === staffId))
+}
+
+/** 某员工看到的分类：企业分类 + 本人个人分类，各自按 sortOrder */
+export function quickReplyCategoriesForStaff(s: DemoState, staffId: string | null): QuickReplyCategory[] {
+  return s.quickReplyCategories.filter((c) => c.scope === 'enterprise' || c.staffId === staffId).sort((a, b) => (a.scope !== b.scope ? (a.scope === 'enterprise' ? -1 : 1) : a.sortOrder - b.sortOrder))
+}
+
+/** 最近用过的话术：按 lastUsedAt 倒序 */
+export function recentQuickReplies(s: DemoState, staffId: string | null, limit = 8): QuickReply[] {
+  return quickRepliesForStaff(s, staffId)
+    .filter((q) => q.lastUsedAt)
+    .sort((a, b) => b.lastUsedAt!.localeCompare(a.lastUsedAt!))
+    .slice(0, limit)
+}
+
+export interface QuickReplyMatch {
+  item: QuickReply
+  /** 命中的位置：标题 > 关键词 > 正文 */
+  hit: 'title' | 'keyword' | 'text'
+  score: number
+}
+
+/**
+ * 关键词匹配：query 小写后逐项打分，标题命中 3 分、关键词 2 分、正文 1 分，同分按使用次数。
+ * 打字自动匹配和 `/` 弹层共用；query 为空时返回最近使用 + 常用。
+ */
+export function matchQuickReplies(s: DemoState, staffId: string | null, query: string, limit = 6): QuickReplyMatch[] {
+  const q = query.trim().toLowerCase()
+  const pool = quickRepliesForStaff(s, staffId)
+  if (!q) {
+    return [...pool].sort((a, b) => (b.lastUsedAt ?? '').localeCompare(a.lastUsedAt ?? '') || b.useCount - a.useCount).slice(0, limit).map((item) => ({ item, hit: 'title' as const, score: 0 }))
+  }
+  const out: QuickReplyMatch[] = []
+  pool.forEach((item) => {
+    if (item.title.toLowerCase().includes(q)) out.push({ item, hit: 'title', score: 3 })
+    else if (item.keywords.some((k) => k.toLowerCase().includes(q) || q.includes(k.toLowerCase()))) out.push({ item, hit: 'keyword', score: 2 })
+    else if (item.text.toLowerCase().includes(q)) out.push({ item, hit: 'text', score: 1 })
+  })
+  return out.sort((a, b) => b.score - a.score || b.item.useCount - a.item.useCount).slice(0, limit)
+}
+
+/** 话术正文里的变量替换（发送前） */
+export function renderQuickReplyVars(text: string, vars: { customer?: string; staff: string; company: string }): string {
+  return text.replaceAll('{{customer.nickname}}', vars.customer ?? '各位').replaceAll('{{staff.name}}', vars.staff).replaceAll('{{company.name}}', vars.company)
 }

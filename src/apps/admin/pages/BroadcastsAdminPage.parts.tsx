@@ -11,7 +11,7 @@ import { friendsOfSeat, seatById, staffById } from '@/store/selectors'
 import { Button, Field, Input, Select, Textarea } from '@/ui/primitives'
 import { KV, SeatAvatar, Table } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
-import { PREVIEW_LEN, StatusPill, TARGET_LABEL } from '@/apps/workbench/pages/BroadcastPage.parts'
+import { CONTENT_KIND_LABEL, ContentKindPill, MediaPreview, PREVIEW_LEN, StatusPill, TARGET_LABEL } from '@/apps/workbench/pages/BroadcastPage.parts'
 
 type SendMode = 'now' | 'scheduled'
 
@@ -56,10 +56,10 @@ export function BroadcastsAdminTable({ s, rows, onDetail }: { s: DemoState; rows
           key: 'preview',
           title: '内容摘要',
           render: (b) => (
-            <span className="block max-w-64 truncate text-zinc-600" title={b.text}>
+            <span className="block max-w-64 truncate text-zinc-600" title={b.text || b.media?.name}>
               <span className="mr-1 text-zinc-400">{b.name} ·</span>
-              {b.text.slice(0, PREVIEW_LEN)}
-              {b.text.length > PREVIEW_LEN ? '…' : ''}
+              <ContentKindPill kind={b.contentKind} className="mr-1" />
+              {b.text ? `${b.text.slice(0, PREVIEW_LEN)}${b.text.length > PREVIEW_LEN ? '…' : ''}` : (b.media?.name ?? '')}
             </span>
           ),
         },
@@ -88,7 +88,8 @@ export function BroadcastAdminDetailModal({ s, b, onClose }: { s: DemoState; b: 
             { k: '发送坐席', v: seatById(s, b.seatId)?.displayName ?? '-' },
             { k: '实操员工', v: staffById(s, b.operatorId)?.name ?? '-' },
             { k: '目标', v: `${TARGET_LABEL[b.targetKind]} · ${b.targetDesc}` },
-            { k: '内容类型', v: b.contentKind === 'image' ? '图片' : '文本' },
+            { k: '内容类型', v: CONTENT_KIND_LABEL[b.contentKind] },
+            ...(b.contentKind !== 'text' ? [{ k: '附件', v: <MediaPreview kind={b.contentKind} media={b.media} /> }] : []),
             { k: '状态', v: <StatusPill status={b.status} /> },
             { k: b.status === 'scheduled' ? '计划时间' : '发送时间', v: fmtDateTime(b.status === 'scheduled' && b.scheduledAt ? b.scheduledAt : b.sentAt) },
             { k: '送达', v: <span className="tabular-nums">{b.sentCount}</span> },
@@ -96,10 +97,12 @@ export function BroadcastAdminDetailModal({ s, b, onClose }: { s: DemoState; b: 
             { k: '跳过', v: <span className="tabular-nums">{b.skippedCount}</span> },
           ]}
         />
-        <div>
-          <div className="mb-1 text-[12px] font-medium text-zinc-600">全文</div>
-          <div className="rounded-md bg-zinc-50 px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap text-zinc-800">{b.text}</div>
-        </div>
+        {(b.text || b.contentKind === 'text') && (
+          <div>
+            <div className="mb-1 text-[12px] font-medium text-zinc-600">{b.contentKind === 'text' ? '全文' : '随附说明'}</div>
+            <div className="rounded-md bg-zinc-50 px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap text-zinc-800">{b.text}</div>
+          </div>
+        )}
       </div>
     </Modal>
   )

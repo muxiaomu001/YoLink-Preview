@@ -83,7 +83,8 @@ export const AUDIT_LABEL: Record<AuditType, string> = {
   'customer.reset_password': '重置客户密码',
   'bot.update': '群活跃助手',
   'bot.run': '机器人发言',
-  'quick_reply.update': '快捷回复',
+  'quick_reply.update': '个人话术',
+  'quick_reply.library': '企业话术库',
   'staff.prefs': '个人设置',
 }
 

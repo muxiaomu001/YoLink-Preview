@@ -1,12 +1,13 @@
 /**
- * 企业设置分页：短信与邮件服务商（P2 只读）、推送配置、对象存储、群发频控。
+ * 企业设置分页：短信与邮件服务商（P2 只读）、推送配置、对象存储、群发频控与话术库开关。
  * SecretField 是「只写不读」密钥的统一呈现：已配置时显示掩码 + 更换按钮。
  */
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { PushConfig, PushMask, StorageConfig, StorageType } from '@/domain/types'
 import { fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
-import { Button, Field, Input, Select } from '@/ui/primitives'
+import { Button, Field, Input, Select, Switch } from '@/ui/primitives'
 import { Card, Note, Pill } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 
@@ -155,6 +156,34 @@ export function PushPane() {
           保存
         </Button>
         {error && <span className="text-[11px] text-red-600">{error}</span>}
+      </div>
+    </Card>
+  )
+}
+
+/** 话术库开关：是否允许员工在工作台建个人话术；企业话术库始终可用。切换立即生效。 */
+export function QuickReplyPane() {
+  const s = useStore()
+  const admin = s.session.adminStaffId!
+  const on = s.enterprise.allowPersonalQuickReply
+  const toggle = (v: boolean) => {
+    s.updateEnterprise({ allowPersonalQuickReply: v }, admin)
+    toast(v ? '已允许员工建个人话术' : '已关闭个人话术：员工只能用企业话术库，已建的个人话术保留但不可见', v ? 'ok' : 'warn')
+  }
+  return (
+    <Card title="话术库" className="mt-4">
+      <div className="flex items-center justify-between rounded-md border border-zinc-200 px-3 py-2">
+        <div className="text-xs">
+          <div className="font-medium text-zinc-800">允许员工建个人话术</div>
+          <div className="text-zinc-500">
+            开时员工可在工作台「话术」里维护自己的分类与话术（只有本人可见）；关时只能用
+            <Link to="/admin/quick-replies" className="mx-0.5 text-brand-700 hover:underline">
+              企业话术库
+            </Link>
+            。切换立即生效。
+          </div>
+        </div>
+        <Switch checked={on} onChange={toggle} />
       </div>
     </Card>
   )
