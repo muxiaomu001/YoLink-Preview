@@ -2,6 +2,7 @@
  * 群发页的记录表、详情弹窗、「从话术库选」弹窗与文案常量；
  * TARGET_LABEL / StatusPill / ContentKindPill / MediaPreview / DELIVERY_RULES 也供管理后台群发管理页复用。
  */
+import { mediaUrl } from '@/domain/mediaUrl'
 import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import type { Broadcast, BroadcastStatus, BroadcastTargetKind, MessageMedia, QuickReply } from '@/domain/types'
@@ -184,7 +185,7 @@ export function QuickReplyPickerModal({ onPick, onClose }: { onPick: (q: QuickRe
           <button key={m.item.id} type="button" onClick={() => onPick(m.item)} className="flex w-full items-start gap-3 rounded-md border border-transparent px-2.5 py-2 text-left hover:border-zinc-200 hover:bg-zinc-50">
             <span className="w-12 shrink-0">
               {m.item.kind === 'image' && m.item.media ? (
-                <img src={m.item.media.url} alt={m.item.media.name} className="h-12 w-12 rounded-md border border-zinc-200 bg-white object-cover" />
+                <img src={mediaUrl(m.item.media.url)} alt={m.item.media.name} className="h-12 w-12 rounded-md border border-zinc-200 bg-white object-cover" />
               ) : (
                 <Pill tone={m.item.kind === 'file' ? 'purple' : 'zinc'}>{KIND_LABEL[m.item.kind]}</Pill>
               )}

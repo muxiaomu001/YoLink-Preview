@@ -4,6 +4,12 @@
 
 演示企业「恒信财富」及其中所有人物、对话、金额均为虚构。
 
+## 在线预览
+
+[GitHub Pages 演示](https://muxiaomu001.github.io/YoLink-Preview/) · [代码仓库](https://github.com/muxiaomu001/YoLink-Preview)
+
+推送 main 后由 GitHub Actions 构建发布。浏览器演示数据仍只保存在访问者自己的浏览器；不上传 PRD 文档。
+
 ## 跑起来
 
 ```bash

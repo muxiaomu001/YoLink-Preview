@@ -7,6 +7,7 @@
  * 个人话术悬停另有「编辑」「删除」；企业话术只读。不能发时（没选会话 / 拉黑 / 无权限）按钮禁用并在 title 说明。
  * 搜索场景可传 snippet + hit，命中的那一行用 Highlight 渲染。
  */
+import { mediaUrl } from '@/domain/mediaUrl'
 import { clsx } from 'clsx'
 import { Eye, Paperclip, Pencil, Trash2, Zap } from 'lucide-react'
 import type { QuickReply } from '@/domain/types'
@@ -121,7 +122,7 @@ export function QuickReplyImageCell({ item, reason, onSend, onEdit, onDelete }: 
         className={clsx('block w-full overflow-hidden rounded-md border border-zinc-200 bg-white hover:border-brand-300', reason && 'opacity-60')}
       >
         <span className="block aspect-square w-full">
-          <img src={media.url} alt={item.title} className="h-full w-full object-cover object-top" loading="lazy" />
+          <img src={mediaUrl(media.url)} alt={item.title} className="h-full w-full object-cover object-top" loading="lazy" />
         </span>
       </button>
       <div className="mt-1 truncate text-[11px] text-zinc-600" title={item.title}>
