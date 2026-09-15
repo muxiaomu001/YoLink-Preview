@@ -2,6 +2,7 @@ import { clsx } from 'clsx'
 import type { ReactNode } from 'react'
 import { BadgeCheck } from 'lucide-react'
 import type { Seat, Tag, Title } from '@/domain/types'
+import { TitleIcon } from './titleIcons'
 
 /** 客户头像：用昵称首字与稳定色 */
 const CUSTOMER_COLORS = ['#64748b', '#0f766e', '#7c3aed', '#be123c', '#0369a1', '#b45309', '#4d7c0f', '#6d28d9']
@@ -37,6 +38,7 @@ export function TitleChip({ title, size = 'sm', onRemove }: { title: Title; size
       style={{ background: title.color }}
       title={title.desc}
     >
+      <TitleIcon name={title.icon} size={size === 'xs' ? 9 : 10} />
       {title.name}
       {onRemove && (
         <button type="button" onClick={onRemove} className="ml-0.5 opacity-70 hover:opacity-100" aria-label="摘掉">

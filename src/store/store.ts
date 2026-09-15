@@ -22,6 +22,16 @@ import type {
 import { buildSeed } from '@/domain/seed'
 import { newId, newInviteCode } from '@/domain/ids'
 import { iso } from '@/domain/time'
+import { DEMO_IP } from './actions/helpers'
+import { settingsActions, type SettingsActions } from './actions/settings'
+import { peopleActions, type PeopleActions } from './actions/people'
+import { policyActions, type PolicyActions } from './actions/policy'
+import { contentActions, type ContentActions } from './actions/content'
+import { moduleActions, type ModuleActions } from './actions/modules'
+import { integrationActions, type IntegrationActions } from './actions/integrations'
+
+/** localStorage 键；模型变了就升版本号，旧数据直接作废 */
+export const STORAGE_KEY = 'yolink-demo-v2'
 
 const now = () => iso(Date.now())
 
@@ -42,7 +52,7 @@ export interface RegisterResult {
   addedSeatIds?: string[]
 }
 
-export interface DemoActions {
+export interface CoreActions {
   resetDemo: () => void
   logAudit: (type: AuditType, detail: string, actorStaffId?: string | null) => void
   // 会话
@@ -69,7 +79,7 @@ export interface DemoActions {
   createSeat: (input: Omit<Seat, 'id' | 'createdAt' | 'avatarText' | 'avatarColor'> & { avatarColor?: string }, byStaffId: string) => Seat
   updateSeat: (id: string, patch: Partial<Seat>, byStaffId: string) => void
   handoverSeat: (seatId: string, toStaffId: string, reason: string, byStaffId: string) => void
-  createStaff: (input: { name: string; username: string; email?: string; roleId: string; withSeat: boolean; roleDesc?: string }, byStaffId: string) => Staff
+  createStaff: (input: { name: string; username: string; email?: string; roleId: string; withSeat: boolean; roleDesc?: string; assignSeatIds?: string[]; mustChangePassword?: boolean }, byStaffId: string) => Staff
   setStaffStatus: (id: string, status: Staff['status'], byStaffId: string) => void
   updateRoleCaps: (roleId: string, caps: Capability[]) => void
   createInviteGroup: (input: { name: string; seatIds: string[]; primarySeatId: string; chatGroupIds: string[] }, byStaffId: string) => InviteGroup
@@ -79,10 +89,9 @@ export interface DemoActions {
   setDefaultInviteGroup: (id: string) => void
   createTitle: (input: Omit<Title, 'id'>, byStaffId: string) => Title
   updateTitle: (id: string, patch: Partial<Title>, byStaffId: string) => void
-  deleteTag: (id: string) => void
-  applyPreset: (presetId: string, byStaffId: string) => void
-  updateEnterprise: (patch: Partial<DemoState['enterprise']>, byStaffId: string) => void
 }
+
+export type DemoActions = CoreActions & SettingsActions & PeopleActions & PolicyActions & ContentActions & ModuleActions & IntegrationActions
 
 export type DemoStore = DemoState & DemoActions
 
@@ -95,7 +104,7 @@ export const useStore = create<DemoStore>()(
 
       logAudit: (type, detail, actorStaffId) =>
         set((s) => ({
-          audit: [{ id: newId('au'), at: now(), actorStaffId: actorStaffId ?? s.session.adminStaffId, type, detail }, ...s.audit],
+          audit: [{ id: newId('au'), at: now(), actorStaffId: actorStaffId ?? s.session.adminStaffId, type, detail, ip: DEMO_IP }, ...s.audit],
         })),
 
       setSession: (patch) => set((s) => ({ session: { ...s.session, ...patch } })),
@@ -349,19 +358,31 @@ export const useStore = create<DemoStore>()(
 
       createStaff: (input, byStaffId) => {
         const s = get()
-        const staff: Staff = { id: newId('st'), name: input.name, username: input.username, email: input.email, roleId: input.roleId, status: 'active', createdAt: now() }
+        const staff: Staff = { id: newId('st'), name: input.name, username: input.username, email: input.email, roleId: input.roleId, status: 'active', createdAt: now(), mustChangePassword: input.mustChangePassword }
         let seats = s.seats
-        let seatNote = '未创建同名坐席'
+        const notes: string[] = []
         if (input.withSeat) {
           const colors = ['#1f3b73', '#2f56ad', '#0f766e', '#b45309', '#7e22ce', '#be123c', '#0369a1']
-          const seat: Seat = { id: newId('seat'), displayName: input.name, avatarText: input.name.slice(0, 1), avatarColor: colors[s.seats.length % colors.length], roleDesc: input.roleDesc ?? '投资顾问', type: 'assign', operatorStaffId: staff.id, status: 'accepting', welcome: '', customerDeletable: false, createdAt: now() }
-          seats = [...s.seats, seat]
-          seatNote = `同时创建同名坐席「${seat.displayName}」并指派`
+          const seat: Seat = { id: newId('seat'), displayName: input.name, avatarText: input.name.slice(0, 1), avatarColor: colors[s.seats.length % colors.length], roleDesc: input.roleDesc ?? '投资顾问', type: 'assign', operatorStaffId: staff.id, status: 'accepting', welcome: '', customerDeletable: false, seatGroupId: null, maxCustomers: null, createdAt: now() }
+          seats = [...seats, seat]
+          notes.push(`同时创建同名坐席「${seat.displayName}」并指派`)
         }
+        // 指派已有坐席：等同一次交接，记入交接记录
+        const assign = (input.assignSeatIds ?? []).filter((id) => seats.some((x) => x.id === id))
+        const handovers = assign.map((seatId) => {
+          const seat = seats.find((x) => x.id === seatId)!
+          return { id: newId('ho'), seatId, fromStaffId: seat.operatorStaffId, toStaffId: staff.id, at: now(), byStaffId, reason: `创建员工 ${staff.name} 时指派` }
+        })
+        if (assign.length) {
+          seats = seats.map((x) => (assign.includes(x.id) ? { ...x, operatorStaffId: staff.id, status: x.status === 'paused' && x.operatorStaffId === null ? 'accepting' : x.status } : x))
+          notes.push(`指派已有坐席：${assign.map((id) => seats.find((x) => x.id === id)?.displayName).join('、')}`)
+        }
+        if (!notes.length) notes.push('未创建同名坐席')
         set({
           staff: [...s.staff, staff],
           seats,
-          audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'staff.create', detail: `创建员工 ${staff.name}（角色：${s.roles.find((r) => r.id === input.roleId)?.name}），${seatNote}` }, ...s.audit],
+          handovers: [...s.handovers, ...handovers],
+          audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'staff.create', detail: `创建员工 ${staff.name}（角色：${s.roles.find((r) => r.id === input.roleId)?.name}），${notes.join('；')}`, ip: DEMO_IP }, ...s.audit],
         })
         return staff
       },
@@ -448,16 +469,15 @@ export const useStore = create<DemoStore>()(
           return { titles: s.titles.map((x) => (x.id === id ? { ...x, ...patch } : x)), audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'title.library', detail: `修改头衔「${t?.name}」：${Object.keys(patch).join('、')}` }, ...s.audit] }
         }),
 
-      deleteTag: (id) => set((s) => ({ tags: s.tags.filter((t) => t.id !== id), customers: s.customers.map((c) => ({ ...c, tagIds: c.tagIds.filter((t) => t !== id) })) })),
-
-      applyPreset: (presetId, byStaffId) =>
-        set((s) => ({ activePresetId: presetId, audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'policy.update', detail: `应用策略预设「${s.policyPresets.find((p) => p.id === presetId)?.name}」` }, ...s.audit] })),
-
-      updateEnterprise: (patch, byStaffId) =>
-        set((s) => ({ enterprise: { ...s.enterprise, ...patch }, audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'settings.update', detail: `修改企业设置：${Object.keys(patch).join('、')}` }, ...s.audit] })),
+      ...settingsActions(set, get),
+      ...peopleActions(set, get),
+      ...policyActions(set, get),
+      ...contentActions(set, get),
+      ...moduleActions(set, get),
+      ...integrationActions(set, get),
     }),
     {
-      name: 'yolink-demo-v1',
+      name: STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => {
         // 只持久化数据，不持久化函数
@@ -477,6 +497,6 @@ export const useStore = create<DemoStore>()(
 /** 多窗口同步：另一个窗口写了 localStorage，本窗口重新水合 */
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {
-    if (e.key === 'yolink-demo-v1') void useStore.persist.rehydrate()
+    if (e.key === STORAGE_KEY) void useStore.persist.rehydrate()
   })
 }

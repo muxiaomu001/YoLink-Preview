@@ -1,66 +1,168 @@
+import { useState } from 'react'
+import type { PolicyChange, PolicyPreset } from '@/domain/types'
+import { fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
-import { Button, Switch } from '@/ui/primitives'
-import { Card, Note, PageHeader, Pill } from '@/ui/display'
+import { staffById } from '@/store/selectors'
+import { Button } from '@/ui/primitives'
+import { Card, Note, PageHeader, Pill, Table, Tabs } from '@/ui/display'
 import { toast } from '@/ui/overlay'
+import { confirm } from '@/ui/confirm'
+import { MatrixTable, PresetDetailModal } from './PoliciesPage.parts'
+import { NumbersTab } from './PoliciesPage.numbers'
+import { OverridesTab } from './PoliciesPage.overrides'
+
+type Tab = 'presets' | 'matrix' | 'numbers' | 'overrides' | 'changes'
+
+const CHANGE_LABEL: Record<PolicyChange['kind'], { name: string; tone: 'blue' | 'green' | 'amber' | 'purple' }> = {
+  preset: { name: '应用预设', tone: 'blue' },
+  cap: { name: '修改能力', tone: 'green' },
+  number: { name: '修改数值', tone: 'amber' },
+  override: { name: '用户覆盖', tone: 'purple' },
+}
 
 export function PoliciesPage() {
   const s = useStore()
-  const active = s.policyPresets.find((p) => p.id === s.activePresetId)!
-  const groups = Array.from(new Set(s.policyItems.map((p) => p.group)))
+  const [tab, setTab] = useState<Tab>('presets')
+  const active = s.policyPresets.find((p) => p.id === s.activePresetId)
   return (
     <div>
-      <PageHeader title="策略预设与能力矩阵" desc="策略决定客户在 App 里能做什么。预设只是批量填默认值，之后每一项仍可单独改。聊天层能力作用在坐席与客户上，不在员工上。" />
-      <div className="mb-4 flex gap-3">
-        {s.policyPresets.map((p) => (
-          <div key={p.id} className={`flex-1 rounded-lg border p-4 ${p.id === s.activePresetId ? 'border-brand-400 bg-brand-50/40' : 'border-zinc-200 bg-white'}`}>
-            <div className="flex items-center justify-between">
-              <div className="font-medium text-zinc-900">
-                {p.name} {p.builtin && <Pill className="ml-1">系统</Pill>}
-              </div>
-              {p.id === s.activePresetId ? (
-                <Pill tone="blue">当前生效</Pill>
-              ) : (
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    s.applyPreset(p.id, s.session.adminStaffId!)
-                    toast(`已应用「${p.name}」`)
-                  }}
-                >
-                  应用
-                </Button>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-zinc-500">{p.id === 'preset_cs' ? '客户不能加好友、不能搜索、不能互聊、看不到群成员；只与官方坐席往来。' : '所有角色开放全部社交能力，数值取主流社交 IM 默认值。'}</p>
-          </div>
-        ))}
-      </div>
+      <PageHeader title="策略" desc={`策略决定客户与坐席在 App 里能做什么。预设只是批量填默认值，之后每一项仍可单独改。当前生效：${active?.name ?? '自定义'}`} />
       <Note>
         裁决顺序：模块授权 → 角色硬边界（经营者只读、客户不进工作台、坐席不能直接登录）→ 策略矩阵（企业默认 → 群级覆盖 → 用户级覆盖）→ 员工角色能力与群内角色。
       </Note>
-      <Card className="mt-4" title={`能力矩阵 · 客户角色（当前：${active.name}）`} padded={false}>
-        {groups.map((g) => (
-          <div key={g}>
-            <div className="bg-zinc-50/80 px-4 py-1.5 text-[11px] font-medium text-zinc-500">{g}</div>
-            {s.policyItems
-              .filter((p) => p.group === g)
-              .map((p) => (
-                <div key={p.key} className="flex items-center justify-between border-b border-zinc-100 px-4 py-2 last:border-0">
-                  <div>
-                    <div className="text-[13px] text-zinc-800">{p.label}</div>
-                    <div className="font-mono text-[11px] text-zinc-400">{p.key}</div>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-zinc-500">
-                    <span>坐席：允许</span>
-                    <span className="text-zinc-300">|</span>
-                    <span>客户：</span>
-                    <Switch checked={!!active.customer[p.key]} onChange={() => toast('演示中预设为只读，实际产品可逐项改', 'info')} />
-                  </div>
-                </div>
-              ))}
-          </div>
-        ))}
-      </Card>
+      <Tabs
+        className="mt-4 mb-4"
+        value={tab}
+        onChange={setTab}
+        items={[
+          { key: 'presets', label: '预设列表', count: s.policyPresets.length },
+          { key: 'matrix', label: '能力矩阵', count: s.policyItems.length },
+          { key: 'numbers', label: '数值型策略' },
+          { key: 'overrides', label: '用户级覆盖（P1）', count: s.policyOverrides.length },
+          { key: 'changes', label: '变更记录', count: s.policyChanges.length },
+        ]}
+      />
+      {tab === 'presets' && <PresetsTab />}
+      {tab === 'matrix' && <MatrixTab />}
+      {tab === 'numbers' && <NumbersTab />}
+      {tab === 'overrides' && <OverridesTab />}
+      {tab === 'changes' && <ChangesTab />}
     </div>
+  )
+}
+
+function PresetsTab() {
+  const s = useStore()
+  const admin = s.session.adminStaffId!
+  const [detail, setDetail] = useState<PolicyPreset | null>(null)
+
+  const apply = async (p: PolicyPreset) => {
+    const ok = await confirm({ title: `应用预设「${p.name}」`, body: '应用此预设将覆盖当前策略，是否继续？', okText: '应用' })
+    if (!ok) return
+    s.applyPreset(p.id, admin)
+    toast(`已应用「${p.name}」，能力矩阵已覆盖，在线用户收到策略更新推送`)
+  }
+  const copy = (p: PolicyPreset) => {
+    const c = s.copyPreset(p.id, admin)
+    if (c) toast(`已复制为「${c.name}」，可在详情里查看；复制件不是内置，可删除`)
+  }
+  const remove = async (p: PolicyPreset) => {
+    const ok = await confirm({ title: `删除预设「${p.name}」？`, body: '删除后不可恢复。内置预设与当前生效的预设不能删除。', okText: '删除', danger: true })
+    if (!ok) return
+    if (s.deletePreset(p.id, admin)) toast(`已删除预设「${p.name}」`)
+    else toast('内置或当前生效的预设不能删除', 'warn')
+  }
+
+  return (
+    <>
+      <Note>
+        内置「客服预设」：客户不能加好友、搜索、互聊、看群成员、转发；坐席全部开放。「社交预设」：所有角色全部开放。复制后得到一份可删除的副本。
+      </Note>
+      <Card className="mt-4" padded={false}>
+        <Table
+          rows={s.policyPresets}
+          rowKey={(p) => p.id}
+          columns={[
+            {
+              key: 'name',
+              title: '预设名称',
+              render: (p) => (
+                <span className="font-medium text-zinc-900">
+                  {p.name}
+                  {p.builtin && <Pill className="ml-1.5">系统</Pill>}
+                  {p.id === s.activePresetId && (
+                    <Pill tone="blue" className="ml-1.5">
+                      当前生效
+                    </Pill>
+                  )}
+                </span>
+              ),
+            },
+            { key: 'desc', title: '说明', render: (p) => <span className="text-zinc-500">{p.desc}</span> },
+            {
+              key: 'ops',
+              title: '操作',
+              align: 'right',
+              render: (p) => (
+                <div className="flex justify-end gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => setDetail(p)}>
+                    查看详情
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => copy(p)}>
+                    复制
+                  </Button>
+                  <Button size="sm" variant="secondary" disabled={p.id === s.activePresetId} onClick={() => void apply(p)}>
+                    应用
+                  </Button>
+                  <Button size="sm" variant="danger" disabled={p.builtin || p.id === s.activePresetId} title={p.builtin ? '内置预设不可删除' : p.id === s.activePresetId ? '当前生效的预设不可删除' : undefined} onClick={() => void remove(p)}>
+                    删除
+                  </Button>
+                </div>
+              ),
+            },
+          ]}
+        />
+      </Card>
+      {detail && <PresetDetailModal preset={detail} items={s.policyItems} onClose={() => setDetail(null)} />}
+    </>
+  )
+}
+
+function MatrixTab() {
+  const s = useStore()
+  const admin = s.session.adminStaffId!
+  return (
+    <>
+      <Note>修改后立即保存，在线用户收到策略更新推送；聊天层能力作用在坐席上（按 staff 取值），不在员工上。</Note>
+      <Card className="mt-4" title="能力矩阵（行 = 能力键，列 = 角色 × 端）" padded={false}>
+        <MatrixTable
+          items={s.policyItems}
+          matrix={s.policyMatrix}
+          onToggle={(key, col, value) => {
+            s.setPolicyCap(key, col, value, admin)
+            toast(`${key} 已${value ? '开启' : '关闭'}，已推送在线用户`)
+          }}
+        />
+      </Card>
+    </>
+  )
+}
+
+function ChangesTab() {
+  const s = useStore()
+  return (
+    <Card title="变更记录" padded={false}>
+      <Table
+        rows={s.policyChanges}
+        rowKey={(c) => c.id}
+        dense
+        columns={[
+          { key: 'at', title: '时间', width: '160px', render: (c) => <span className="tabular-nums text-zinc-600">{fmtDateTime(c.at)}</span> },
+          { key: 'by', title: '操作人', render: (c) => staffById(s, c.byStaffId)?.name ?? '-' },
+          { key: 'kind', title: '变更类型', render: (c) => <Pill tone={CHANGE_LABEL[c.kind].tone}>{CHANGE_LABEL[c.kind].name}</Pill> },
+          { key: 'detail', title: '详情', render: (c) => <span className="text-zinc-700">{c.detail}</span> },
+        ]}
+      />
+    </Card>
   )
 }

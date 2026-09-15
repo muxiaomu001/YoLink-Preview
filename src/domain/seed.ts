@@ -16,8 +16,6 @@ import type {
   InviteLink,
   KnowledgeItem,
   Message,
-  PolicyItem,
-  PolicyPreset,
   QuickReply,
   Role,
   Seat,
@@ -28,6 +26,7 @@ import type {
   TitleAssignment,
 } from './types'
 import { ago, agoMs, iso } from './time'
+import { buildAdminSeed } from './seed-admin'
 
 /** 确定性伪随机，保证每次重置出来的数据一样 */
 function mulberry32(seed: number) {
@@ -41,7 +40,8 @@ function mulberry32(seed: number) {
   }
 }
 
-const rand = mulberry32(20260915)
+const SEED = 20260915
+let rand = mulberry32(SEED)
 const pick = <T>(arr: T[]): T => arr[Math.floor(rand() * arr.length)]
 const chance = (p: number) => rand() < p
 const between = (a: number, b: number) => a + Math.floor(rand() * (b - a + 1))
@@ -60,12 +60,30 @@ export const ENTERPRISE: Enterprise = {
   code: 'HXWM',
   slogan: '海外资产配置 · 长期陪伴',
   timezone: 'Asia/Hong_Kong',
+  logoText: '恒',
+  defaultLanguage: 'zh',
+  brandColor: '#1f3b73',
+  agreementUrl: 'https://hxwm.example/legal/terms',
+  privacyUrl: 'https://hxwm.example/legal/privacy',
+  faqUrl: 'https://hxwm.example/help/faq',
+  allowedThemes: ['classic', 'dark', 'ocean'],
+  defaultTheme: 'classic',
+  registerMethods: ['username', 'phone'],
   inviteCodeRequired: true,
+  emailVerify: false,
+  forcePhoneBind: false,
+  push: { apnsMode: 'p8', apnsKeyId: 'K7M2Q9XA', apnsTeamId: 'HX8Z2T4Y', fcmConfigured: true, mask: 'sender_only' },
+  storage: { type: 'oss', bucket: 'hxwm-im-prod', endpoint: 'oss-cn-hongkong.aliyuncs.com', accessKeyConfigured: true, secretKeyConfigured: true, lastTestAt: ago(3), lastTestOk: true },
+  webTabs: [
+    { id: 'wt_1', enabled: true, title: '我的账户', iconText: '账', url: 'https://portal.hxwm.example/account?uid={user_id}&ext={external_id}&ts={ts}&sig={sig}' },
+    { id: 'wt_2', enabled: false, title: '产品中心', iconText: '产', url: 'https://portal.hxwm.example/products' },
+  ],
   defaultWelcome: '您好，我是恒信财富的{{seat.name}}，很高兴为您服务。有任何配置或账户问题随时找我。',
   defaultChatGroupIds: ['cg_strategy', 'cg_community'],
+  modules: { customers: true, invite: true, wallet: true, checkin: true, referral: true, broadcast: true, banner: true, content: true },
 }
 
-const ALL_CAPS: Role['caps'] = [
+export const ALL_CAPS: Role['caps'] = [
   'view_all_conversations',
   'view_all_customers',
   'create_invite',
@@ -74,28 +92,39 @@ const ALL_CAPS: Role['caps'] = [
   'view_audit',
   'view_seat_operator',
   'assign_title',
+  'export_customers',
+  'delete_user',
+  'review_withdrawal',
+  'mark_paid',
+  'adjust',
   'manage_seats',
+  'manage_titles',
   'manage_staff',
   'manage_roles',
   'manage_policies',
   'manage_settings',
   'view_audit_logs',
-  'manage_titles',
+  'export_data',
 ]
 
 export const ROLES: Role[] = [
-  { id: 'role_admin', name: '管理员', builtin: true, caps: ALL_CAPS },
+  { id: 'role_admin', name: '管理员', desc: '全部权限，系统内置', builtin: true, caps: ALL_CAPS },
   {
     id: 'role_seat',
     name: '坐席',
+    desc: '只看本人持有坐席的会话与客户；能发邀请链接、群发、挂头衔',
     builtin: true,
     caps: ['create_invite', 'broadcast', 'assign_title'],
   },
   {
     id: 'role_lead',
     name: '运营主管',
+    desc: '看全部会话与客户，管群，查消息审计与实操员工，审提现',
     builtin: false,
     caps: [
+      'review_withdrawal',
+      'mark_paid',
+      'export_customers',
       'view_all_conversations',
       'view_all_customers',
       'create_invite',
@@ -176,6 +205,8 @@ export const SEATS: Seat[] = [
     welcome:
       '{{customer.nickname}}您好，我是您的专属投资顾问林顾问。先花两分钟做个风险测评，我再根据结果给您一版配置思路，可以吗？',
     customerDeletable: false,
+    seatGroupId: 'sg_advisors',
+    maxCustomers: 60,
     createdAt: ago(110),
   },
   {
@@ -190,6 +221,8 @@ export const SEATS: Seat[] = [
     welcome:
       '{{customer.nickname}}您好，我是陈顾问，负责您的账户配置与日常跟进。您先说说这笔资金的用途和期限，我们从这里开始。',
     customerDeletable: false,
+    seatGroupId: 'sg_advisors',
+    maxCustomers: 80,
     createdAt: ago(110),
   },
   {
@@ -203,6 +236,8 @@ export const SEATS: Seat[] = [
     status: 'accepting',
     welcome: '您好，这里是恒信财富客户服务。开户、入金到账、资料修改这类问题直接在这里说，工作时间 15 分钟内回复。',
     customerDeletable: true,
+    seatGroupId: null,
+    maxCustomers: null,
     createdAt: ago(105),
   },
   {
@@ -217,6 +252,8 @@ export const SEATS: Seat[] = [
     welcome:
       '【恒信财富】欢迎加入。本账号发送官方通知与合规提示。投资有风险，本平台任何内容不构成投资建议，请以正式文件为准。',
     customerDeletable: false,
+    seatGroupId: null,
+    maxCustomers: null,
     createdAt: ago(105),
   },
 ]
@@ -236,10 +273,10 @@ export const HANDOVERS: SeatHandover[] = [
 // ---------- 头衔与内部标签 ----------
 
 export const TITLES: Title[] = [
-  { id: 't_vip', name: '私享会员', color: '#b45309', desc: '年度私享服务会员，享专属策略与线下活动', enabled: true },
-  { id: 't_verified', name: '认证投资者', color: '#1d4ed8', desc: '已完成资产证明与风险测评', enabled: true },
+  { id: 't_vip', name: '私享会员', color: '#b45309', icon: 'crown', desc: '年度私享服务会员，享专属策略与线下活动', enabled: true },
+  { id: 't_verified', name: '认证投资者', color: '#1d4ed8', icon: 'shield-check', desc: '已完成资产证明与风险测评', enabled: true },
   { id: 't_new', name: '新客', color: '#15803d', desc: '注册 30 天内', enabled: true },
-  { id: 't_guest', name: '活动嘉宾', color: '#7e22ce', desc: '受邀参加线下策略会', enabled: true },
+  { id: 't_guest', name: '活动嘉宾', color: '#7e22ce', icon: 'star', desc: '受邀参加线下策略会', enabled: true },
 ]
 
 export const TAGS: Tag[] = [
@@ -265,6 +302,7 @@ export const CHAT_GROUPS: ChatGroup[] = [
     memberSeatIds: ['seat_notice', 'seat_lin', 'seat_chen'],
     memberCustomerIds: [],
     requiredTitleId: null,
+    maxMembers: null,
     createdAt: ago(100),
   },
   {
@@ -277,6 +315,7 @@ export const CHAT_GROUPS: ChatGroup[] = [
     memberSeatIds: ['seat_lin', 'seat_chen', 'seat_cs', 'seat_notice'],
     memberCustomerIds: [],
     requiredTitleId: null,
+    maxMembers: 500,
     createdAt: ago(100),
   },
   {
@@ -289,6 +328,7 @@ export const CHAT_GROUPS: ChatGroup[] = [
     memberSeatIds: ['seat_lin', 'seat_chen'],
     memberCustomerIds: [],
     requiredTitleId: 't_vip',
+    maxMembers: 200,
     createdAt: ago(80),
   },
 ]
@@ -816,49 +856,6 @@ export const KNOWLEDGE: KnowledgeItem[] = [
   { id: 'kb_7', title: '私享会员权益', body: '每季度组合复盘、线下策略会优先、专属顾问响应；年费 1,200 美元；到期前两周提醒续费。', tags: ['会员'], enabled: true },
 ]
 
-export const POLICY_ITEMS: PolicyItem[] = [
-  { key: 'friend.add', label: '主动添加好友', group: '关系链' },
-  { key: 'user.search', label: '搜索用户', group: '关系链' },
-  { key: 'dm.customer_to_customer', label: '客户之间私聊', group: '关系链' },
-  { key: 'profile.view_stranger', label: '查看陌生人资料', group: '关系链' },
-  { key: 'group.create', label: '创建群', group: '群与频道' },
-  { key: 'group.invite', label: '拉人入群', group: '群与频道' },
-  { key: 'group.view_members', label: '查看群成员列表', group: '群与频道' },
-  { key: 'group.leave', label: '退出官方群', group: '群与频道' },
-  { key: 'message.recall', label: '撤回消息（2 分钟内）', group: '消息' },
-  { key: 'message.forward', label: '转发消息', group: '消息' },
-  { key: 'media.send_video', label: '发送视频', group: '消息' },
-  { key: 'media.send_voice', label: '发送语音', group: '消息' },
-]
-
-export const POLICY_PRESETS: PolicyPreset[] = [
-  {
-    id: 'preset_cs',
-    name: '客服预设',
-    builtin: true,
-    customer: {
-      'friend.add': false,
-      'user.search': false,
-      'dm.customer_to_customer': false,
-      'profile.view_stranger': false,
-      'group.create': false,
-      'group.invite': false,
-      'group.view_members': false,
-      'group.leave': false,
-      'message.recall': true,
-      'message.forward': true,
-      'media.send_video': true,
-      'media.send_voice': true,
-    },
-  },
-  {
-    id: 'preset_social',
-    name: '社交预设',
-    builtin: true,
-    customer: Object.fromEntries(POLICY_ITEMS.map((p) => [p.key, true])),
-  },
-]
-
 function buildBroadcasts(): Broadcast[] {
   return [
     { id: sid('bc'), name: '本周市场观点', seatId: 'seat_lin', operatorId: 'st_lin', targetDesc: '头衔 = 私享会员', text: '各位会员好，本周观点已整理：美元短端仍有吸引力，港股科技反弹属修复，黄金维持区间配置。周五晚 8 点线上复盘，欢迎参加。', sentAt: ago(2, 3), sentCount: 9, readCount: 7 },
@@ -885,7 +882,8 @@ function buildAudit(): AuditEvent[] {
     { id: sid('au'), at: ago(0, 1), actorStaffId: 'st_admin', type: 'login', detail: '登录管理后台' },
     { id: sid('au'), at: ago(0, 0, 25), actorStaffId: 'st_lin', type: 'login', detail: '登录工作台' },
   ]
-  return list
+  const ips = ['10.0.8.21', '10.0.8.35', '192.0.2.190', '198.51.100.8']
+  return list.map((e, i) => ({ ...e, ip: ips[i % ips.length] }))
 }
 
 function buildAiEvents(convs: Conversation[]): AiEvent[] {
@@ -902,7 +900,12 @@ function buildAiEvents(convs: Conversation[]): AiEvent[] {
         convId: pick(dmConvs).id,
         result: r < 0.5 ? 'adopted' : r < 0.75 ? 'edited' : 'ignored',
         tokens: between(600, 1800),
+        module: 'reply',
       })
+    }
+    // 群活跃助手：赵磊持有的机器人账号每天发起几个话题
+    for (let i = 0; i < between(1, 3); i += 1) {
+      list.push({ id: sid('ai'), at: iso(agoMs(d, between(9, 18), between(0, 59))), staffId: 'st_zhao', convId: dmConvs[0].id, result: chance(0.7) ? 'adopted' : 'ignored', tokens: between(300, 900), module: 'group' })
     }
   }
   return list
@@ -911,6 +914,7 @@ function buildAiEvents(convs: Conversation[]): AiEvent[] {
 /** 生成整份演示状态 */
 export function buildSeed(): DemoState {
   seq = 0
+  rand = mulberry32(SEED)
   const chatGroups = CHAT_GROUPS.map((g) => ({ ...g, memberCustomerIds: [...g.memberCustomerIds] }))
   const c = buildCustomers()
   const g = buildGroupMessages(c.customers, chatGroups)
@@ -936,10 +940,8 @@ export function buildSeed(): DemoState {
     broadcasts: buildBroadcasts(),
     quickReplies: QUICK_REPLIES,
     knowledge: KNOWLEDGE,
-    policyItems: POLICY_ITEMS,
-    policyPresets: POLICY_PRESETS,
-    activePresetId: 'preset_cs',
     aiEvents: buildAiEvents(conversations),
+    ...buildAdminSeed({ customers: c.customers, conversations, messages }),
     session: { adminStaffId: 'st_admin', workbenchStaffId: 'st_lin', workbenchSeatId: 'seat_lin', phoneCustomerId: null },
     seededAt: iso(Date.now()),
   }

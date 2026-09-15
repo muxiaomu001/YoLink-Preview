@@ -1,11 +1,28 @@
+import { Link } from 'react-router-dom'
 import { fmtAgo } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { dashboardNumbers, seatById, staffById } from '@/store/selectors'
 import { Card, Note, PageHeader, Stat } from '@/ui/display'
 
+/** 需要管理员动手的事，从各模块汇总到首页 */
+function useTodos() {
+  const s = useStore()
+  const licenseDays = Math.ceil((new Date(s.license.expiresAt).getTime() - Date.now()) / 86400000)
+  const items = [
+    { n: s.reports.filter((r) => r.status === 'pending').length, label: '待处理举报', to: '/admin/reports' },
+    { n: s.withdrawals.filter((w) => w.status === 'pending' || w.status === 'approved').length, label: '待审核 / 待打款提现', to: '/admin/wallet' },
+    { n: s.seats.filter((x) => x.status !== 'disabled' && !x.operatorStaffId).length, label: '无人实操的坐席', to: '/admin/seats' },
+    { n: s.seats.filter((x) => x.status === 'paused').length, label: '暂停接新的坐席', to: '/admin/seats' },
+    { n: s.webhookLogs.filter((l) => l.httpStatus >= 400 && Date.now() - new Date(l.at).getTime() < 86400000).length, label: '24 小时内 Webhook 失败', to: '/admin/webhooks' },
+    { n: licenseDays <= 30 ? 1 : 0, label: `许可 ${licenseDays} 天后到期`, to: '/admin/license' },
+  ]
+  return items.filter((it) => it.n > 0)
+}
+
 export function AdminHome() {
   const s = useStore()
   const n = dashboardNumbers(s)
+  const todos = useTodos()
   const perStaff = s.staff
     .filter((st) => st.status === 'active' && st.roleId !== 'role_admin')
     .map((st) => {
@@ -20,6 +37,16 @@ export function AdminHome() {
   return (
     <div>
       <PageHeader title="经营首页" desc="老板看的六个数，只读。按人统计的指标按实操员工（真人）算，按归属统计的按主归属坐席算。" />
+      {todos.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <span className="font-medium">待处理</span>
+          {todos.map((t) => (
+            <Link key={t.label} to={t.to} className="rounded bg-white px-2 py-0.5 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100">
+              {t.label} <b className="tabular-nums">{t.n}</b>
+            </Link>
+          ))}
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-3">
         <Stat label="客户总数 · 本周新增" value={n.customersTotal} sub={`本周 +${n.newThisWeek}`} />
         <Stat label="7 日活跃客户" value={n.active7} sub={`占 ${n.active7Pct}%`} />

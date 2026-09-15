@@ -1,0 +1,553 @@
+/**
+ * 管理后台完整版的种子数据：策略矩阵与数值、举报、敏感词、安全日志、钱包、签到、
+ * 推荐奖励、横幅公告、AI、客户画像同步、日报、插件与开放 API、系统。
+ * 与 seed.ts 分开放，避免单文件过长。所有数据均为虚构。
+ */
+import type {
+  AiSettings,
+  Announcement,
+  ApiKey,
+  AppVersion,
+  AutomationRule,
+  Backup,
+  Banner,
+  CheckinRecord,
+  CheckinRules,
+  Conversation,
+  CustomField,
+  Customer,
+  DailyReportRecord,
+  DailyReportSettings,
+  DailyStat,
+  HealthStatus,
+  License,
+  Message,
+  PayoutField,
+  Plugin,
+  PolicyChange,
+  PolicyCol,
+  PolicyItem,
+  PolicyMatrix,
+  PolicyNumbers,
+  PolicyOverride,
+  PolicyPreset,
+  ProfileSyncSettings,
+  ReferralAnomaly,
+  ReferralRules,
+  Report,
+  SeatGroup,
+  SecurityEvent,
+  SensitiveHit,
+  SensitiveWord,
+  SyncRecord,
+  WalletSettings,
+  WalletTx,
+  Webhook,
+  WebhookLog,
+  Withdrawal,
+} from './types'
+import { ago, agoMs, iso } from './time'
+
+function mulberry32(seed: number) {
+  let a = seed
+  return () => {
+    a |= 0
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+let rand = mulberry32(20260916)
+const between = (a: number, b: number) => a + Math.floor(rand() * (b - a + 1))
+const chance = (p: number) => rand() < p
+
+let seq = 0
+const aid = (p: string) => {
+  seq += 1
+  return `${p}_${String(seq).padStart(4, '0')}`
+}
+
+const DAY = 86400000
+const dateStr = (ms: number) => iso(ms).slice(0, 10)
+
+// ---------- 坐席组（P1） ----------
+
+export const SEAT_GROUPS: SeatGroup[] = [{ id: 'sg_advisors', name: '投资顾问组', seatIds: ['seat_lin', 'seat_chen'], strategy: 'least', createdAt: ago(30) }]
+
+// ---------- 策略 ----------
+
+export const POLICY_ITEMS: PolicyItem[] = [
+  { key: 'friend.add', label: '主动添加好友', group: '关系链' },
+  { key: 'friend.search_user', label: '搜索用户', group: '关系链' },
+  { key: 'dm.create_with_stranger', label: '与非好友发起私聊', group: '关系链' },
+  { key: 'profile.view_stranger', label: '查看陌生人资料', group: '关系链' },
+  { key: 'group.create', label: '创建群', group: '群与频道' },
+  { key: 'group.invite', label: '拉人入群', group: '群与频道' },
+  { key: 'group.view_members', label: '查看群成员列表', group: '群与频道' },
+  { key: 'group.forward', label: '转发群消息', group: '群与频道' },
+  { key: 'group.leave', label: '退出官方群', group: '群与频道' },
+  { key: 'message.recall', label: '撤回消息', group: '消息' },
+  { key: 'message.edit', label: '编辑已发消息', group: '消息' },
+  { key: 'message.forward', label: '转发消息', group: '消息' },
+  { key: 'media.send_image', label: '发送图片', group: '消息' },
+  { key: 'media.send_video', label: '发送视频', group: '消息' },
+  { key: 'media.send_voice', label: '发送语音', group: '消息' },
+  { key: 'tag.create', label: '员工在工作台新建内部标签', group: '工作台' },
+]
+
+export const POLICY_COLS: { key: PolicyCol; label: string }[] = [
+  { key: 'customer_mobile', label: '客户 · 手机' },
+  { key: 'customer_desktop', label: '客户 · 桌面' },
+  { key: 'staff_mobile', label: '坐席 · 手机' },
+  { key: 'staff_desktop', label: '坐席 · 桌面' },
+]
+
+/** 用"客户是否允许"生成整张矩阵：坐席列全开 */
+function matrixFrom(customerAllowed: Record<string, boolean>): PolicyMatrix {
+  const m: PolicyMatrix = {}
+  POLICY_ITEMS.forEach((p) => {
+    const c = customerAllowed[p.key] ?? true
+    m[p.key] = { customer_mobile: c, customer_desktop: c, staff_mobile: true, staff_desktop: true }
+  })
+  return m
+}
+
+export const POLICY_PRESETS: PolicyPreset[] = [
+  {
+    id: 'preset_cs',
+    name: '客服预设',
+    desc: '客户不能加好友、不能搜索、不能互聊、看不到群成员、不能退官方群；只与官方坐席往来。坐席全部开放。',
+    builtin: true,
+    matrix: matrixFrom({
+      'friend.add': false,
+      'friend.search_user': false,
+      'dm.create_with_stranger': false,
+      'profile.view_stranger': false,
+      'group.create': false,
+      'group.invite': false,
+      'group.view_members': false,
+      'group.forward': false,
+      'group.leave': false,
+      'message.edit': false,
+      'tag.create': false,
+    }),
+  },
+  {
+    id: 'preset_social',
+    name: '社交预设',
+    desc: '所有角色开放全部社交能力，数值取主流社交 IM 默认值。',
+    builtin: true,
+    matrix: matrixFrom({}),
+  },
+]
+
+export const POLICY_NUMBERS: PolicyNumbers = {
+  recallSeconds: 120,
+  editSeconds: 900,
+  groupMaxMembers: 10000,
+  slowModeSeconds: 0,
+  retentionDays: 0,
+  imageMaxMb: 10,
+  videoMaxMb: 100,
+  voiceMaxSeconds: 60,
+}
+
+export const POLICY_CHANGES: PolicyChange[] = [
+  { id: 'pc_0001', at: ago(90), byStaffId: 'st_admin', kind: 'preset', detail: '应用预设「客服预设」' },
+  { id: 'pc_0002', at: ago(60), byStaffId: 'st_admin', kind: 'number', detail: '消息撤回时限 60 → 120 秒' },
+  { id: 'pc_0003', at: ago(21), byStaffId: 'st_admin', kind: 'cap', detail: 'media.send_video 客户 · 手机：关 → 开' },
+  { id: 'pc_0004', at: ago(3), byStaffId: 'st_admin', kind: 'preset', detail: '应用预设「客服预设」' },
+]
+
+// ---------- 钱包、签到、推荐（P2） ----------
+
+export const WALLET_SETTINGS: WalletSettings = {
+  currency: 'USD',
+  unitName: '积分',
+  rate: 1000,
+  minWithdraw: 10000,
+  maxPerWithdraw: 0,
+  dailyWithdrawCount: 1,
+  fee: '2%',
+  reviewLevels: 2,
+}
+
+export const PAYOUT_FIELDS: PayoutField[] = [
+  { id: 'pf_1', name: '银行名称', type: 'text', required: true },
+  { id: 'pf_2', name: '户名', type: 'text', required: true },
+  { id: 'pf_3', name: '账号', type: 'text', required: true },
+  { id: 'pf_4', name: 'SWIFT', type: 'text', required: false },
+]
+
+export const CHECKIN_RULES: CheckinRules = {
+  cycle: [10, 10, 20, 20, 30, 30, 50],
+  startAt: ago(30),
+  endAt: iso(agoMs(-60)),
+  budget: 200000,
+  perCustomerMax: 2000,
+}
+
+export const REFERRAL_RULES: ReferralRules = {
+  timing: 'first_checkin',
+  referrerReward: 500,
+  newcomerReward: 200,
+  dailyMax: 5,
+  totalMax: 50,
+}
+
+// ---------- 横幅与公告 ----------
+
+export const BANNERS: Banner[] = [
+  { id: 'bn_1', title: '四季度全球配置展望 · 线下策略会报名', imageColor: '#1f3b73', action: 'link', url: 'https://hxwm.example/event/q4', order: 1, startAt: ago(10), endAt: iso(agoMs(-27)), audience: 'all', tagIds: [], impressions: 1840, clicks: 212 },
+  { id: 'bn_2', title: '每日签到领积分', imageColor: '#b45309', action: 'checkin', order: 2, startAt: ago(30), endAt: iso(agoMs(-60)), audience: 'all', tagIds: [], impressions: 5120, clicks: 903 },
+  { id: 'bn_3', title: '私享会员群 · 季度复盘直播', imageColor: '#7e22ce', action: 'group', chatGroupId: 'cg_vip', order: 3, startAt: ago(5), endAt: iso(agoMs(-2)), audience: 'tags', tagIds: ['tag_hnw'], impressions: 320, clicks: 88 },
+  { id: 'bn_4', title: '8 月线下沙龙回顾', imageColor: '#0f766e', action: 'link', url: 'https://hxwm.example/event/aug', order: 4, startAt: ago(40), endAt: ago(12), audience: 'all', tagIds: [], impressions: 2210, clicks: 140 },
+]
+
+export const ANNOUNCEMENTS: Announcement[] = [
+  { id: 'an_1', title: '系统维护通知', body: '9 月 20 日 02:00 至 04:00（香港时间）进行系统维护，期间账户查询可能短暂不可用，交易不受影响。', buttonText: '我知道了', buttonAction: 'close', kind: 'popup', startAt: ago(2), endAt: iso(agoMs(-5)), showMode: 'once', impressions: 612 },
+  { id: 'an_2', title: '合规提示：谨防冒充顾问收款', body: '恒信财富所有资金往来均通过您本人名下的托管账户，顾问不会要求您向个人账户转账。', buttonText: '查看详情', buttonAction: 'link', url: 'https://hxwm.example/compliance', kind: 'bar', startAt: ago(20), endAt: ago(3), showMode: 'every', impressions: 4380 },
+]
+
+// ---------- AI ----------
+
+export const AI_SETTINGS: AiSettings = {
+  endpoint: 'https://ai-gateway.hxwm.example/v1',
+  keyConfigured: true,
+  shareProfile: false,
+  lastTestAt: ago(1),
+  lastTestOk: true,
+  contextCount: 10,
+  tone: 'professional',
+  dailyLimitPerStaff: 200,
+  group: {
+    botLimit: 3,
+    botUsed: 1,
+    defaultRule: '群里超过 30 分钟无人发言时，用当天策略要点发起一个话题；不回答具体买卖建议；涉及金额与收益一律转顾问。',
+    reviewMode: 'review',
+  },
+}
+
+// ---------- 客户画像 ----------
+
+export const PROFILE_SYNC: ProfileSyncSettings = {
+  apiKeyConfigured: true,
+  apiKeyPrefix: 'hxp_7f3a',
+  amountVisibleRoleIds: ['role_admin', 'role_lead'],
+  shareWithAi: false,
+  scheduledPull: false,
+  webhookUrl: '',
+}
+
+export const SYNC_RECORDS: SyncRecord[] = [
+  { id: 'sr_1', at: ago(0, 3), kind: 'purchase', source: 'api', count: 6, failed: 0, unmatched: 1 },
+  { id: 'sr_2', at: ago(1, 3), kind: 'purchase', source: 'api', count: 4, failed: 0, unmatched: 0 },
+  { id: 'sr_3', at: ago(2, 3), kind: 'referral', source: 'api', count: 3, failed: 1, failReason: '推荐人手机号在客户库中不存在', unmatched: 1 },
+  { id: 'sr_4', at: ago(7), kind: 'purchase', source: 'csv', count: 18, failed: 0, unmatched: 2 },
+]
+
+export const CUSTOM_FIELDS: CustomField[] = [
+  { id: 'cf_risk', name: '风险等级', type: 'select', options: ['保守型', '稳健型', '平衡型', '进取型'] },
+  { id: 'cf_open', name: '开户日期', type: 'date' },
+  { id: 'cf_aum', name: '资产规模（万美元）', type: 'number' },
+]
+
+export const AUTOMATION_RULES: AutomationRule[] = [
+  { id: 'ar_1', name: '入金后挂「认证投资者」', trigger: '购买记录同步', condition: '单笔金额 ≥ 10,000 美元', action: '挂头衔：认证投资者', enabled: true, runs: 14, lastRunAt: ago(0, 3) },
+  { id: 'ar_2', name: '30 天没聊过打「需回访」', trigger: '每日 10:00', condition: '最近消息距今 ≥ 30 天且已入金', action: '打内部标签：需回访', enabled: false, runs: 0, lastRunAt: null },
+  { id: 'ar_3', name: '会员到期前两周提醒顾问', trigger: '每日 10:00', condition: '头衔 = 私享会员 且 到期日 ≤ 14 天', action: '给主归属坐席的实操员工发提醒', enabled: true, runs: 3, lastRunAt: ago(1, 2) },
+]
+
+// ---------- 日报 ----------
+
+export const DAILY_REPORT: DailyReportSettings = {
+  recipients: [
+    { id: 'rr_1', name: '周敏', staffId: 'st_admin', channels: ['app', 'feishu'] },
+    { id: 'rr_2', name: '李总（经营者）', channels: ['wecom'] },
+  ],
+  sendTime: '08:30',
+  thresholds: { medianMinutes: 10, waitingOverMinutes: 60, idleDays: 14 },
+}
+
+function buildDailyReportRecords(): DailyReportRecord[] {
+  const list: DailyReportRecord[] = []
+  for (let d = 1; d <= 30; d += 1) {
+    const ms = agoMs(d)
+    const failed = d === 9
+    list.push({
+      id: aid('dr'),
+      date: dateStr(ms),
+      sentTo: failed ? ['周敏'] : ['周敏', '李总（经营者）'],
+      status: failed ? 'failed' : 'sent',
+      summary: failed ? '企微机器人 webhook 超时，已重试 3 次' : `客户 ${36 + between(-3, 3)} 位 · 7 日活跃 ${between(14, 24)} · 首响中位 ${between(3, 14)} 分钟 · AI 采纳 ${between(55, 80)}%`,
+    })
+  }
+  return list
+}
+
+// ---------- 插件与开放 API（P1） ----------
+
+export const PLUGINS: Plugin[] = [
+  {
+    id: 'pl_crm',
+    name: 'CRM 同步',
+    version: '1.2.0',
+    desc: '把客户、内部标签与购买记录同步到企业 CRM',
+    enabled: true,
+    fields: [
+      { key: 'crm_url', label: 'CRM 地址', type: 'text' },
+      { key: 'token', label: 'API Token', type: 'secret' },
+      { key: 'interval', label: '同步频率', type: 'select', options: ['5 分钟', '30 分钟', '每小时'] },
+      { key: 'sync_tags', label: '同步内部标签', type: 'switch' },
+    ],
+    config: { crm_url: 'https://crm.hxwm.example/api', token: '', interval: '30 分钟', sync_tags: true },
+  },
+  {
+    id: 'pl_sig',
+    name: '合规签名',
+    version: '0.9.1',
+    desc: '坐席发出的每条消息自动附一行合规声明',
+    enabled: false,
+    fields: [
+      { key: 'text', label: '声明文字', type: 'text' },
+      { key: 'only_dm', label: '仅私聊附加', type: 'switch' },
+    ],
+    config: { text: '以上内容不构成投资建议，投资有风险。', only_dm: true },
+  },
+  {
+    id: 'pl_translate',
+    name: '消息翻译',
+    version: '2.0.3',
+    desc: '客户发英文时给坐席显示中文译文',
+    enabled: true,
+    fields: [
+      { key: 'provider', label: '翻译服务', type: 'select', options: ['DeepL', 'Google', '内置'] },
+      { key: 'key', label: '服务密钥', type: 'secret' },
+    ],
+    config: { provider: 'DeepL', key: '' },
+  },
+]
+
+export const API_KEYS: ApiKey[] = [
+  { id: 'ak_1', name: 'CRM 对接', prefix: 'yk_live_8a3f2c91', scopes: ['read_customers', 'write_customers', 'read_stats'], createdAt: ago(80), lastUsedAt: ago(0, 0, 12) },
+  { id: 'ak_2', name: '数据仓库拉取', prefix: 'yk_live_4d7e1b02', scopes: ['read_customers', 'read_messages', 'read_stats'], createdAt: ago(35), lastUsedAt: ago(1, 2) },
+]
+
+export const WEBHOOKS: Webhook[] = [
+  { id: 'wh_1', name: 'CRM 客户同步', url: 'https://crm.hxwm.example/hooks/yolink', secretConfigured: true, events: ['user_registered', 'title_assigned', 'purchase_synced'], enabled: true, lastTriggeredAt: ago(0, 0, 40) },
+  { id: 'wh_2', name: '数据仓库消息流', url: 'https://dw.hxwm.example/ingest/messages', secretConfigured: true, events: ['message_created', 'conversation_created'], enabled: false, lastTriggeredAt: ago(6) },
+]
+
+function buildWebhookLogs(): WebhookLog[] {
+  const list: WebhookLog[] = []
+  const events: Webhook['events'] = ['user_registered', 'title_assigned', 'purchase_synced']
+  for (let i = 0; i < 12; i += 1) {
+    const fail = i === 2 || i === 7
+    list.push({ id: aid('wl'), webhookId: 'wh_1', at: iso(agoMs(0, i * 2, between(0, 59))), event: events[i % events.length], httpStatus: fail ? (i === 2 ? 500 : 502) : 200, ms: fail ? between(3000, 8000) : between(80, 420), retries: fail ? 3 : 0 })
+  }
+  for (let i = 0; i < 4; i += 1) {
+    list.push({ id: aid('wl'), webhookId: 'wh_2', at: iso(agoMs(6, i * 3)), event: 'message_created', httpStatus: 200, ms: between(60, 200), retries: 0 })
+  }
+  return list.sort((a, b) => b.at.localeCompare(a.at))
+}
+
+// ---------- 系统 ----------
+
+export const APP_VERSIONS: AppVersion[] = [
+  { platform: 'android', latest: '1.4.2', downloadUrl: 'https://dl.hxwm.example/app/android/1.4.2.apk', notes: '新增头衔展示；修复群消息偶发不同步', minVersion: '1.3.0' },
+  { platform: 'ios', latest: '1.4.2', downloadUrl: 'https://apps.apple.com/app/id0000000000', notes: '新增头衔展示；修复群消息偶发不同步', minVersion: '1.3.0' },
+  { platform: 'windows', latest: '1.2.0', downloadUrl: 'https://dl.hxwm.example/workbench/1.2.0.exe', notes: '工作台：AI 回复推荐、快捷回复搜索', minVersion: '1.1.0' },
+]
+
+export const LICENSE: License = {
+  version: 'v1.0.3',
+  instanceId: '6f1c2a3e-9b4d-4c8e-a1f2-7d5e8b9c0a11',
+  type: 'private',
+  expiresAt: iso(agoMs(-200)),
+  modules: [
+    { key: 'customers', name: '客户管理', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-200)) },
+    { key: 'invite', name: '邀请与分配', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-200)) },
+    { key: 'broadcast', name: '群发', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-200)) },
+    { key: 'banner', name: '公告与横幅', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-200)) },
+    { key: 'content', name: '内容管控', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-200)) },
+    { key: 'ai', name: 'AI 模块', enabled: true, botLimit: 3, botUsed: 1, expiresAt: iso(agoMs(-200)) },
+    { key: 'wallet', name: '钱包', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-110)) },
+    { key: 'checkin', name: '签到', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-110)) },
+    { key: 'referral', name: '推荐奖励', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-110)) },
+  ],
+}
+
+export const BACKUPS: Backup[] = [
+  { id: 'bk_1', at: ago(0, 3), sizeMb: 412, status: 'done' },
+  { id: 'bk_2', at: ago(1, 3), sizeMb: 409, status: 'done' },
+  { id: 'bk_3', at: ago(2, 3), sizeMb: 405, status: 'done' },
+  { id: 'bk_4', at: ago(3, 3), sizeMb: 401, status: 'done' },
+  { id: 'bk_5', at: ago(7, 3), sizeMb: 388, status: 'done' },
+]
+
+export const HEALTH: HealthStatus = { db: 'ok', redis: 'ok', storage: 'ok', connections: 143, latencyMs: 38, checkedAt: ago(0, 0, 30) }
+
+export const SENSITIVE_WORDS: SensitiveWord[] = [
+  { id: 'sw_1', word: '保本', action: 'block' },
+  { id: 'sw_2', word: '稳赚', action: 'block' },
+  { id: 'sw_3', word: '内幕', action: 'replace', replaceWith: '***' },
+  { id: 'sw_4', word: '代客理财', action: 'log' },
+  { id: 'sw_5', word: '转到我个人账户', action: 'block' },
+]
+
+function buildDailyStats(customers: Customer[]): DailyStat[] {
+  const list: DailyStat[] = []
+  for (let d = 30; d >= 1; d -= 1) {
+    const ms = agoMs(d)
+    const date = dateStr(ms)
+    const registrations = customers.filter((c) => c.registeredAt.slice(0, 10) === date).length + (chance(0.3) ? between(0, 2) : 0)
+    const dau = between(9, 26)
+    const messages = between(40, 170)
+    list.push({ date, registrations, dau, messages, senders: Math.min(dau, between(6, 18)), pushes: between(20, 90) })
+  }
+  return list
+}
+
+// ---------- 依赖客户/消息的部分 ----------
+
+export interface AdminSeedContext {
+  customers: Customer[]
+  conversations: Conversation[]
+  messages: Message[]
+}
+
+export function buildAdminSeed(ctx: AdminSeedContext) {
+  rand = mulberry32(20260916)
+  seq = 0
+  const { customers, conversations, messages } = ctx
+  const funded = customers.filter((c) => c.purchases.length > 0)
+  const community = conversations.find((c) => c.kind === 'group' && c.chatGroupId === 'cg_community')
+  const communityMsgs = messages.filter((m) => m.convId === community?.id && m.senderKind === 'customer')
+
+  // 用户级覆盖（P1）：一个客户放开建群，一个坐席收紧转发
+  const policyOverrides: PolicyOverride[] = [
+    { id: aid('po'), targetKind: 'customer', targetId: funded[0]?.id ?? customers[0].id, caps: { 'group.create': true, 'group.invite': true }, byStaffId: 'st_admin', createdAt: ago(12) },
+    { id: aid('po'), targetKind: 'seat', targetId: 'seat_notice', caps: { 'message.forward': false }, byStaffId: 'st_admin', createdAt: ago(25) },
+  ]
+
+  // 举报（P1）
+  const reports: Report[] = [
+    { id: aid('rp'), at: ago(0, 4), reporterCustomerId: customers[3].id, targetKind: 'message', targetCustomerId: communityMsgs[0]?.senderId ?? customers[5].id, messageId: communityMsgs[0]?.id, reason: '疑似广告，反复发第三方理财链接', status: 'pending' },
+    { id: aid('rp'), at: ago(1, 2), reporterCustomerId: customers[8].id, targetKind: 'user', targetCustomerId: customers[12].id, reason: '私聊骚扰，要求加微信', status: 'pending' },
+    { id: aid('rp'), at: ago(6), reporterCustomerId: customers[2].id, targetKind: 'message', targetCustomerId: communityMsgs[1]?.senderId ?? customers[6].id, messageId: communityMsgs[1]?.id, reason: '言论不当', status: 'handled', resolution: 'ignored', handledBy: 'st_zhao', handledAt: ago(5, 20) },
+  ]
+
+  // 敏感词命中（P1）
+  const sensitiveHits: SensitiveHit[] = [
+    { id: aid('sh'), at: ago(0, 6), customerId: customers[4].id, convId: community?.id ?? '', word: '保本', original: '有没有保本的产品推荐一下', result: 'blocked' },
+    { id: aid('sh'), at: ago(1, 5), customerId: customers[9].id, convId: community?.id ?? '', word: '内幕', original: '听说有内幕消息，下周要涨', result: 'replaced' },
+    { id: aid('sh'), at: ago(3, 1), customerId: customers[14].id, convId: community?.id ?? '', word: '代客理财', original: '能不能帮我代客理财，我不想自己操作', result: 'logged' },
+    { id: aid('sh'), at: ago(8, 9), customerId: customers[1].id, convId: community?.id ?? '', word: '稳赚', original: '这个组合是不是稳赚的', result: 'blocked' },
+  ]
+
+  // 安全日志（P1）
+  const securityEvents: SecurityEvent[] = [
+    { id: aid('se'), at: ago(0, 2), who: `客户 ${customers[7].nickname}（${customers[7].accountId}）`, ip: '203.0.113.42', type: 'policy_denied', detail: '尝试创建群，策略 group.create 对客户关闭' },
+    { id: aid('se'), at: ago(0, 9), who: '员工 wangfang', ip: '198.51.100.8', type: 'abnormal_login', detail: '连续 5 次密码错误，账号锁定 15 分钟' },
+    { id: aid('se'), at: ago(2, 4), who: `客户 ${customers[11].nickname}（${customers[11].accountId}）`, ip: '203.0.113.77', type: 'device', detail: '同一设备指纹登录 3 个不同客户账号' },
+    { id: aid('se'), at: ago(4, 1), who: '员工 linwei', ip: '192.0.2.190', type: 'abnormal_login', detail: '异地登录：上次在香港，本次在新加坡' },
+    { id: aid('se'), at: ago(9, 6), who: `客户 ${customers[16].nickname}（${customers[16].accountId}）`, ip: '203.0.113.10', type: 'policy_denied', detail: '尝试退出官方群「恒信财富社群」，策略 group.leave 对客户关闭' },
+  ]
+
+  // 签到记录：近 20 天，约 15 位客户
+  const checkinRecords: CheckinRecord[] = []
+  const walletTxs: WalletTx[] = []
+  const balance: Record<string, number> = {}
+  const push = (customerId: string, type: WalletTx['type'], amount: number, at: string, note: string) => {
+    balance[customerId] = (balance[customerId] ?? 0) + amount
+    walletTxs.push({ id: aid('wt'), at, customerId, type, amount, balanceAfter: balance[customerId], note })
+  }
+  const checkers = customers.filter((_, i) => i % 3 !== 1).slice(0, 15)
+  checkers.forEach((c) => {
+    let streak = 0
+    for (let d = 20; d >= 0; d -= 1) {
+      if (!chance(0.7)) {
+        streak = 0
+        continue
+      }
+      streak += 1
+      const day = ((streak - 1) % 7) + 1
+      const reward = CHECKIN_RULES.cycle[day - 1]
+      const at = iso(agoMs(d, between(0, 14), between(0, 59)))
+      checkinRecords.push({ id: aid('ck'), at, customerId: c.id, day, reward })
+      push(c.id, 'checkin_reward', reward, at, `第 ${day} 天签到`)
+    }
+  })
+  // 推荐奖励：有推荐人的客户，给推荐人发奖
+  customers
+    .filter((c) => c.referrerId)
+    .forEach((c) => {
+      const at = iso(new Date(c.registeredAt).getTime() + DAY)
+      push(c.referrerId!, 'referral_reward', REFERRAL_RULES.referrerReward, at, `推荐 ${c.nickname} 完成首次签到`)
+      push(c.id, 'referral_reward', REFERRAL_RULES.newcomerReward, at, '新人奖励')
+    })
+  // 手动加减
+  if (funded[1]) push(funded[1].id, 'admin_adjust', 1000, ago(4, 2), '线下策略会到场补偿（周敏）')
+  // 提现
+  const withdrawals: Withdrawal[] = []
+  const rich = Object.entries(balance)
+    .filter(([, v]) => v >= 300)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+  rich.forEach(([cid], i) => {
+    const pts = Math.min(balance[cid], 10000)
+    const at = iso(agoMs(i * 2, 3))
+    const status: Withdrawal['status'] = i === 0 ? 'pending' : i === 1 ? 'pending' : i === 2 ? 'approved' : 'paid'
+    withdrawals.push({ id: aid('wd'), at, customerId: cid, points: pts, status, account: { 银行名称: '汇丰银行', 户名: customers.find((c) => c.id === cid)?.nickname ?? '', 账号: `HK${between(100000000, 999999999)}`, SWIFT: 'HSBCHKHH' } })
+    push(cid, 'withdraw_freeze', -pts, at, `提现申请冻结 ${pts} 积分`)
+  })
+  walletTxs.sort((a, b) => b.at.localeCompare(a.at))
+
+  const referralAnomalies: ReferralAnomaly[] = [
+    { id: aid('ra'), customerId: customers[11].id, type: 'same_device', relatedIds: [customers[21]?.id, customers[29]?.id].filter(Boolean), cancelled: false },
+    { id: aid('ra'), customerId: customers[18].id, type: 'burst_register', relatedIds: [customers[19]?.id, customers[20]?.id, customers[22]?.id].filter(Boolean), cancelled: true },
+  ]
+
+  return {
+    seatGroups: SEAT_GROUPS,
+    policyItems: POLICY_ITEMS,
+    policyPresets: POLICY_PRESETS,
+    activePresetId: 'preset_cs',
+    policyMatrix: POLICY_PRESETS[0].matrix,
+    policyNumbers: POLICY_NUMBERS,
+    policyOverrides,
+    policyChanges: POLICY_CHANGES,
+    reports,
+    sensitiveWords: SENSITIVE_WORDS,
+    sensitiveHits,
+    securityEvents,
+    walletSettings: WALLET_SETTINGS,
+    payoutFields: PAYOUT_FIELDS,
+    walletTxs,
+    withdrawals,
+    checkinRules: CHECKIN_RULES,
+    checkinRecords,
+    referralRules: REFERRAL_RULES,
+    referralAnomalies,
+    banners: BANNERS,
+    announcements: ANNOUNCEMENTS,
+    aiSettings: AI_SETTINGS,
+    profileSync: PROFILE_SYNC,
+    syncRecords: SYNC_RECORDS,
+    customFields: CUSTOM_FIELDS,
+    automationRules: AUTOMATION_RULES,
+    dailyReport: DAILY_REPORT,
+    dailyReportRecords: buildDailyReportRecords(),
+    plugins: PLUGINS,
+    apiKeys: API_KEYS,
+    webhooks: WEBHOOKS,
+    webhookLogs: buildWebhookLogs(),
+    appVersions: APP_VERSIONS,
+    license: LICENSE,
+    backups: BACKUPS,
+    health: HEALTH,
+    dailyStats: buildDailyStats(customers),
+  }
+}
