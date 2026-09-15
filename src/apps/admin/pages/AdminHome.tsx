@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fmtAgo } from '@/domain/time'
 import { useStore } from '@/store/store'
@@ -7,13 +8,14 @@ import { Card, Note, PageHeader, Stat } from '@/ui/display'
 /** 需要管理员动手的事，从各模块汇总到首页 */
 function useTodos() {
   const s = useStore()
-  const licenseDays = Math.ceil((new Date(s.license.expiresAt).getTime() - Date.now()) / 86400000)
+  const [now] = useState(Date.now)
+  const licenseDays = Math.ceil((new Date(s.license.expiresAt).getTime() - now) / 86400000)
   const items = [
     { n: s.reports.filter((r) => r.status === 'pending').length, label: '待处理举报', to: '/admin/reports' },
     { n: s.withdrawals.filter((w) => w.status === 'pending' || w.status === 'approved').length, label: '待审核 / 待打款提现', to: '/admin/wallet' },
     { n: s.seats.filter((x) => x.status !== 'disabled' && !x.operatorStaffId).length, label: '无人实操的坐席', to: '/admin/seats' },
     { n: s.seats.filter((x) => x.status === 'paused').length, label: '暂停接新的坐席', to: '/admin/seats' },
-    { n: s.webhookLogs.filter((l) => l.httpStatus >= 400 && Date.now() - new Date(l.at).getTime() < 86400000).length, label: '24 小时内 Webhook 失败', to: '/admin/webhooks' },
+    { n: s.webhookLogs.filter((l) => l.httpStatus >= 400 && now - new Date(l.at).getTime() < 86400000).length, label: '24 小时内 Webhook 失败', to: '/admin/webhooks' },
     { n: licenseDays <= 30 ? 1 : 0, label: `许可 ${licenseDays} 天后到期`, to: '/admin/license' },
     { n: s.botRuns.filter((r) => r.status === 'pending_review').length, label: '群活跃助手待审发言', to: '/admin/ai' },
     { n: s.broadcasts.filter((b) => b.status === 'scheduled').length, label: '待发送的定时群发', to: '/admin/broadcasts' },

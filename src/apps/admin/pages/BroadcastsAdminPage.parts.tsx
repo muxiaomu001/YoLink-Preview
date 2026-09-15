@@ -11,7 +11,8 @@ import { friendsOfSeat, seatById, staffById } from '@/store/selectors'
 import { Button, Field, Input, Select, Textarea } from '@/ui/primitives'
 import { KV, SeatAvatar, Table } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
-import { CONTENT_KIND_LABEL, ContentKindPill, MediaPreview, PREVIEW_LEN, StatusPill, TARGET_LABEL } from '@/apps/workbench/pages/BroadcastPage.parts'
+import { ContentKindPill, MediaPreview, StatusPill } from '@/apps/workbench/pages/BroadcastPage.parts'
+import { CONTENT_KIND_LABEL, PREVIEW_LEN, TARGET_LABEL } from '@/apps/workbench/pages/BroadcastPage.shared'
 
 type SendMode = 'now' | 'scheduled'
 
@@ -110,6 +111,7 @@ export function BroadcastAdminDetailModal({ s, b, onClose }: { s: DemoState; b: 
 
 /** 新建群发：选坐席 → 目标固定全部好友 → 名称与文本 → 立即 / 定时 */
 export function BroadcastCreateModal({ s, onClose }: { s: DemoStore; onClose: () => void }) {
+  const [openedAt] = useState(Date.now)
   const seats = useMemo(() => s.seats.filter((x) => x.status !== 'disabled'), [s.seats])
   const [seatId, setSeatId] = useState(seats[0]?.id ?? '')
   const [name, setName] = useState('')
@@ -121,11 +123,12 @@ export function BroadcastCreateModal({ s, onClose }: { s: DemoStore; onClose: ()
   const friends = useMemo(() => (seatId ? friendsOfSeat(s, seatId) : []), [s, seatId])
   const operatorId = s.session.adminStaffId
   const perStaff = s.enterprise.broadcastPerStaffPerDay
-  const scheduleOk = mode === 'now' || (!!scheduledAt && new Date(scheduledAt).getTime() > Date.now())
+  const scheduleOk = mode === 'now' || (!!scheduledAt && new Date(scheduledAt).getTime() > openedAt)
   const error = !operatorId ? '后台未登录管理员' : !seat ? '选一个发送坐席' : friends.length === 0 ? '该坐席还没有好友' : !name.trim() ? '填任务名称' : !text.trim() ? '填内容' : !scheduleOk ? '定时时间要晚于现在' : ''
 
   const submit = () => {
     if (error || !seat || !operatorId) return
+    if (mode === 'scheduled' && new Date(scheduledAt).getTime() <= Date.now()) return toast('定时时间要晚于现在', 'warn')
     const r = s.sendBroadcast({
       name: name.trim(),
       seatId: seat.id,

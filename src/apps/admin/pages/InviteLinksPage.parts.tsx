@@ -9,12 +9,7 @@ import { staffById } from '@/store/selectors'
 import { Button, Field, Input, Select } from '@/ui/primitives'
 import { Avatar, KV, Note, Pill, Table, TitleChip } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
-
-const LINK_HOST = 'https://hxwm.example/i/'
-
-export function linkUrl(code: string): string {
-  return `${LINK_HOST}${code}`
-}
+import { linkUrl } from './InviteLinksPage.shared'
 
 const STATUS_LABEL: Record<InviteLinkStatus, string> = { active: '有效', expired: '已过期', revoked: '已失效' }
 

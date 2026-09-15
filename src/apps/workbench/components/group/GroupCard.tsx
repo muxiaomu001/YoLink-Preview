@@ -13,7 +13,8 @@ import { GroupMembers } from './GroupMembers'
 import { GroupPinned } from './GroupPinned'
 import { GroupSettingsPanel } from './GroupSettingsPanel'
 import { GroupSummary } from './GroupSummary'
-import { PERM_META, type GroupPanelProps } from './shared'
+import { PERM_META } from './groupRules'
+import type { GroupPanelProps } from './shared'
 
 export interface GroupCardProps extends GroupPanelProps {
   /** 官方群标记能不能改：员工角色 manage_groups 或管理后台 */

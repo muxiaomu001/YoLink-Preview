@@ -13,7 +13,8 @@ import { Avatar, Card, Note, Pill, SeatAvatar, Table, Tabs, TagChip, TitleChip }
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { useWorkbench } from '../useWorkbench'
-import { BulkGroupModal, BulkTagModal, EMPTY_FILTER, FilterPanel, SortHeader, advancedFilterCount, applyFilter, exportCustomersCsv, isFilterActive, sortCustomers, type CustomerFilter, type SortState } from './CustomersPage.parts'
+import { BulkGroupModal, BulkTagModal, FilterPanel, SortHeader } from './CustomersPage.parts'
+import { EMPTY_FILTER, advancedFilterCount, applyFilter, exportCustomersCsv, isFilterActive, sortCustomers, type CustomerFilter, type SortState } from './CustomersPage.shared'
 
 export function CustomersPage() {
   const { s, staff, seat, can } = useWorkbench()

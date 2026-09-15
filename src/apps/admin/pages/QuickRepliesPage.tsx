@@ -11,7 +11,8 @@ import { Button, Input, Select, Switch } from '@/ui/primitives'
 import { Card, PageHeader, Stat, Table } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
-import { CAT_ALL, CAT_NONE, CategoryEditor, CategorySidebar, KIND_LABEL, KindCell, QuickReplyEditor, confirmDeleteCategory } from './QuickRepliesPage.parts'
+import { CategoryEditor, CategorySidebar, KindCell, QuickReplyEditor } from './QuickRepliesPage.parts'
+import { CAT_ALL, CAT_NONE, KIND_LABEL, confirmDeleteCategory } from './QuickRepliesPage.shared'
 
 type KindFilter = 'all' | QuickReplyKind
 

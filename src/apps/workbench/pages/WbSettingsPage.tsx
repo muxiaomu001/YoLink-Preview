@@ -1,7 +1,7 @@
 /**
  * 工作台设置页：个人设置、快捷键、我的欢迎语（坐席属性）、我的话术、我持有的坐席、企业设置入口（仅有 manage_settings 的角色可见）。
  */
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ExternalLink } from 'lucide-react'
 import { Button, Field, Textarea } from '@/ui/primitives'
@@ -13,8 +13,6 @@ import { MyQuickRepliesCard, PrefsCard, ShortcutsCard } from './WbSettingsPage.p
 
 export function WbSettingsPage() {
   const { s, staff, seat, mySeats, can } = useWorkbench()
-  const [welcome, setWelcome] = useState(seat?.welcome ?? '')
-  useEffect(() => setWelcome(seat?.welcome ?? ''), [seat?.id, seat?.welcome])
   const role = s.roles.find((r) => r.id === staff?.roleId)
   return (
     <div className="thin-scroll h-full overflow-y-auto p-5">
@@ -22,32 +20,7 @@ export function WbSettingsPage() {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-4">
           <PrefsCard />
-          <Card
-            title={
-              <span className="inline-flex items-center gap-1.5">
-                「{seat?.displayName ?? '-'}」的欢迎语
-                <HelpTip text="欢迎语是坐席的属性：交接后跟着坐席走，不跟人走。客户添加该坐席后立即以坐席身份发出；留空用企业默认。" />
-              </span>
-            }
-          >
-            <Field label="模板" hint="支持 {{customer.nickname}}、{{seat.name}}">
-              <Textarea rows={4} value={welcome} disabled={!seat} onChange={(e) => setWelcome(e.target.value)} placeholder={s.enterprise.defaultWelcome} />
-            </Field>
-            <div className="mt-2 flex items-center justify-between">
-              <span className="text-[11px] text-zinc-400">企业默认：{s.enterprise.defaultWelcome.slice(0, 40)}…</span>
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={!seat || welcome === (seat?.welcome ?? '')}
-                onClick={() => {
-                  if (seat) s.updateSeatWelcome(seat.id, welcome)
-                  toast(welcome.trim() ? '已保存坐席欢迎语' : '已清空，改用企业默认欢迎语')
-                }}
-              >
-                保存
-              </Button>
-            </div>
-          </Card>
+          <WelcomeSettingsCard key={seat?.id ?? 'no-seat'} />
           <ShortcutsCard />
         </div>
         <div className="space-y-4">
@@ -76,5 +49,39 @@ export function WbSettingsPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+function WelcomeSettingsCard() {
+  const { s, seat } = useWorkbench()
+  const [welcome, setWelcome] = useState(seat?.welcome ?? '')
+
+  return (
+    <Card
+      title={
+        <span className="inline-flex items-center gap-1.5">
+          「{seat?.displayName ?? '-'}」的欢迎语
+          <HelpTip text="欢迎语是坐席的属性：交接后跟着坐席走，不跟人走。客户添加该坐席后立即以坐席身份发出；留空用企业默认。" />
+        </span>
+      }
+    >
+      <Field label="模板" hint="支持 {{customer.nickname}}、{{seat.name}}">
+        <Textarea rows={4} value={welcome} disabled={!seat} onChange={(e) => setWelcome(e.target.value)} placeholder={s.enterprise.defaultWelcome} />
+      </Field>
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[11px] text-zinc-400">企业默认：{s.enterprise.defaultWelcome.slice(0, 40)}…</span>
+        <Button
+          variant="primary"
+          size="sm"
+          disabled={!seat || welcome === (seat?.welcome ?? '')}
+          onClick={() => {
+            if (seat) s.updateSeatWelcome(seat.id, welcome)
+            toast(welcome.trim() ? '已保存坐席欢迎语' : '已清空，改用企业默认欢迎语')
+          }}
+        >
+          保存
+        </Button>
+      </div>
+    </Card>
   )
 }

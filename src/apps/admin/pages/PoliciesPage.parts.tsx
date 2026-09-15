@@ -8,23 +8,10 @@ import type { ModuleKey, PolicyCol, PolicyItem, PolicyMatrix, PolicyPreset } fro
 import { POLICY_COLS } from '@/domain/seed-admin'
 import { MODULE_LABEL } from '@/domain/labels'
 import { useStore } from '@/store/store'
-import type { CapResult } from '@/store/policy'
 import { Button, Switch } from '@/ui/primitives'
 import { Pill } from '@/ui/display'
 import { Modal } from '@/ui/overlay'
-
-/** resolveCap 的 source → 给人看的文字 */
-export const SOURCE_LABEL: Record<CapResult['source'], string> = {
-  default: '企业默认',
-  group: '群级覆盖',
-  user: '用户级覆盖',
-  module_off: '模块停用',
-  official_group: '官方群',
-  unknown: '未登记',
-}
-
-/** 分组锚点 id */
-export const groupAnchorId = (group: string) => `policy-group-${group.replace(/[^\w一-龥]/g, '-')}`
+import { groupAnchorId } from './PoliciesPage.shared'
 
 interface MatrixTableProps {
   items: PolicyItem[]

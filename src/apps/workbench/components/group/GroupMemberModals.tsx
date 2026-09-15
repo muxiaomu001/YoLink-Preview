@@ -7,7 +7,8 @@ import type { Customer } from '@/domain/types'
 import { useStore } from '@/store/store'
 import { Button, Checkbox, Field, Select, Textarea } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
-import { RESTRICT_DURATIONS, type GroupPanelProps } from './shared'
+import { RESTRICT_DURATIONS } from './groupRules'
+import type { GroupPanelProps } from './shared'
 
 const REASON_MAX = 100
 

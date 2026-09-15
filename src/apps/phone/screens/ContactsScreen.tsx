@@ -7,7 +7,8 @@ import { useStore } from '@/store/store'
 import { seatsOfCustomer } from '@/store/selectors'
 import { customerCan } from '@/store/policy'
 import { SeatAvatar } from '@/ui/display'
-import { GroupAvatar, SectionLabel, TabTitle, groupKindLabel } from '../parts'
+import { GroupAvatar, SectionLabel, TabTitle } from '../parts'
+import { groupKindLabel } from '../shared'
 import { SocialSheet } from './SocialSheets'
 
 /** 关系链 5 项 */

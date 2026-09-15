@@ -7,7 +7,8 @@ import { useStore } from '@/store/store'
 import { senderName, visibleText } from '@/store/policy'
 import { Button } from '@/ui/primitives'
 import { toast } from '@/ui/overlay'
-import { jumpToMessage, Section, type GroupPanelProps } from './shared'
+import { jumpToMessage } from './groupRules'
+import { Section, type GroupPanelProps } from './shared'
 
 export function GroupPinned({ group: g, actor, perm, compact }: GroupPanelProps) {
   const s = useStore()

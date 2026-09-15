@@ -14,7 +14,8 @@ import { HelpTip } from '@/ui/help'
 import { toast } from '@/ui/overlay'
 import { FileCard, ImageThumb, readFileAsMedia } from '@/ui/media'
 import { useWorkbench } from '../useWorkbench'
-import { BroadcastDetailModal, BroadcastRecords, DELIVERY_RULES, QuickReplyPickerModal, TARGET_LABEL, renderVars } from './BroadcastPage.parts'
+import { BroadcastDetailModal, BroadcastRecords, QuickReplyPickerModal } from './BroadcastPage.parts'
+import { DELIVERY_RULES, TARGET_LABEL, renderVars } from './BroadcastPage.shared'
 
 type ContentKind = Broadcast['contentKind']
 type SendMode = 'now' | 'scheduled'
@@ -23,6 +24,7 @@ const TARGET_KINDS: BroadcastTargetKind[] = ['friends', 'mine', 'tag', 'purchase
 const AI_SAMPLE = '各位好，本周观点已整理：美元短端仍有吸引力，港股科技反弹属修复，黄金维持区间配置。周五晚 8 点线上复盘，欢迎参加。\n\n以上仅为信息分享，不构成投资建议。'
 
 export function BroadcastPage() {
+  const [openedAt] = useState(Date.now)
   const { s, staff, seat, can } = useWorkbench()
   const [params] = useSearchParams()
   const paramTarget = params.get('target')
@@ -100,7 +102,7 @@ export function BroadcastPage() {
               ? `角色 = ${role || '未选'}`
               : `群「${group?.name ?? '未选'}」`
   const targetOk = targetKind === 'group' ? !!group : targets.length > 0 && (targetKind !== 'tag' || tagIds.length > 0) && (targetKind !== 'role' || !!role)
-  const scheduleOk = mode === 'now' || (!!scheduledAt && new Date(scheduledAt).getTime() > Date.now())
+  const scheduleOk = mode === 'now' || (!!scheduledAt && new Date(scheduledAt).getTime() > openedAt)
   const needMedia = contentKind !== 'text'
   const contentOk = needMedia ? !!media : !!text.trim()
   const canSend = !overLimit && !!name.trim() && contentOk && targetOk && scheduleOk
@@ -143,6 +145,7 @@ export function BroadcastPage() {
 
   const send = () => {
     if (!seat || !staff || !canSend) return
+    if (mode === 'scheduled' && new Date(scheduledAt).getTime() <= Date.now()) return toast('定时时间要晚于现在', 'warn')
     const r = s.sendBroadcast({ name: name.trim(), seatId: seat.id, operatorId: staff.id, targetKind, targetDesc, contentKind, media: needMedia ? media : undefined, text: text.trim(), customerIds: targets.map((c) => c.id), chatGroupId: targetKind === 'group' ? groupId : undefined, scheduledAt: mode === 'scheduled' ? new Date(scheduledAt).toISOString() : null })
     if (!r) return toast(`超过频控：每个实操员工每天 ${perStaff} 个任务，明天再发`, 'warn')
     if (mode === 'scheduled') toast('已创建定时任务，到点按当时人群发送', 'info')

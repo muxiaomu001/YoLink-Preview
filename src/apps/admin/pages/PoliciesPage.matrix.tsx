@@ -7,7 +7,8 @@ import { useStore } from '@/store/store'
 import { Input } from '@/ui/primitives'
 import { Card, Note } from '@/ui/display'
 import { toast } from '@/ui/overlay'
-import { MatrixTable, groupAnchorId } from './PoliciesPage.parts'
+import { MatrixTable } from './PoliciesPage.parts'
+import { groupAnchorId } from './PoliciesPage.shared'
 import { EffectPreview } from './PoliciesPage.preview'
 
 export function MatrixTab() {

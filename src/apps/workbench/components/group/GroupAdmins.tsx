@@ -11,7 +11,8 @@ import { Avatar, Pill, SeatAvatar } from '@/ui/display'
 import { Button, Select } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
 import { GroupAdminModal } from './GroupAdminModal'
-import { PERM_LABEL, Section, type GroupPanelProps } from './shared'
+import { PERM_LABEL } from './groupRules'
+import { Section, type GroupPanelProps } from './shared'
 
 type Target = { kind: GroupMemberKind; id: string; name: string }
 

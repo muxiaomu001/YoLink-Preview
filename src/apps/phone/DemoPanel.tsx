@@ -6,7 +6,7 @@ import { useStore } from '@/store/store'
 import { customerById } from '@/store/selectors'
 import { customerSnapshot, resolveCap } from '@/store/policy'
 import { Button, Select } from '@/ui/primitives'
-import { PHONE_SOURCE_LABEL } from './parts'
+import { PHONE_SOURCE_LABEL } from './shared'
 
 export function DemoPanel({ onSwitch }: { onSwitch: () => void }) {
   const s = useStore()

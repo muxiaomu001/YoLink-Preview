@@ -8,19 +8,12 @@ import type { Message } from '@/domain/types'
 import { fmtTime } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { customerById, seatById } from '@/store/selectors'
-import { botById, senderName, visibleText } from '@/store/policy'
+import { botById, senderName } from '@/store/policy'
 import { Avatar, SeatAvatar, TitleChip } from '@/ui/display'
 import { FileCard, ImageThumb } from '@/ui/media'
 import { Button, Input } from '@/ui/primitives'
 import { toast } from '@/ui/overlay'
-
-/** 客户视角的一行预览：会话列表、引用条、置顶条、回复条共用；图片 / 文件消息显示占位 */
-export function customerPreview(m: Message): string {
-  if (m.recalledAt || m.deletedAt) return visibleText(m, 'customer')
-  if (m.kind === 'image') return m.text ? `[图片] ${m.text}` : '[图片]'
-  if (m.kind === 'file') return `[文件] ${m.media?.name ?? m.text}`
-  return visibleText(m, 'customer')
-}
+import { customerPreview } from './ChatScreen.shared'
 
 /** 引用条：被引用消息的发送者与内容 */
 export function QuoteBar({ m, mine }: { m: Message | undefined; mine: boolean }) {

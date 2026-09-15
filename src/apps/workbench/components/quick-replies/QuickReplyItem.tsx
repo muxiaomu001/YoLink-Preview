@@ -14,7 +14,8 @@ import type { QuickReply } from '@/domain/types'
 import type { QuickReplySnippet } from '@/store/selectors'
 import { FileCard, ImageThumb, showImage } from '@/ui/media'
 import { toast } from '@/ui/overlay'
-import { Highlight, KIND_META, previewLine } from './shared'
+import { KIND_META, previewLine } from './quickReplyRules'
+import { Highlight } from './shared'
 
 const THUMB_MAX_HEIGHT = 120
 

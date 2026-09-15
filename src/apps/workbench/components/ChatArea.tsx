@@ -11,10 +11,11 @@ import { seatCan, seatGroupPerm } from '@/store/policy'
 import { customerById, messagesOf, type ConvRow } from '@/store/selectors'
 import { toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
-import { AiPanel, ChatHeader, ForwardModal, MessageSearchBar, PinModal, PinnedBar, sendBlockReason } from './ChatArea.parts'
+import { AiPanel, ChatHeader, ForwardModal, MessageSearchBar, PinModal, PinnedBar } from './ChatArea.parts'
+import { sendBlockReason } from './ChatArea.shared'
 import { ChatInput } from './ChatInput'
 import { MessageItem } from './MessageItem'
-import { jumpToMessage } from './group/shared'
+import { jumpToMessage } from './group/groupRules'
 
 /** 右栏话术面板等外部入口能对当前会话做的三件事 */
 export interface ChatAreaHandle {

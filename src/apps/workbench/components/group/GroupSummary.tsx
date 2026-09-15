@@ -10,7 +10,7 @@ import { Avatar, Pill } from '@/ui/display'
 import { Button } from '@/ui/primitives'
 import type { GroupCardProps } from './GroupCard'
 import { GroupManageModal } from './GroupManageModal'
-import { GROUP_KIND_TEXT, memberTotal, PERM_META, SLOW_MODE_OPTIONS } from './shared'
+import { GROUP_KIND_TEXT, memberTotal, PERM_META, SLOW_MODE_OPTIONS } from './groupRules'
 
 const AVATAR_COLOR = { group: '#0f766e', channel: '#b45309' } as const
 

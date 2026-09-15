@@ -9,7 +9,8 @@ import { Card, Note, PageHeader, Pill, Table, type Column } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { AttachedActionsCell } from '@/apps/workbench/pages/InvitesPage.parts'
-import { InviteLinkCreateModal, InviteLinkDetailModal, StatusPill, linkUrl } from './InviteLinksPage.parts'
+import { InviteLinkCreateModal, InviteLinkDetailModal, StatusPill } from './InviteLinksPage.parts'
+import { linkUrl } from './InviteLinksPage.shared'
 
 export function InviteLinksPage() {
   const s = useStore()

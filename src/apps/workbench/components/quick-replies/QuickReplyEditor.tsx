@@ -11,7 +11,7 @@ import { Button, Field, Input, Select, Textarea } from '@/ui/primitives'
 import { FileCard, formatBytes, ImageThumb, readFileAsMedia, UPLOAD_MAX_BYTES } from '@/ui/media'
 import { Modal, toast } from '@/ui/overlay'
 import { useWorkbench } from '../../useWorkbench'
-import { KIND_META } from './shared'
+import { KIND_META } from './quickReplyRules'
 
 /** 分类下拉里「新建分类…」的占位值 */
 const NEW_CATEGORY = '__new__'

@@ -11,7 +11,8 @@ import { botById, customerCan, groupRoleOf, resolveCap } from '@/store/policy'
 import { Avatar, SeatAvatar, TitleChip } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
-import { DemoHint, GroupAvatar, PHONE_SOURCE_LABEL, ScreenHeader, SectionLabel, groupKindLabel } from '../parts'
+import { DemoHint, GroupAvatar, ScreenHeader, SectionLabel } from '../parts'
+import { PHONE_SOURCE_LABEL, groupKindLabel } from '../shared'
 
 const ROLE_LABEL = { owner: '群主', admin: '管理员', member: '', none: '' } as const
 

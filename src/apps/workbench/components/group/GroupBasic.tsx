@@ -11,7 +11,8 @@ import { seatById } from '@/store/selectors'
 import { Avatar, KV, Pill, SeatAvatar } from '@/ui/display'
 import { Button, Field, Input, Select, Textarea } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
-import { GROUP_KIND_TEXT, memberTotal, type GroupPanelProps } from './shared'
+import { GROUP_KIND_TEXT, memberTotal } from './groupRules'
+import type { GroupPanelProps } from './shared'
 
 const NAME_MAX = 128
 const DESC_MAX = 255

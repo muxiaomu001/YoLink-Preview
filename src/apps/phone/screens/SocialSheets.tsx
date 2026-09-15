@@ -7,16 +7,7 @@ import { useStore } from '@/store/store'
 import { Button, Input } from '@/ui/primitives'
 import { toast } from '@/ui/overlay'
 import { DemoHint, Sheet } from '../parts'
-
-export type SocialAction = 'group.create' | 'channel.create' | 'friend.add' | 'friend.search_user' | 'group.join_by_link'
-
-export const SOCIAL_ACTIONS: { key: SocialAction; label: string }[] = [
-  { key: 'group.create', label: '发起群聊' },
-  { key: 'channel.create', label: '创建频道' },
-  { key: 'friend.add', label: '添加好友' },
-  { key: 'friend.search_user', label: '搜索用户' },
-  { key: 'group.join_by_link', label: '扫码 / 链接入群' },
-]
+import type { SocialAction } from './SocialSheets.shared'
 
 export function SocialSheet({ action, onClose }: { action: SocialAction; onClose: () => void }) {
   if (action === 'group.create' || action === 'channel.create') return <CreateSheet kind={action === 'group.create' ? '群聊' : '频道'} onClose={onClose} />

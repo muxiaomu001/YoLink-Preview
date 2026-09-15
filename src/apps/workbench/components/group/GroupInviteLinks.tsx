@@ -11,7 +11,8 @@ import { Pill } from '@/ui/display'
 import { Button, Field, Input, Select } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
-import { copyText, GROUP_LINK_BASE, LINK_EXPIRY_OPTIONS, Section, type GroupPanelProps } from './shared'
+import { copyText, GROUP_LINK_BASE, LINK_EXPIRY_OPTIONS } from './groupRules'
+import { Section, type GroupPanelProps } from './shared'
 
 const MAX_USES_LIMIT = 99999
 

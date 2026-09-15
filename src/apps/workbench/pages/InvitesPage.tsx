@@ -11,7 +11,8 @@ import { HelpTip } from '@/ui/help'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { useWorkbench } from '../useWorkbench'
-import { AttachedActionsCell, InviteCreateModal, LINK_HOST, effectiveStatus } from './InvitesPage.parts'
+import { AttachedActionsCell, InviteCreateModal } from './InvitesPage.parts'
+import { LINK_HOST, effectiveStatus } from './InvitesPage.shared'
 
 function StatusPill({ l }: { l: InviteLink }) {
   const st = effectiveStatus(l)

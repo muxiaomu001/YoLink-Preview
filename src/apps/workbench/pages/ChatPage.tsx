@@ -13,13 +13,14 @@ import { Empty } from '@/ui/display'
 import { useWorkbench } from '../useWorkbench'
 import { useLocalPref } from '../useLocalPref'
 import { ChatArea, type ChatAreaHandle } from '../components/ChatArea'
-import { sendBlockReason } from '../components/ChatArea.parts'
+import { sendBlockReason } from '../components/ChatArea.shared'
 import { CustomerCard } from '../components/CustomerCard'
 import { GroupCard } from '../components/group/GroupCard'
 import { ResizeHandle } from '../components/layout/ResizeHandle'
 import { QuickReplyPanel } from '../components/quick-replies/QuickReplyPanel'
 import type { QuickReplyTarget } from '../components/quick-replies/shared'
-import { activeFilterCount, applyFilters, ContextMenu, ConvItem, EMPTY_FILTERS, FilterBar, VIEWS, type Filters } from './ChatPage.parts'
+import { ContextMenu, ConvItem, FilterBar } from './ChatPage.parts'
+import { activeFilterCount, applyFilters, EMPTY_FILTERS, VIEWS, type Filters } from './ChatPage.shared'
 
 const LEFT = { def: 320, min: 260, max: 420 }
 const RIGHT = { def: 380, min: 300, max: 480 }

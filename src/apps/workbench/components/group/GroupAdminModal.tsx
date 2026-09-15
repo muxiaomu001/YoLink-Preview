@@ -7,7 +7,8 @@ import type { GroupAdminPerm, GroupMemberKind } from '@/domain/types'
 import { useStore } from '@/store/store'
 import { Button, Checkbox } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
-import { PERM_META, type GroupPanelProps } from './shared'
+import { PERM_META } from './groupRules'
+import type { GroupPanelProps } from './shared'
 
 const MAX_ADMINS = 50
 

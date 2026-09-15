@@ -26,7 +26,8 @@ const ACTION_LABEL: Record<string, string> = {
 export function GroupLogPanel({ group: g, compact }: GroupPanelProps) {
   const s = useStore()
   const [action, setAction] = useState('all')
-  const since = new Date(Date.now() - RETENTION_HOURS * 3600000).toISOString()
+  const [openedAt] = useState(Date.now)
+  const since = new Date(openedAt - RETENTION_HOURS * 3600000).toISOString()
   const logs = useMemo(() => s.groupLogs.filter((l) => l.groupId === g.id && l.at >= since).sort((a, b) => b.at.localeCompare(a.at)), [s.groupLogs, g.id, since])
   const kinds = Array.from(new Set(logs.map((l) => l.action)))
   const visible = logs.filter((l) => action === 'all' || l.action === action)

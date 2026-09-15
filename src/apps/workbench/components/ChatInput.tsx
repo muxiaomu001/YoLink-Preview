@@ -19,7 +19,8 @@ import { readFileAsMedia } from '@/ui/media'
 import { toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
 import { CandidatePopover, type CandidateBase } from './quick-replies/CandidatePopover'
-import { categoryName, Highlight, KIND_META, previewLine } from './quick-replies/shared'
+import { categoryName, KIND_META, previewLine } from './quick-replies/quickReplyRules'
+import { Highlight } from './quick-replies/shared'
 
 const MENTION_ALL = '所有人'
 const MAX_CANDIDATES = 8

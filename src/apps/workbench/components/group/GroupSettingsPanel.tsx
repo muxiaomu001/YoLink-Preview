@@ -8,7 +8,8 @@ import { Select, Switch } from '@/ui/primitives'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { useStore } from '@/store/store'
-import { Section, SLOW_MODE_OPTIONS, type GroupPanelProps } from './shared'
+import { SLOW_MODE_OPTIONS } from './groupRules'
+import { Section, type GroupPanelProps } from './shared'
 
 export function GroupSettingsPanel({ group: g, actor, perm, compact, officialEditable }: GroupPanelProps & { officialEditable: boolean }) {
   const s = useStore()

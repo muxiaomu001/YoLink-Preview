@@ -8,8 +8,7 @@ import { Button, Field, Input, Select, Textarea } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, SeatAvatar, Table, type Column } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
-
-export const GROUP_KIND_LABEL: Record<ChatGroupKind, string> = { group: '群', channel: '频道' }
+import { GROUP_KIND_LABEL } from './ChatGroupsPage.shared'
 
 type KindFilter = 'all' | ChatGroupKind
 

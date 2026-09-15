@@ -9,8 +9,9 @@ import { customerCan, senderName } from '@/store/policy'
 import { fmtRelative } from '@/domain/time'
 import { SeatAvatar } from '@/ui/display'
 import { GroupAvatar, TabTitle } from '../parts'
-import { customerPreview } from './ChatScreen.parts'
-import { SOCIAL_ACTIONS, SocialSheet, type SocialAction } from './SocialSheets'
+import { customerPreview } from './ChatScreen.shared'
+import { SocialSheet } from './SocialSheets'
+import { SOCIAL_ACTIONS, type SocialAction } from './SocialSheets.shared'
 
 export function ChatsScreen({ customerId, onOpen }: { customerId: string; onOpen: (id: string) => void }) {
   const s = useStore()

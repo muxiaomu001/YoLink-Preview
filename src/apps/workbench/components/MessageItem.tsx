@@ -2,6 +2,7 @@
  * 单条消息：系统消息灰色居中；文本 URL 自动成链接；图片消息显示缩略图（点开大图）、文件消息显示文件卡，说明文字在下方；
  * 引用条可跳转；撤回 / 删除用占位；机器人、群发、转发、AI 草稿、欢迎语小标；悬停操作按权限显示（引用、撤回、删除、转发、复制、置顶）。
  */
+import { useState } from 'react'
 import { clsx } from 'clsx'
 import { Bot, Copy, Forward, Pin, Reply, Trash2, Undo2 } from 'lucide-react'
 import type { ChatGroup, Message, Seat } from '@/domain/types'
@@ -13,7 +14,7 @@ import { FileCard, ImageThumb } from '@/ui/media'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { useWorkbench } from '../useWorkbench'
-import { copyText, jumpToMessage } from './group/shared'
+import { copyText, jumpToMessage } from './group/groupRules'
 
 const URL_RE = /(https?:\/\/[^\s]+)/g
 
@@ -54,6 +55,7 @@ export function MessageItem({
   onPin: (m: Message) => void
 }) {
   const { s, staff, can } = useWorkbench()
+  const [renderedAt] = useState(Date.now)
   const isGroup = !!group
   const mine = m.senderKind === 'seat' && m.seatId === seat.id
   const gone = !!m.recalledAt || !!m.deletedAt
@@ -69,7 +71,7 @@ export function MessageItem({
 
   // 操作权限
   const recallLimit = s.policyNumbers.recallSeconds
-  const recallExpired = Date.now() - new Date(m.at).getTime() > recallLimit * 1000
+  const recallExpired = renderedAt - new Date(m.at).getTime() > recallLimit * 1000
   const showRecall = mine && !gone
   const showDelete = !gone && (isGroup ? !mine && seatGroupPerm(s, group, seat.id, staff?.id ?? null, 'can_delete_messages') : m.senderKind === 'customer' && (can('view_audit') || can('manage_groups')))
   const showForward = !gone && seatCan(s, seat.id, isGroup ? 'group.forward' : 'dm.forward', group?.id)
@@ -77,7 +79,7 @@ export function MessageItem({
 
   const recall = async () => {
     if (!staff) return
-    if (recallExpired) return toast(`超过 ${recallLimit} 秒，不能撤回`, 'warn')
+    if (Date.now() - new Date(m.at).getTime() > recallLimit * 1000) return toast(`超过 ${recallLimit} 秒，不能撤回`, 'warn')
     const ok = await confirm({ title: '撤回这条消息？', body: `撤回后客户端显示「消息已撤回」，审计仍可查原文。时限 ${recallLimit} 秒。`, okText: '撤回' })
     if (!ok) return
     toast(s.recallMessage(m.id, staff.id) ? '已撤回' : `超过 ${recallLimit} 秒，撤回失败`, 'info')

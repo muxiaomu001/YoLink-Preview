@@ -18,7 +18,8 @@ import { useWorkbench } from '../../useWorkbench'
 import { useLocalPref } from '../../useLocalPref'
 import { QuickReplyEditor } from './QuickReplyEditor'
 import { QuickReplyImageCell, QuickReplyItem } from './QuickReplyItem'
-import { buildQuickReplyTabs, categoryName, quickRepliesInTab, TAB_ALL, TAB_RECENT, type QuickReplyTab, type QuickReplyTarget } from './shared'
+import { buildQuickReplyTabs, categoryName, quickRepliesInTab, TAB_ALL, TAB_RECENT, type QuickReplyTab } from './quickReplyRules'
+import type { QuickReplyTarget } from './shared'
 
 const SEARCH_LIMIT = 50
 const NO_CONVERSATION = '先选一条会话'

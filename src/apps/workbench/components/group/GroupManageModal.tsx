@@ -16,7 +16,8 @@ import { GroupLogPanel } from './GroupLogPanel'
 import { GroupMembers } from './GroupMembers'
 import { GroupPinned } from './GroupPinned'
 import { GroupSettingsPanel } from './GroupSettingsPanel'
-import { PERM_META, type GroupPanelProps } from './shared'
+import { PERM_META } from './groupRules'
+import type { GroupPanelProps } from './shared'
 
 type TabKey = 'basic' | 'announcement' | 'pinned' | 'settings' | 'members' | 'admins' | 'links' | 'logs'
 type PermFn = (p: GroupAdminPerm) => boolean

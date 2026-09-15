@@ -9,15 +9,10 @@ import { useStore } from '@/store/store'
 import { Button, Field, Input, Select, Textarea } from '@/ui/primitives'
 import { Pill } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
-import { confirm } from '@/ui/confirm'
 import { FileCard, ImageThumb, UPLOAD_MAX_BYTES, formatBytes, readFileAsMedia } from '@/ui/media'
+import { CAT_ALL, CAT_NONE, KIND_LABEL } from './QuickRepliesPage.shared'
 
-export const KIND_LABEL: Record<QuickReplyKind, string> = { text: '文字', image: '图片', file: '文件' }
 const KINDS: QuickReplyKind[] = ['text', 'image', 'file']
-
-/** 固定的两个分类筛选项 */
-export const CAT_ALL = 'all'
-export const CAT_NONE = 'none'
 
 /** 表格「类型」列：文字用 Pill，图片 40px 缩略图，文件用文件图标 */
 export function KindCell({ q }: { q: QuickReply }) {
@@ -124,11 +119,6 @@ export function CategoryEditor({ cat, onClose }: { cat?: QuickReplyCategory; onC
       {error && <div className="mt-1 text-[11px] text-red-600">{error}</div>}
     </Modal>
   )
-}
-
-/** 删除分类的确认：其下话术转未分类 */
-export async function confirmDeleteCategory(cat: QuickReplyCategory, count: number): Promise<boolean> {
-  return confirm({ title: `删除分类「${cat.name}」？`, body: `分类下的 ${count} 条话术不会删除，会转为「未分类」。`, okText: '删除', danger: true })
 }
 
 // ---------- 话术编辑弹窗 ----------

@@ -15,7 +15,8 @@ import { Modal, toast } from '@/ui/overlay'
 import { GroupAdminModal } from './GroupAdminModal'
 import { GroupBulkAddModal } from './GroupBulkAdd'
 import { KickModal, RestrictModal } from './GroupMemberModals'
-import { isRestrictionActive, PERM_LABEL, restrictionLabel, Section, type GroupPanelProps } from './shared'
+import { isRestrictionActive, PERM_LABEL, restrictionLabel } from './groupRules'
+import { Section, type GroupPanelProps } from './shared'
 
 const PAGE = 50
 

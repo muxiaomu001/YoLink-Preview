@@ -4,31 +4,16 @@
  * 另有工作台的生成链接弹窗。
  */
 import { useState } from 'react'
-import type { ChatGroup, DemoState, InviteLink } from '@/domain/types'
+import type { DemoState, InviteLink } from '@/domain/types'
 import { fmtDate } from '@/domain/time'
 import { Button, Checkbox, Field, Input, Select } from '@/ui/primitives'
 import { Pill } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
-
-export type AttachLayer = 'enterprise' | 'group' | 'link'
+import { LINK_HOST, MAX_USES_LIMIT, attachedGroups, type AttachLayer } from './InvitesPage.shared'
 
 const LAYER_LABEL: Record<AttachLayer, string> = { enterprise: '企业默认', group: '组', link: '本链接' }
 const LAYER_TONE: Record<AttachLayer, 'blue' | 'purple' | 'green'> = { enterprise: 'blue', group: 'purple', link: 'green' }
-
-export const LINK_HOST = 'https://hxwm.example/i/'
-export const MAX_USES_LIMIT = 99999
-
-/** 一条链接注册后会进哪些群：去重后每个群只标最外层来源 */
-export function attachedGroups(s: DemoState, link: Pick<InviteLink, 'inviteGroupId' | 'chatGroupIds'>): { group: ChatGroup; layer: AttachLayer }[] {
-  const ig = s.inviteGroups.find((g) => g.id === link.inviteGroupId)
-  const layers: [string, AttachLayer][] = [...s.enterprise.defaultChatGroupIds.map((id): [string, AttachLayer] => [id, 'enterprise']), ...(ig?.chatGroupIds ?? []).map((id): [string, AttachLayer] => [id, 'group']), ...link.chatGroupIds.map((id): [string, AttachLayer] => [id, 'link'])]
-  const seen = new Set<string>()
-  return layers
-    .filter(([id]) => (seen.has(id) ? false : (seen.add(id), true)))
-    .map(([id, layer]) => ({ group: s.chatGroups.find((g) => g.id === id), layer }))
-    .filter((x): x is { group: ChatGroup; layer: AttachLayer } => !!x.group)
-}
 
 export function AttachedActionsCell({ s, link }: { s: DemoState; link: Pick<InviteLink, 'inviteGroupId' | 'chatGroupIds'> }) {
   const list = attachedGroups(s, link)
@@ -45,14 +30,6 @@ export function AttachedActionsCell({ s, link }: { s: DemoState; link: Pick<Invi
       ))}
     </div>
   )
-}
-
-/** 链接状态：存的是 active 但已过期 / 用满时按实际算 */
-export function effectiveStatus(l: InviteLink): InviteLink['status'] | 'exhausted' {
-  if (l.status !== 'active') return l.status
-  if (l.expiresAt && l.expiresAt < new Date().toISOString()) return 'expired'
-  if (l.maxUses != null && l.uses >= l.maxUses) return 'exhausted'
-  return 'active'
 }
 
 const EXPIRE_OPTIONS = [

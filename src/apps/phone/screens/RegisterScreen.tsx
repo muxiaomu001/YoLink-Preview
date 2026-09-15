@@ -7,7 +7,8 @@ import { useStore } from '@/store/store'
 import { seatById } from '@/store/selectors'
 import { SeatAvatar } from '@/ui/display'
 import { Button, Input } from '@/ui/primitives'
-import { GroupAvatar, groupKindLabel } from '../parts'
+import { GroupAvatar } from '../parts'
+import { groupKindLabel } from '../shared'
 
 export interface JustAdded {
   seatIds: string[]

@@ -10,7 +10,7 @@ import { activeCustomers } from '@/store/selectors'
 import { resolveCap, type CapResult } from '@/store/policy'
 import { Field, Select } from '@/ui/primitives'
 import { Card, Note, Pill } from '@/ui/display'
-import { SOURCE_LABEL } from './PoliciesPage.parts'
+import { SOURCE_LABEL } from './PoliciesPage.shared'
 
 const SOURCE_TONE: Record<CapResult['source'], 'zinc' | 'green' | 'amber' | 'red' | 'blue' | 'purple'> = {
   default: 'zinc',
