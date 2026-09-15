@@ -1,5 +1,5 @@
 /**
- * 话术库页（管理后台）的零件：分类栏、分类编辑弹窗、话术新建 / 编辑弹窗、类型单元格、关键词解析。
+ * 话术库页（管理后台）的零件：分类栏、分类编辑弹窗、话术新建 / 编辑弹窗、类型单元格。
  */
 import { useRef, useState } from 'react'
 import { clsx } from 'clsx'
@@ -18,11 +18,6 @@ const KINDS: QuickReplyKind[] = ['text', 'image', 'file']
 /** 固定的两个分类筛选项 */
 export const CAT_ALL = 'all'
 export const CAT_NONE = 'none'
-
-/** 关键词输入：逗号（中英文）或空白分隔，去重去空 */
-export function parseKeywords(raw: string): string[] {
-  return Array.from(new Set(raw.split(/[,，\s]+/).map((k) => k.trim()).filter(Boolean)))
-}
 
 /** 表格「类型」列：文字用 Pill，图片 40px 缩略图，文件用文件图标 */
 export function KindCell({ q }: { q: QuickReply }) {
@@ -144,12 +139,10 @@ export function QuickReplyEditor({ item, cats, defaultCategoryId, onClose }: { i
   const [kind, setKind] = useState<QuickReplyKind>(item?.kind ?? 'text')
   const [title, setTitle] = useState(item?.title ?? '')
   const [categoryId, setCategoryId] = useState<string>(item?.categoryId ?? defaultCategoryId ?? '')
-  const [keywordsRaw, setKeywordsRaw] = useState(item?.keywords.join(', ') ?? '')
   const [text, setText] = useState(item?.text ?? '')
   const [media, setMedia] = useState<MessageMedia | undefined>(item?.media)
   const [reading, setReading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-  const keywords = parseKeywords(keywordsRaw)
 
   const needMedia = kind !== 'text'
   const reason = !title.trim() ? '填标题' : kind === 'text' && !text.trim() ? '填正文' : needMedia && !media ? (kind === 'image' ? '选一张图片' : '选一个文件') : ''
@@ -166,7 +159,7 @@ export function QuickReplyEditor({ item, cats, defaultCategoryId, onClose }: { i
 
   const submit = () => {
     if (reason) return
-    const r = s.saveQuickReply('enterprise', { id: item?.id, categoryId: categoryId || null, kind, title, text, keywords, media: needMedia ? media : undefined }, admin)
+    const r = s.saveQuickReply('enterprise', { id: item?.id, categoryId: categoryId || null, kind, title, text, media: needMedia ? media : undefined }, admin)
     if (!r) return toast('标题和内容必填', 'warn')
     toast(item ? `话术「${r.title}」已保存` : `${KIND_LABEL[kind]}话术「${r.title}」已入库，员工在工作台立即可用`)
     onClose()
@@ -218,18 +211,7 @@ export function QuickReplyEditor({ item, cats, defaultCategoryId, onClose }: { i
         </div>
         <Field label="标题" required hint="员工在话术面板和自动匹配里看到的名字">
           <Input autoFocus value={title} maxLength={40} onChange={(e) => setTitle(e.target.value)} placeholder="如：开户材料" />
-        </Field>
-        <Field label="关键词" hint="逗号或空格分隔；员工打字满 2 个字时按标题、关键词、正文自动匹配">
-          <Input value={keywordsRaw} onChange={(e) => setKeywordsRaw(e.target.value)} placeholder="开户, 材料, 身份证" />
-          {keywords.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              {keywords.map((k) => (
-                <Pill key={k} tone="blue">
-                  {k}
-                </Pill>
-              ))}
-            </div>
-          )}
+          <div className="mt-1 text-[11px] text-zinc-400">标题和正文都会被搜索到，不用单独填关键词</div>
         </Field>
         {needMedia && (
           <Field label={kind === 'image' ? '图片' : '文件'} required hint={`本机选择，最大 ${formatBytes(UPLOAD_MAX_BYTES)}（演示存在浏览器里）`}>

@@ -1,5 +1,6 @@
 /**
- * 新建 / 编辑个人话术的弹窗：类型（文字 / 图片 / 文件，新建时选）、标题、分类（个人分类 + 新建分类）、关键词、附件（本机选文件）、正文 / 说明。
+ * 新建 / 编辑个人话术的弹窗：类型（文字 / 图片 / 文件，新建时选）、标题、分类（个人分类 + 新建分类）、附件（本机选文件）、正文 / 说明。
+ * 没有关键词字段：搜索走全文匹配，标题和正文都能被搜到。
  * 只管个人话术；企业话术在管理后台维护。父级用 key 区分新建与编辑，初始值在挂载时读一次。
  */
 import { useRef, useState } from 'react'
@@ -10,7 +11,7 @@ import { Button, Field, Input, Select, Textarea } from '@/ui/primitives'
 import { FileCard, formatBytes, ImageThumb, readFileAsMedia, UPLOAD_MAX_BYTES } from '@/ui/media'
 import { Modal, toast } from '@/ui/overlay'
 import { useWorkbench } from '../../useWorkbench'
-import { KIND_META, parseKeywords } from './shared'
+import { KIND_META } from './shared'
 
 /** 分类下拉里「新建分类…」的占位值 */
 const NEW_CATEGORY = '__new__'
@@ -21,7 +22,6 @@ interface Form {
   title: string
   categoryId: string
   newCategory: string
-  keywords: string
   text: string
   media?: MessageMedia
 }
@@ -32,7 +32,6 @@ function initForm(initial?: QuickReply): Form {
     title: initial?.title ?? '',
     categoryId: initial?.categoryId ?? '',
     newCategory: '',
-    keywords: initial?.keywords.join(', ') ?? '',
     text: initial?.text ?? '',
     media: initial?.media,
   }
@@ -62,7 +61,7 @@ export function QuickReplyEditor({ initial, onClose }: { initial?: QuickReply; o
     // 选了「新建分类…」先建分类再存话术
     const categoryId = form.categoryId === NEW_CATEGORY ? (s.saveQuickReplyCategory('personal', { name: form.newCategory }, staff.id)?.id ?? null) : form.categoryId || null
     if (form.categoryId === NEW_CATEGORY && !categoryId) return toast('新建分类失败：分类名不能为空', 'warn')
-    const saved = s.saveQuickReply('personal', { id: initial?.id, categoryId, kind: form.kind, title: form.title, text: form.text, keywords: parseKeywords(form.keywords), media: isText ? undefined : form.media }, staff.id)
+    const saved = s.saveQuickReply('personal', { id: initial?.id, categoryId, kind: form.kind, title: form.title, text: form.text, media: isText ? undefined : form.media }, staff.id)
     if (!saved) return toast('保存失败：请检查标题、正文或附件', 'warn')
     toast(initial ? '已更新话术' : '已新建个人话术')
     onClose()
@@ -104,6 +103,7 @@ export function QuickReplyEditor({ initial, onClose }: { initial?: QuickReply; o
         )}
         <Field label="标题" required hint="1 到 20 字，打字匹配时优先按标题命中">
           <Input value={form.title} maxLength={20} onChange={(e) => patch({ title: e.target.value })} placeholder={isText ? '如：约时间' : '如：开户流程图'} />
+          <div className="mt-1 text-[11px] text-zinc-400">标题和正文都会被搜索到，不用单独填关键词</div>
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="分类">
@@ -115,21 +115,12 @@ export function QuickReplyEditor({ initial, onClose }: { initial?: QuickReply; o
               <option value={NEW_CATEGORY}>新建分类…</option>
             </Select>
           </Field>
-          {form.categoryId === NEW_CATEGORY ? (
+          {form.categoryId === NEW_CATEGORY && (
             <Field label="新分类名" required>
               <Input value={form.newCategory} maxLength={12} autoFocus onChange={(e) => patch({ newCategory: e.target.value })} placeholder="如：日常跟进" />
             </Field>
-          ) : (
-            <Field label="关键词" hint="逗号或空格分隔">
-              <Input value={form.keywords} onChange={(e) => patch({ keywords: e.target.value })} placeholder="如：约, 时间, 电话" />
-            </Field>
           )}
         </div>
-        {form.categoryId === NEW_CATEGORY && (
-          <Field label="关键词" hint="逗号或空格分隔，打字时按这些词匹配">
-            <Input value={form.keywords} onChange={(e) => patch({ keywords: e.target.value })} placeholder="如：约, 时间, 电话" />
-          </Field>
-        )}
         {!isText && (
           <Field label={form.kind === 'image' ? '图片' : '文件'} required hint={`本机选择，演示上限 ${formatBytes(UPLOAD_MAX_BYTES)}`}>
             <input ref={fileInput} type="file" accept={form.kind === 'image' ? 'image/*' : undefined} className="hidden" onChange={(e) => void pickFile(e)} />

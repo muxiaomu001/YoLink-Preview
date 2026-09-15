@@ -40,7 +40,7 @@ import { dExtraActions, type DExtraActions } from './actions/D-extra'
 import { quickReplyActions, type QuickReplyActions } from './actions/quickReplies'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
-export const STORAGE_KEY = 'yolink-demo-v5'
+export const STORAGE_KEY = 'yolink-demo-v6'
 
 const now = () => iso(Date.now())
 

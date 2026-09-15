@@ -7,8 +7,9 @@ import type { ReactNode } from 'react'
 
 export interface CandidateBase {
   id: string
-  label: string
-  sub?: string
+  /** 允许传节点：全文匹配命中的那一段要加底色 */
+  label: ReactNode
+  sub?: ReactNode
   icon?: ReactNode
 }
 

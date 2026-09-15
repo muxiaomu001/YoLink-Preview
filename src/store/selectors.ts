@@ -267,28 +267,64 @@ export function recentQuickReplies(s: DemoState, staffId: string | null, limit =
     .slice(0, limit)
 }
 
+/** 命中的那一小段：候选行按它高亮，让人一眼看出这条为什么被匹配出来 */
+export interface QuickReplySnippet {
+  before: string
+  match: string
+  after: string
+}
+
 export interface QuickReplyMatch {
   item: QuickReply
-  /** 命中的位置：标题 > 关键词 > 正文 */
-  hit: 'title' | 'keyword' | 'text'
+  /** 命中的字段：标题 > 正文 > 附件文件名 */
+  hit: 'title' | 'text' | 'file'
   score: number
+  /** 命中字段里截出的一段（含高亮位置）；query 为空时没有 */
+  snippet: QuickReplySnippet | null
+}
+
+/** 正文命中时左右各留一点上下文，太长的两头加省略号 */
+const SNIPPET_BEFORE = 10
+const SNIPPET_AFTER = 26
+
+/** source 需已压过空白，index 是在 source 上的下标 */
+function cutSnippet(flat: string, index: number, length: number): QuickReplySnippet {
+  const head = Math.max(0, index - SNIPPET_BEFORE)
+  const tail = Math.min(flat.length, index + length + SNIPPET_AFTER)
+  return {
+    before: (head > 0 ? '…' : '') + flat.slice(head, index),
+    match: flat.slice(index, index + length),
+    after: flat.slice(index + length, tail) + (tail < flat.length ? '…' : ''),
+  }
 }
 
 /**
- * 关键词匹配：query 小写后逐项打分，标题命中 3 分、关键词 2 分、正文 1 分，同分按使用次数。
- * 打字自动匹配和 `/` 弹层共用；query 为空时返回最近使用 + 常用。
+ * 全文匹配（对齐易歪歪：不维护关键词表，输入什么就在整条话术里找什么）。
+ * 找的范围是 标题 3 分 > 正文 2 分 > 附件文件名 1 分，取第一个命中的字段，同分按使用次数。
+ * 打字自动匹配、`/` 弹层、面板搜索、群发选话术共用；query 为空时返回最近使用 + 常用。
  */
 export function matchQuickReplies(s: DemoState, staffId: string | null, query: string, limit = 6): QuickReplyMatch[] {
   const q = query.trim().toLowerCase()
   const pool = quickRepliesForStaff(s, staffId)
   if (!q) {
-    return [...pool].sort((a, b) => (b.lastUsedAt ?? '').localeCompare(a.lastUsedAt ?? '') || b.useCount - a.useCount).slice(0, limit).map((item) => ({ item, hit: 'title' as const, score: 0 }))
+    return [...pool]
+      .sort((a, b) => (b.lastUsedAt ?? '').localeCompare(a.lastUsedAt ?? '') || b.useCount - a.useCount)
+      .slice(0, limit)
+      .map((item) => ({ item, hit: 'title' as const, score: 0, snippet: null }))
   }
   const out: QuickReplyMatch[] = []
   pool.forEach((item) => {
-    if (item.title.toLowerCase().includes(q)) out.push({ item, hit: 'title', score: 3 })
-    else if (item.keywords.some((k) => k.toLowerCase().includes(q) || q.includes(k.toLowerCase()))) out.push({ item, hit: 'keyword', score: 2 })
-    else if (item.text.toLowerCase().includes(q)) out.push({ item, hit: 'text', score: 1 })
+    const fields: { hit: QuickReplyMatch['hit']; score: number; source: string }[] = [
+      { hit: 'title', score: 3, source: item.title.replace(/\s+/g, ' ') },
+      { hit: 'text', score: 2, source: item.text.replace(/\s+/g, ' ') },
+      { hit: 'file', score: 1, source: item.media?.name.replace(/\s+/g, ' ') ?? '' },
+    ]
+    for (const f of fields) {
+      const i = f.source.toLowerCase().indexOf(q)
+      if (i < 0) continue
+      out.push({ item, hit: f.hit, score: f.score, snippet: cutSnippet(f.source, i, q.length) })
+      break
+    }
   })
   return out.sort((a, b) => b.score - a.score || b.item.useCount - a.item.useCount).slice(0, limit)
 }

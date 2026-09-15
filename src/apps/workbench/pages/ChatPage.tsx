@@ -22,7 +22,7 @@ import type { QuickReplyTarget } from '../components/quick-replies/shared'
 import { activeFilterCount, applyFilters, ContextMenu, ConvItem, EMPTY_FILTERS, FilterBar, VIEWS, type Filters } from './ChatPage.parts'
 
 const LEFT = { def: 320, min: 260, max: 420 }
-const RIGHT = { def: 340, min: 300, max: 480 }
+const RIGHT = { def: 380, min: 300, max: 480 }
 
 type RightTab = 'profile' | 'quick'
 const RIGHT_TABS: { key: RightTab; label: string; icon: typeof UserRound; hint: string }[] = [

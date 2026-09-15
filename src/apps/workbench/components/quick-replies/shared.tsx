@@ -1,8 +1,10 @@
 /**
- * 话术库共用：类型元数据（图标 / 名称）、分类名、条目预览行、关键词解析、右栏面板的分组构造、面板与聊天区之间的发送接口。
+ * 话术库共用：类型元数据（图标 / 名称）、分类名、条目预览行、命中高亮、右栏分类标签列、面板与聊天区之间的发送接口。
+ * 没有关键词字段：搜索与打字匹配都走 selectors.matchQuickReplies 的全文匹配。
  */
-import { Image, Paperclip, Zap } from 'lucide-react'
+import { Clock, Image, LayoutGrid, Paperclip, Zap } from 'lucide-react'
 import type { DemoState, MessageMedia, QuickReply, QuickReplyKind } from '@/domain/types'
+import type { QuickReplySnippet } from '@/store/selectors'
 import { quickRepliesForStaff, quickReplyCategoriesForStaff, recentQuickReplies } from '@/store/selectors'
 
 export const KIND_META: Record<QuickReplyKind, { label: string; icon: typeof Zap }> = {
@@ -35,32 +37,55 @@ export function previewLine(q: QuickReply, max = 40): string {
   return q.media?.name ?? ''
 }
 
-/** 关键词输入：逗号 / 顿号 / 空格分隔，去重去空 */
-export function parseKeywords(raw: string): string[] {
-  return Array.from(new Set(raw.split(/[,，、\s]+/).map((k) => k.trim()).filter(Boolean)))
+/** 全文匹配命中的那一段加底色，让人知道这条为什么被搜出来 */
+export function Highlight({ snippet, fallback, className }: { snippet: QuickReplySnippet | null; fallback?: string; className?: string }) {
+  if (!snippet) return <span className={className}>{fallback ?? ''}</span>
+  return (
+    <span className={className}>
+      {snippet.before}
+      <mark className="rounded-[2px] bg-amber-100 px-px text-inherit">{snippet.match}</mark>
+      {snippet.after}
+    </span>
+  )
 }
 
-export interface QuickReplyGroup {
+// ---------- 右栏分类标签列 ----------
+
+/** 侧栏一个标签：最近 / 全部在最上，然后企业分类，再是「我的」下的个人分类，最后未分类 */
+export interface QuickReplyTab {
   key: string
   title: string
-  items: QuickReply[]
-  /** 个人分类归在「我的」小节下 */
-  section?: 'mine'
+  count: number
+  section: 'top' | 'enterprise' | 'mine' | 'other'
+  icon?: typeof Zap
 }
 
-/** 右栏面板分组：最近使用 → 企业分类（按 sortOrder）→ 我的（个人分类）→ 未分类（企业 + 个人） */
-export function buildQuickReplyGroups(s: DemoState, staffId: string | null): QuickReplyGroup[] {
+export const TAB_RECENT = 'recent'
+export const TAB_ALL = 'all'
+export const TAB_NONE = 'none'
+
+export function buildQuickReplyTabs(s: DemoState, staffId: string | null): QuickReplyTab[] {
   const all = quickRepliesForStaff(s, staffId)
   const cats = quickReplyCategoriesForStaff(s, staffId)
-  const recent = recentQuickReplies(s, staffId)
-  const byCat = (id: string) => all.filter((x) => x.categoryId === id)
-  const enterprise = cats.filter((c) => c.scope === 'enterprise').map((c) => ({ key: c.id, title: c.name, items: byCat(c.id) }))
-  const mine = cats.filter((c) => c.scope === 'personal').map((c) => ({ key: c.id, title: c.name, items: byCat(c.id), section: 'mine' as const }))
-  const none = all.filter((x) => x.categoryId === null || !cats.some((c) => c.id === x.categoryId))
+  const inCat = (id: string) => all.filter((x) => x.categoryId === id).length
+  const uncategorized = all.filter((x) => x.categoryId === null || !cats.some((c) => c.id === x.categoryId)).length
   return [
-    ...(recent.length ? [{ key: 'recent', title: '最近使用', items: recent }] : []),
-    ...enterprise,
-    ...mine,
-    ...(none.length ? [{ key: 'none', title: '未分类', items: none }] : []),
+    { key: TAB_RECENT, title: '最近', count: recentQuickReplies(s, staffId).length, section: 'top', icon: Clock },
+    { key: TAB_ALL, title: '全部', count: all.length, section: 'top', icon: LayoutGrid },
+    ...cats.filter((c) => c.scope === 'enterprise').map((c) => ({ key: c.id, title: c.name, count: inCat(c.id), section: 'enterprise' as const })),
+    ...cats.filter((c) => c.scope === 'personal').map((c) => ({ key: c.id, title: c.name, count: inCat(c.id), section: 'mine' as const })),
+    ...(uncategorized ? [{ key: TAB_NONE, title: '未分类', count: uncategorized, section: 'other' as const }] : []),
   ]
+}
+
+/** 某个标签下的话术 */
+export function quickRepliesInTab(s: DemoState, staffId: string | null, tabKey: string): QuickReply[] {
+  const all = quickRepliesForStaff(s, staffId)
+  if (tabKey === TAB_RECENT) return recentQuickReplies(s, staffId)
+  if (tabKey === TAB_ALL) return all
+  if (tabKey === TAB_NONE) {
+    const cats = quickReplyCategoriesForStaff(s, staffId)
+    return all.filter((x) => x.categoryId === null || !cats.some((c) => c.id === x.categoryId))
+  }
+  return all.filter((x) => x.categoryId === tabKey)
 }

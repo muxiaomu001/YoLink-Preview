@@ -3,8 +3,8 @@
  * 三种候选浮层共用 CandidatePopover：
  * - `@` 成员选择（坐席 + 客户成员 + 「所有人」按策略），Enter / Tab 插入
  * - `/` 话术（matchQuickReplies），Enter / Tab 选中：文字插入光标处，图片 / 文件直接发出
- * - 打字自动匹配（staff.prefs.quickMatch）：光标前最后一个词 ≥ 2 字就匹配；Tab / 点击选中，Enter 仍是发送，Esc 关闭后同一个词不再弹；
- *   选中文字话术用正文替换整个输入框
+ * - 打字自动匹配（staff.prefs.quickMatch）：光标前最后一段 ≥ 2 字就在全库找（标题 / 正文 / 文件名），长的先试、没结果再往短里退；
+ *   Tab / 点击选中，Enter 仍是发送，Esc 关闭后同一个词不再弹；选中文字话术用正文替换整个输入框
  * 变量 {{customer.nickname}} {{staff.name}} {{company.name}} 发送时替换；图片 / 文件按钮按策略 canMedia 显示，选本机文件后直接发出。
  */
 import { useMemo, useRef, useState } from 'react'
@@ -19,7 +19,7 @@ import { readFileAsMedia } from '@/ui/media'
 import { toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
 import { CandidatePopover, type CandidateBase } from './quick-replies/CandidatePopover'
-import { categoryName, KIND_META, previewLine } from './quick-replies/shared'
+import { categoryName, Highlight, KIND_META, previewLine } from './quick-replies/shared'
 
 const MENTION_ALL = '所有人'
 const MAX_CANDIDATES = 8
@@ -35,13 +35,20 @@ type Candidate = CandidateBase & { insert: string; qr?: QuickReply }
 const POP_TITLE: Record<PopKind, string> = {
   mention: '@ 提及成员 · ↑↓ 选择，Enter 插入',
   quick: '话术 · ↑↓ 选择，Enter 选中；图片 / 文件直接发出',
-  auto: '匹配到的话术 · Tab 选中，Esc 关闭',
+  auto: '匹配到的话术（标题 / 正文 / 文件名）· Tab 选中，Esc 关闭',
 }
 
 /** 光标前最后一个「词」：按空白切，取最后一段的末尾若干字 */
 function lastWord(before: string): string {
   const seg = before.split(/\s+/).pop() ?? ''
   return seg.slice(-AUTO_WORD_MAX)
+}
+
+/** 中文没有空格，整句都会被当成一个词；从长到短依次退，取第一个能搜到东西的后缀 */
+function suffixQueries(word: string): string[] {
+  const out: string[] = []
+  for (let n = word.length; n >= AUTO_MIN_CHARS; n -= 1) out.push(word.slice(-n))
+  return out
 }
 
 export function ChatInput({
@@ -95,9 +102,26 @@ export function ChatInput({
   const candidates: Candidate[] = useMemo(() => {
     if (!pop) return []
     if (pop.kind !== 'mention') {
-      return matchQuickReplies(s, staff?.id ?? null, pop.query, pop.kind === 'auto' ? AUTO_MAX : MAX_CANDIDATES).map(({ item }) => {
+      const staffId = staff?.id ?? null
+      const auto = pop.kind === 'auto'
+      const limit = auto ? AUTO_MAX : MAX_CANDIDATES
+      // 自动匹配时长后缀先试，没结果再退一个字；`/` 弹层直接用输入的词
+      const queries = auto ? suffixQueries(pop.query) : [pop.query]
+      // 一个都搜不到就不弹（`/` 弹层的空查询本身会返回最近使用，不受影响）
+      const hits = queries.map((q) => matchQuickReplies(s, staffId, q, limit)).find((r) => r.length > 0) ?? []
+      return hits.map(({ item, hit, snippet }) => {
         const Icon = KIND_META[item.kind].icon
-        return { id: item.id, label: item.title, insert: item.text, qr: item, icon: <Icon size={12} className="shrink-0 text-zinc-400" />, sub: `${categoryName(s, item.categoryId)} · ${previewLine(item)}` }
+        const cat = categoryName(s, item.categoryId)
+        const label = hit === 'title' && snippet ? <Highlight snippet={snippet} /> : item.title
+        const sub =
+          hit === 'title' || !snippet ? (
+            `${cat} · ${previewLine(item)}`
+          ) : (
+            <>
+              {cat} · <Highlight snippet={snippet} />
+            </>
+          )
+        return { id: item.id, label, insert: item.text, qr: item, icon: <Icon size={12} className="shrink-0 text-zinc-400" />, sub }
       })
     }
     const q = pop.query.toLowerCase()

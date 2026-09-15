@@ -118,7 +118,7 @@ export interface StaffPrefs {
   language: Language
   /** AI 推荐是否在客户来消息后自动弹出草稿；关时只能点输入栏的「AI 推荐」按钮 */
   aiSuggest: boolean
-  /** 打字时按关键词自动匹配话术并浮出候选；关了只能用 `/` 或话术面板 */
+  /** 打字时全文匹配话术并浮出候选（标题 / 正文 / 文件名）；关了只能用 `/` 或话术面板 */
   quickMatch: boolean
 }
 
@@ -651,7 +651,7 @@ export interface Broadcast {
   readCount: number
 }
 
-// ---------- 话术库（易歪歪式：分类 + 文字 / 图片 / 文件 + 关键词匹配） ----------
+// ---------- 话术库（易歪歪式：分类 + 文字 / 图片 / 文件 + 全文匹配，不设关键词字段） ----------
 
 export type QuickReplyScope = 'enterprise' | 'personal'
 export type QuickReplyKind = 'text' | 'image' | 'file'
@@ -668,7 +668,7 @@ export interface QuickReplyCategory {
 
 /**
  * 一条话术。文字话术 text 为正文（支持变量）；图片 / 文件话术 media 为附件，text 是随附说明（可空）。
- * keywords 用于打字自动匹配：标题、关键词、正文都参与，命中顺序 标题 > 关键词 > 正文。
+ * 打字自动匹配走全文：标题、正文、附件文件名都参与，命中顺序 标题 > 正文 > 文件名，不需要另外维护关键词。
  */
 export interface QuickReply {
   id: string
@@ -680,7 +680,6 @@ export interface QuickReply {
   kind: QuickReplyKind
   title: string
   text: string
-  keywords: string[]
   media?: MessageMedia
   /** 企业话术可停用：停用后工作台不可见，后台保留 */
   enabled: boolean

@@ -6,7 +6,9 @@ import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import type { Broadcast, BroadcastStatus, BroadcastTargetKind, MessageMedia, QuickReply } from '@/domain/types'
 import { fmtDateTime } from '@/domain/time'
-import { quickReplyCategoriesForStaff, quickRepliesForStaff, seatById, staffById } from '@/store/selectors'
+import { matchQuickReplies, quickReplyCategoriesForStaff, quickRepliesForStaff, seatById, staffById } from '@/store/selectors'
+import type { QuickReplyMatch, QuickReplySnippet } from '@/store/selectors'
+import { Highlight } from '@/apps/workbench/components/quick-replies/shared'
 import { Button, Input } from '@/ui/primitives'
 import { Empty, KV, Pill, Table } from '@/ui/display'
 import { Modal } from '@/ui/overlay'
@@ -147,44 +149,58 @@ export function BroadcastDetailModal({ b, onClose }: { b: Broadcast; onClose: ()
 
 const KIND_LABEL: Record<QuickReply['kind'], string> = { text: '文字', image: '图片', file: '文件' }
 
-/** 从话术库选一条作为群发内容：启用的企业话术 + 本人个人话术，按标题 / 关键词 / 正文搜索 */
+/** 选话术弹窗一次最多列多少条 */
+const PICKER_LIMIT = 200
+
+/** 标题命中才高亮标题；片段两头带省略号说明标题被截过，这时退回完整标题，免得标题看着缺一块 */
+function titleSnippetOf(m: QuickReplyMatch): QuickReplySnippet | null {
+  if (m.hit !== 'title' || !m.snippet) return null
+  return m.snippet.before.startsWith('…') || m.snippet.after.endsWith('…') ? null : m.snippet
+}
+
+/** 从话术库选一条作为群发内容：启用的企业话术 + 本人个人话术，全文搜索（标题 / 正文 / 附件文件名） */
 export function QuickReplyPickerModal({ onPick, onClose }: { onPick: (q: QuickReply) => void; onClose: () => void }) {
   const { s, staff } = useWorkbench()
   const [keyword, setKeyword] = useState('')
   const all = useMemo(() => quickRepliesForStaff(s, staff?.id ?? null), [s, staff])
   const cats = useMemo(() => quickReplyCategoriesForStaff(s, staff?.id ?? null), [s, staff])
   const catName = (q: QuickReply) => (q.categoryId ? (cats.find((c) => c.id === q.categoryId)?.name ?? '未分类') : '未分类')
-  const rows = useMemo(() => {
-    const kw = keyword.trim().toLowerCase()
-    const list = kw ? all.filter((q) => q.title.toLowerCase().includes(kw) || q.keywords.some((k) => k.toLowerCase().includes(kw)) || q.text.toLowerCase().includes(kw)) : all
-    return [...list].sort((a, b) => b.useCount - a.useCount)
-  }, [all, keyword])
+  const rows = useMemo<QuickReplyMatch[]>(() => {
+    const kw = keyword.trim()
+    // 没输关键词就按使用次数倒序列全部；输了就交给全文匹配，顺便拿到高亮片段
+    if (!kw) return [...all].sort((a, b) => b.useCount - a.useCount).map((item) => ({ item, hit: 'title' as const, score: 0, snippet: null }))
+    return matchQuickReplies(s, staff?.id ?? null, kw, PICKER_LIMIT)
+  }, [all, s, staff, keyword])
 
   return (
     <Modal open onClose={onClose} title="从话术库选" width={640} footer={<Button onClick={onClose}>取消</Button>}>
       <div className="relative mb-3">
         <Search size={13} className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-zinc-400" />
-        <Input autoFocus value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="搜标题 / 关键词 / 正文" className="pl-7" />
+        <Input autoFocus value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="搜标题 / 正文 / 文件名" className="pl-7" />
       </div>
       <div className="thin-scroll max-h-[420px] space-y-1 overflow-y-auto">
         {rows.length === 0 && <Empty text={all.length ? '没有匹配的话术' : '话术库是空的'} />}
-        {rows.map((q) => (
-          <button key={q.id} type="button" onClick={() => onPick(q)} className="flex w-full items-start gap-3 rounded-md border border-transparent px-2.5 py-2 text-left hover:border-zinc-200 hover:bg-zinc-50">
+        {rows.map((m) => (
+          <button key={m.item.id} type="button" onClick={() => onPick(m.item)} className="flex w-full items-start gap-3 rounded-md border border-transparent px-2.5 py-2 text-left hover:border-zinc-200 hover:bg-zinc-50">
             <span className="w-12 shrink-0">
-              {q.kind === 'image' && q.media ? (
-                <img src={q.media.url} alt={q.media.name} className="h-12 w-12 rounded-md border border-zinc-200 bg-white object-cover" />
+              {m.item.kind === 'image' && m.item.media ? (
+                <img src={m.item.media.url} alt={m.item.media.name} className="h-12 w-12 rounded-md border border-zinc-200 bg-white object-cover" />
               ) : (
-                <Pill tone={q.kind === 'file' ? 'purple' : 'zinc'}>{KIND_LABEL[q.kind]}</Pill>
+                <Pill tone={m.item.kind === 'file' ? 'purple' : 'zinc'}>{KIND_LABEL[m.item.kind]}</Pill>
               )}
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5 text-[13px] font-medium text-zinc-900">
-                {q.title}
+                <Highlight snippet={titleSnippetOf(m)} fallback={m.item.title} />
                 <span className="text-[11px] font-normal text-zinc-400">
-                  {q.scope === 'personal' ? '个人' : '企业'} · {catName(q)} · 用过 {q.useCount} 次
+                  {m.item.scope === 'personal' ? '个人' : '企业'} · {catName(m.item)} · 用过 {m.item.useCount} 次
                 </span>
               </span>
-              <span className="mt-0.5 block truncate text-[12px] text-zinc-500">{q.kind === 'text' ? q.text : `${q.media?.name ?? ''}${q.text ? ` · ${q.text}` : ''}`}</span>
+              <Highlight
+                snippet={m.hit === 'title' ? null : m.snippet}
+                fallback={m.item.kind === 'text' ? m.item.text : `${m.item.media?.name ?? ''}${m.item.text ? ` · ${m.item.text}` : ''}`}
+                className="mt-0.5 block truncate text-[12px] text-zinc-500"
+              />
             </span>
           </button>
         ))}

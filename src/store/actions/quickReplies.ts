@@ -12,7 +12,6 @@ export interface QuickReplyInput {
   kind: QuickReplyKind
   title: string
   text: string
-  keywords: string[]
   media?: MessageMedia
 }
 
@@ -36,7 +35,6 @@ function normalize(input: QuickReplyInput): QuickReplyInput {
     ...input,
     title: input.title.trim(),
     text: input.text.trim(),
-    keywords: Array.from(new Set(input.keywords.map((k) => k.trim()).filter(Boolean))),
   }
 }
 
@@ -53,7 +51,7 @@ export function quickReplyActions(set: Set, get: Get): QuickReplyActions {
       if (input.id) {
         const old = s.quickReplies.find((q) => q.id === input.id && q.scope === scope && (scope === 'enterprise' || q.staffId === byStaffId))
         if (!old) return null
-        const next: QuickReply = { ...old, categoryId: input.categoryId, kind: input.kind, title: input.title, text: input.text, keywords: input.keywords, media: input.kind === 'text' ? undefined : input.media }
+        const next: QuickReply = { ...old, categoryId: input.categoryId, kind: input.kind, title: input.title, text: input.text, media: input.kind === 'text' ? undefined : input.media }
         set({
           quickReplies: s.quickReplies.map((q) => (q.id === next.id ? next : q)),
           audit: withAudit(s.audit, auditType, `编辑${scope === 'enterprise' ? '企业' : '个人'}话术「${next.title}」`, byStaffId),
@@ -68,7 +66,6 @@ export function quickReplyActions(set: Set, get: Get): QuickReplyActions {
         kind: input.kind,
         title: input.title,
         text: input.text,
-        keywords: input.keywords,
         media: input.kind === 'text' ? undefined : input.media,
         enabled: true,
         useCount: 0,
