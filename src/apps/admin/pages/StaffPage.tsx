@@ -77,7 +77,7 @@ export function StaffPage() {
                     ))}
                   </div>
                 ) : (
-                  <span className="text-zinc-400">无（等待交接）</span>
+                  <span className="text-zinc-400">未持有坐席</span>
                 )
               },
             },
