@@ -68,10 +68,17 @@ export function actorCanView(s: DemoState, convId: string, actor: ChatActor) {
  * 消息对某个身份是否还存在。删除只有一套语义：
  * 为所有人删除的直接消失、不留占位，仅为本方删除的只在该身份隐藏；
  * 两种原文都保留在审计。气泡、回复、转发、搜索、未读、置顶、资料库共用这一个判断。
+ *
+ * 影子屏蔽也接在这一个判断上，不另起一套。会话列表的最后一条、未读数、@我提示、
+ * 回复与转发的目标全都走 messageVisibleFor，接在这里才没有漏网的入口——
+ * 少接一处，被屏蔽的那句话就会从会话列表的预览里冒出来，影子当场穿帮。
  */
 export function messageVisibleFor(s: DemoState, m: Message, actor: ChatActor) {
   const conv = s.conversations.find((c) => c.id === m.convId)
   if(m.recipientCustomerId && (actor.kind!=='customer'||actor.id!==m.recipientCustomerId))return false
+  // 影子屏蔽：发的人自己看得见（他不知道被屏蔽了），坐席看得见（要能判断这人在干什么），
+  // 其他客户看不见。私聊里没有「其他客户」，所以影子屏蔽实际只在群和频道里起作用。
+  if (m.shadowedAt && actor.kind === 'customer' && m.senderId !== actor.id) return false
   if (!conv || !actorCanView(s, conv.id, actor) || m.deletedAt) return false
   if (m.hiddenFor?.includes(actorKey(actor)) || m.at <= (conv.clearedThroughByViewer?.[actorKey(actor)] ?? '')) return false
   if (m.delivery && m.delivery !== 'sent') return m.senderKind === actor.kind && m.senderId === actor.id && (actor.kind !== 'seat' || m.operatorId === actor.staffId)

@@ -29,6 +29,8 @@ export interface WorkbenchActions {
   muteCustomerAll: (customerId: string, hours: number | null, byStaffId: string) => void
   /** 强制下线：撤销客户全部登录 session，账号不停用，可重新登录 */
   forceLogoutCustomer: (customerId: string, byStaffId: string) => void
+  /** 客户级影子模式：开了之后他发的每条群消息只有他自己和坐席看得见 */
+  setCustomerShadowMode: (customerId: string, on: boolean, reason: string, byStaffId: string) => void
   updateStaffPrefs: (staffId: string, patch: Partial<StaffPrefs>) => void
   // 客户手机端
   customerEditMessage: (messageId: string, text: string, customerId: string, expectedText: string) => string | null
@@ -152,6 +154,18 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
         return {
           customers: s.customers.map((x) => (x.id === customerId ? { ...x, sessionsRevokedAt: now() } : x)),
           audit: withAudit(s.audit, 'customer.force_logout', `强制下线客户「${c.nickname}」：撤销全部登录 session，账号未停用可重新登录`, byStaffId),
+        }
+      }),
+
+    setCustomerShadowMode: (customerId, on, reason, byStaffId) =>
+      set((s) => {
+        const c = s.customers.find((x) => x.id === customerId)
+        if (!c) return {}
+        return {
+          customers: s.customers.map((x) => (x.id === customerId ? { ...x, shadowModeAt: on ? now() : undefined, shadowModeReason: on ? reason.trim() || undefined : undefined } : x)),
+          // 已经发出去的不回溯：开影子模式之前那些话群里已经有人看过了，
+          // 这时候把它们抹掉，等于告诉所有人"这个人被处理了"，比不处理更显眼
+          audit: withAudit(s.audit, 'customer.shadow', on ? `开启客户「${c.nickname}」（${c.accountId}）的影子模式：此后他发的群消息只有他自己和坐席看得见，客户端无任何提示。原因：${reason.trim() || '未填写'}` : `关闭客户「${c.nickname}」（${c.accountId}）的影子模式，此后他的群消息恢复正常可见；影子期间发的那些消息仍然不对其他客户显示`, byStaffId),
         }
       }),
 

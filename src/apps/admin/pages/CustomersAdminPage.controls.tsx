@@ -1,18 +1,18 @@
 /**
- * 后台客户详情里的「账号管控」：重置密码、强制下线、拉黑 / 解除、全群禁言 / 解除。
+ * 后台客户详情里的「账号管控」：重置密码、强制下线、拉黑 / 解除、全群禁言 / 解除、影子模式。
  *
  * 这些动作原来只有工作台有，管理员要处理一个闹事的客户得先去工作台、还得是那个客户
  * 主归属坐席的实操员工才点得动。后台是管理员的地盘，不该绕这一圈。
  * 确认框与提示文案取自 domain/customerControl，和工作台是同一份，不会两边说法不一致。
  */
 import { useState } from 'react'
-import { Ban, KeyRound, LogOut, MicOff } from 'lucide-react'
+import { Ban, EyeOff, KeyRound, LogOut, MicOff } from 'lucide-react'
 import type { Customer } from '@/domain/types'
 import { CONTROL_COPY, MUTE_OPTIONS, muteLabel } from '@/domain/customerControl'
 import { isMutedNow } from '@/domain/customerStatus'
 import { fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
-import { Button } from '@/ui/primitives'
+import { Button, Field, Input } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 
@@ -33,9 +33,12 @@ export function CustomerControlSection({ c }: { c: Customer }) {
   const admin = s.session.adminStaffId!
   const [pwd, setPwd] = useState<string | null>(null)
   const [muting, setMuting] = useState(false)
+  const [shadowing, setShadowing] = useState(false)
+  const [shadowReason, setShadowReason] = useState('')
   const deleted = !!c.deletedAt
   const muted = isMutedNow(c)
   const blacklisted = !!c.blacklistedAt
+  const shadowed = !!c.shadowModeAt
 
   const reset = async () => {
     const ok = await confirm({ title: `重置「${c.nickname}」的密码？`, body: CONTROL_COPY.resetPassword, okText: '生成' })
@@ -58,6 +61,22 @@ export function CustomerControlSection({ c }: { c: Customer }) {
     if (!ok) return
     s.setCustomerBlacklist(c.id, !blacklisted, admin)
     toast(blacklisted ? '已解除拉黑' : '已拉黑，客户无法发消息')
+  }
+  const toggleShadow = async () => {
+    if (!shadowed) {
+      setShadowReason('')
+      setShadowing(true)
+      return
+    }
+    const ok = await confirm({ title: `关闭「${c.nickname}」的影子模式？`, body: CONTROL_COPY.shadowOff, okText: '关闭' })
+    if (!ok) return
+    s.setCustomerShadowMode(c.id, false, '', admin)
+    toast('已关闭影子模式，之后发的消息恢复正常可见')
+  }
+  const confirmShadow = () => {
+    s.setCustomerShadowMode(c.id, true, shadowReason, admin)
+    setShadowing(false)
+    toast('已开启影子模式，客户端无任何提示')
   }
   const mute = (hours: number | null) => {
     s.muteCustomerAll(c.id, hours, admin)
@@ -95,9 +114,38 @@ export function CustomerControlSection({ c }: { c: Customer }) {
         </Button>
       </Row>
 
+      <Row title="影子模式" desc={shadowed ? `开启于 ${fmtDateTime(c.shadowModeAt!)}${c.shadowModeReason ? `：${c.shadowModeReason}` : ''}；群消息只有他自己和坐席看得见` : '他发的群消息只有他自己和坐席看得见，客户端无任何提示'}>
+        <Button size="sm" variant={shadowed ? 'secondary' : 'danger'} disabled={deleted} onClick={() => void toggleShadow()}>
+          <EyeOff size={13} /> {shadowed ? '关闭影子' : '开启影子'}
+        </Button>
+      </Row>
+
       <Modal open={!!pwd} onClose={() => setPwd(null)} title="一次性密码" width={400} footer={<Button variant="primary" onClick={() => setPwd(null)}>我已告知客户</Button>}>
         <div className="rounded-md bg-zinc-50 px-3 py-3 text-center font-mono text-lg tracking-widest text-zinc-900">{pwd}</div>
         <p className="mt-3 text-[12px] text-amber-700">{CONTROL_COPY.password}</p>
+      </Modal>
+
+      <Modal
+        open={shadowing}
+        onClose={() => setShadowing(false)}
+        title={`开启「${c.nickname}」的影子模式`}
+        width={440}
+        footer={
+          <>
+            <Button onClick={() => setShadowing(false)}>取消</Button>
+            <Button variant="danger" onClick={confirmShadow}>
+              开启影子模式
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[12px] leading-relaxed text-zinc-600">{CONTROL_COPY.shadowOn}</p>
+        {/* 原因不是走形式：影子模式客户永远不会来申诉，只能靠这一行让后面接手的人知道当初为什么开 */}
+        <div className="mt-3">
+          <Field label="开启原因" hint="会写进审计记录，也会显示在客户状态上">
+            <Input value={shadowReason} onChange={(e) => setShadowReason(e.target.value)} placeholder="例：多次在群里发引流链接" />
+          </Field>
+        </div>
       </Modal>
 
       <Modal open={muting} onClose={() => setMuting(false)} title={`禁言「${c.nickname}」（所有群）`} width={400}>

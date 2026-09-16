@@ -82,15 +82,22 @@ export function chatExperienceActions(set: Set, get: Get): ChatExperienceActions
       if(input.forwardedFrom){const from=s.conversations.find((c)=>c.id===input.forwardedFrom!.convId),fwdKey=from?.chatGroupId?'group.forward':'dm.forward'
         if(!(input.actor.kind==='seat'?seatCan(s,input.actor.id,fwdKey,from?.chatGroupId):customerCan(s,input.actor.id,fwdKey,from?.chatGroupId)))return{ok:false,reason:'当前不允许转发这条消息'}}
       const id=newId('msg'),attemptId=newId('attempt'),at=now()
-      // 敏感词：只查客户发言，坐席合规词库另做。拦截与替换都要落一条命中记录，后台才追得到人
-      const scan=input.actor.kind==='customer'&&text?scanSensitive(s.sensitiveWords,text):undefined
-      const hits=scan?.hits.length?sensitiveHitsOf(scan,{customerId:input.actor.id,convId:input.convId,original:text,at}):[]
+      // 敏感词：客户查客户词库，坐席查坐席合规词库，两套互不干扰。
+      // 拦截、影子屏蔽、替换都要落一条命中记录，后台才追得到人
+      const scope=input.actor.kind==='customer'?'customer' as const:'seat' as const
+      const scan=text?scanSensitive(s.sensitiveWords,text,scope):undefined
+      const hits=scan?.hits.length?sensitiveHitsOf(scan,{scope,senderId:input.actor.id,operatorStaffId:input.actor.staffId,convId:input.convId,original:text,at}):[]
       if(scan?.action==='block'){
         set({sensitiveHits:[...s.sensitiveHits,...hits]})
-        return{ok:false,reason:`消息里的「${scan.blockedBy!.word}」不能发送，改一下再试`}
+        // 坐席被拦下时说清这是合规词库，顾问才知道该改哪一句；对客户只说「改一下再试」
+        return{ok:false,reason:scope==='seat'?`合规词库拦截：「${scan.blockedBy!.word}」不能对客户说，换个说法再发`:`消息里的「${scan.blockedBy!.word}」不能发送，改一下再试`}
       }
+      // 影子屏蔽：踩了影子词，或者这个客户整个人在影子模式里。
+      // 两种来源分开记，后台看命中记录时要能分清是这句话的事还是这个人的事
+      const sender=input.actor.kind==='customer'?s.customers.find((c)=>c.id===input.actor.id):undefined
+      const shadowReason:Message['shadowReason']|undefined=scan?.action==='shadow'?'word':sender?.shadowModeAt?'customer':undefined
       const sendText=scan?.text??text
-      const m:Message={id,convId:input.convId,senderKind:input.actor.kind,senderId:input.actor.id,seatId:input.actor.kind==='seat'?input.actor.id:undefined,operatorId:input.actor.staffId,kind:input.kind??'text',text:sendText,media:input.media,at,replyToId:input.replyToId,quoteText:input.quoteText,...mentions,delivery:'pending',attemptId,aiDraftUsed:input.aiDraftUsed,forwardedFrom:input.forwardedFrom,
+      const m:Message={id,convId:input.convId,senderKind:input.actor.kind,senderId:input.actor.id,seatId:input.actor.kind==='seat'?input.actor.id:undefined,operatorId:input.actor.staffId,kind:input.kind??'text',text:sendText,media:input.media,at,replyToId:input.replyToId,quoteText:input.quoteText,...mentions,delivery:'pending',attemptId,aiDraftUsed:input.aiDraftUsed,forwardedFrom:input.forwardedFrom,shadowedAt:shadowReason?at:undefined,shadowReason,
         channelId:group?.kind==='channel'?group.id:undefined,channelSignature:group?.kind==='channel'&&input.signature?s.seats.find((x)=>x.id===input.actor.id)?.displayName:undefined,receiptMemberSeatIds:group?.memberSeatIds,receiptMemberCustomerIds:group?.memberCustomerIds}
       set({messages:[...s.messages,m],sensitiveHits:hits.length?[...s.sensitiveHits,...hits]:s.sensitiveHits,failNextSend:false})
       finish(id,attemptId,input.actor,!!s.failNextSend)

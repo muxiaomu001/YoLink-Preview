@@ -46,6 +46,7 @@ export const AUDIT_LABEL: Record<AuditType, string> = {
   'message.delete': '删除消息',
   'report.handle': '处理举报',
   'sensitive.update': '敏感词',
+  'customer.shadow': '影子模式',
   export: '导出数据',
   'wallet.settings': '钱包设置',
   'wallet.adjust': '手动加减积分',

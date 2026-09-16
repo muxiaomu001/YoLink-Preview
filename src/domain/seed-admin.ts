@@ -427,11 +427,22 @@ export const BACKUPS: Backup[] = [
 export const HEALTH: HealthStatus = { db: 'ok', redis: 'ok', storage: 'ok', connections: 143, latencyMs: 38, checkedAt: ago(0, 0, 30) }
 
 export const SENSITIVE_WORDS: SensitiveWord[] = [
-  { id: 'sw_1', word: '保本', action: 'block' },
-  { id: 'sw_2', word: '稳赚', action: 'block' },
-  { id: 'sw_3', word: '内幕', action: 'replace', replaceWith: '***' },
-  { id: 'sw_4', word: '代客理财', action: 'log' },
-  { id: 'sw_5', word: '转到我个人账户', action: 'block' },
+  // 客户词库：客户在群里说的话
+  { id: 'sw_1', word: '保本', scope: 'customer', action: 'block' },
+  { id: 'sw_2', word: '稳赚', scope: 'customer', action: 'block' },
+  { id: 'sw_3', word: '内幕', scope: 'customer', action: 'replace', replaceWith: '***' },
+  { id: 'sw_4', word: '代客理财', scope: 'customer', action: 'log' },
+  { id: 'sw_5', word: '转到我个人账户', scope: 'customer', action: 'block' },
+  // 拉人引流用影子屏蔽而不是拦截：拦下来他立刻知道「加V」发不出去，换成「加威」再试，
+  // 一路试到能过为止；影子屏蔽他每次都以为发成功了，反而不会换写法
+  { id: 'sw_6', word: '加微信', scope: 'customer', action: 'shadow' },
+  { id: 'sw_7', word: '私我', scope: 'customer', action: 'shadow', exact: true },
+  // 坐席合规词库：顾问对客户说的话
+  { id: 'sw_8', word: '稳赚不赔', scope: 'seat', action: 'block' },
+  { id: 'sw_9', word: '保证收益', scope: 'seat', action: 'block' },
+  { id: 'sw_10', word: '转我私人账户', scope: 'seat', action: 'block' },
+  { id: 'sw_11', word: '包赚', scope: 'seat', action: 'block' },
+  { id: 'sw_12', word: '一定涨', scope: 'seat', action: 'log' },
 ]
 
 function buildDailyStats(customers: Customer[]): DailyStat[] {
@@ -479,10 +490,14 @@ export function buildAdminSeed(ctx: AdminSeedContext) {
 
   // 敏感词命中（P1）
   const sensitiveHits: SensitiveHit[] = [
-    { id: aid('sh'), at: ago(0, 6), customerId: customers[4].id, convId: community?.id ?? '', word: '保本', original: '有没有保本的产品推荐一下', result: 'blocked' },
-    { id: aid('sh'), at: ago(1, 5), customerId: customers[9].id, convId: community?.id ?? '', word: '内幕', original: '听说有内幕消息，下周要涨', result: 'replaced' },
-    { id: aid('sh'), at: ago(3, 1), customerId: customers[14].id, convId: community?.id ?? '', word: '代客理财', original: '能不能帮我代客理财，我不想自己操作', result: 'logged' },
-    { id: aid('sh'), at: ago(8, 9), customerId: customers[1].id, convId: community?.id ?? '', word: '稳赚', original: '这个组合是不是稳赚的', result: 'blocked' },
+    { id: aid('sh'), at: ago(0, 6), scope: 'customer', senderId: customers[4].id, convId: community?.id ?? '', word: '保本', original: '有没有保本的产品推荐一下', result: 'blocked' },
+    // 变形写法：中间插了一个空格，直接子串匹配拦不住，变形匹配拦得住
+    { id: aid('sh'), at: ago(0, 8), scope: 'customer', senderId: customers[6].id, convId: community?.id ?? '', word: '加微信', original: '想深入聊的加 微信 hx_888888，群里不方便说', result: 'shadowed' },
+    { id: aid('sh'), at: ago(1, 5), scope: 'customer', senderId: customers[9].id, convId: community?.id ?? '', word: '内幕', original: '听说有内幕消息，下周要涨', result: 'replaced' },
+    { id: aid('sh'), at: ago(3, 1), scope: 'customer', senderId: customers[14].id, convId: community?.id ?? '', word: '代客理财', original: '能不能帮我代客理财，我不想自己操作', result: 'logged' },
+    // 坐席命中：合规追责要追到坐席背后的实操员工
+    { id: aid('sh'), at: ago(2, 3), scope: 'seat', senderId: 'seat_lin', operatorStaffId: 'st_lin', convId: community?.id ?? '', word: '保证收益', original: '这只我可以给你保证收益，放心拿着', result: 'blocked' },
+    { id: aid('sh'), at: ago(8, 9), scope: 'customer', senderId: customers[1].id, convId: community?.id ?? '', word: '稳赚', original: '这个组合是不是稳赚的', result: 'blocked' },
   ]
 
   // 安全日志（P1）

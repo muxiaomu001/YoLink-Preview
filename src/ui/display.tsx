@@ -199,6 +199,6 @@ export function KV({ items }: { items: { k: ReactNode; v: ReactNode }[] }) {
 }
 
 /** 产品自己的提示条：给用户讲清楚这块的规则或注意事项。演示旁白用 DemoNote，不要用这个 */
-export function Note({ children, tone = 'blue' }: { children: ReactNode; tone?: 'blue' | 'amber' }) {
-  return <div className={clsx('rounded-md border px-3 py-2 text-xs leading-relaxed', tone === 'blue' ? 'border-brand-100 bg-brand-50/60 text-brand-900' : 'border-amber-200 bg-amber-50 text-amber-900')}>{children}</div>
+export function Note({ children, tone = 'blue', className }: { children: ReactNode; tone?: 'blue' | 'amber'; className?: string }) {
+  return <div className={clsx('rounded-md border px-3 py-2 text-xs leading-relaxed', tone === 'blue' ? 'border-brand-100 bg-brand-50/60 text-brand-900' : 'border-amber-200 bg-amber-50 text-amber-900', className)}>{children}</div>
 }

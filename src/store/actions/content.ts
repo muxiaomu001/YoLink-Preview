@@ -2,6 +2,7 @@
  * 内容与审计（删消息、举报、敏感词、导出）、群与频道、内部标签库、客户管理（批量挂头衔、改主归属、注销）。
  */
 import type { ChatGroup, Report, SensitiveWord, Tag } from '@/domain/types'
+import { SENSITIVE_ACTION_LABEL, SENSITIVE_SCOPE_LABEL, scopeOf } from '@/domain/sensitive'
 import { newId } from '@/domain/ids'
 import { type Get, type Set, now, withAudit } from './helpers'
 
@@ -55,7 +56,7 @@ export function contentActions(set: Set, get: Get): ContentActions {
     createSensitiveWord: (input, byStaffId) =>
       set((s) => ({
         sensitiveWords: [...s.sensitiveWords, { ...input, id: newId('sw') }],
-        audit: withAudit(s.audit, 'sensitive.update', `添加敏感词「${input.word}」，命中动作：${input.action}`, byStaffId),
+        audit: withAudit(s.audit, 'sensitive.update', `在${SENSITIVE_SCOPE_LABEL[scopeOf(input as SensitiveWord)]}添加敏感词「${input.word}」，命中动作：${SENSITIVE_ACTION_LABEL[input.action]}`, byStaffId),
       })),
 
     updateSensitiveWord: (id, patch, byStaffId) =>
@@ -63,14 +64,14 @@ export function contentActions(set: Set, get: Get): ContentActions {
         const w = s.sensitiveWords.find((x) => x.id === id)
         return {
           sensitiveWords: s.sensitiveWords.map((x) => (x.id === id ? { ...x, ...patch } : x)),
-          audit: withAudit(s.audit, 'sensitive.update', `修改敏感词「${w?.word}」`, byStaffId),
+          audit: withAudit(s.audit, 'sensitive.update', `修改${w ? SENSITIVE_SCOPE_LABEL[scopeOf(w)] : '词库'}里的敏感词「${w?.word}」`, byStaffId),
         }
       }),
 
     deleteSensitiveWord: (id, byStaffId) =>
       set((s) => {
         const w = s.sensitiveWords.find((x) => x.id === id)
-        return { sensitiveWords: s.sensitiveWords.filter((x) => x.id !== id), audit: withAudit(s.audit, 'sensitive.update', `删除敏感词「${w?.word}」`, byStaffId) }
+        return { sensitiveWords: s.sensitiveWords.filter((x) => x.id !== id), audit: withAudit(s.audit, 'sensitive.update', `删除${w ? SENSITIVE_SCOPE_LABEL[scopeOf(w)] : '词库'}里的敏感词「${w?.word}」`, byStaffId) }
       }),
 
     recordExport: (what, byStaffId) => set((s) => ({ audit: withAudit(s.audit, 'export', `导出：${what}`, byStaffId) })),

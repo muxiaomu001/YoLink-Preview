@@ -143,6 +143,12 @@ export function MessageItem({
             {pinned && <span className="inline-flex items-center gap-0.5 text-amber-600"><Pin size={10} />已置顶</span>}
             {m.isWelcome && <span className="rounded bg-zinc-100 px-1">欢迎语</span>}
             {m.isBroadcast && <span className="rounded bg-amber-50 px-1 text-amber-700">群发</span>}
+            {/* 影子屏蔽只有坐席这一侧看得到。客户那边一点提示都不能有，否则整个机制就白做了 */}
+            {m.shadowedAt && (
+              <span className="rounded bg-purple-50 px-1 text-purple-700" title={`${m.shadowReason === 'customer' ? '该客户处于影子模式' : '命中影子屏蔽词'}；群里其他客户看不到这条，他本人以为发出去了`}>
+                影子屏蔽{m.shadowReason === 'customer' ? '（整号）' : ''}
+              </span>
+            )}
             {m.aiDraftUsed && <span className="rounded bg-violet-50 px-1 text-violet-600">AI 草稿</span>}
             {m.mentionAll && <span className="rounded bg-amber-50 px-1 text-amber-700">@所有人</span>}
             {m.senderKind === 'seat' && can('view_seat_operator') && op && <span title="仅企业内部可见，客户看不到">实操：{op.name}</span>}

@@ -700,6 +700,11 @@ function buildCustomers() {
     if (s === 'complaint_refund') c.blacklistedAt = iso(registeredMs + 86400000 * 12)
     if (s === 'quiet_long' && idx % 7 === 3) c.mutedAllUntil = iso(Date.now() + 86400000 * 2)
     if (s === 'onboarding_pending' && idx % 5 === 1) c.mustChangePassword = true
+    // 影子模式只种一个：这是个重手段，满屏紫色标记会让人以为它是日常操作
+    if (s === 'quiet_long' && idx % 11 === 5) {
+      c.shadowModeAt = iso(Date.now() - 86400000 * 3)
+      c.shadowModeReason = '连续三天在群里发第三方理财链接，已确认是引流号'
+    }
     // 最近两天注册的当新号看：观察期与「系统发的默认昵称」不种上，
     // 状态列的「新号观察期」和软引导在演示数据里就永远是空的
     if (plan.daysAgo <= 2) {

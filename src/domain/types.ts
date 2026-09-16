@@ -236,6 +236,10 @@ export interface Customer {
   watchUntil?: ISODate
   /** 客户关掉了注册后的完善资料引导，关了就不再出现 */
   profileGuideDismissedAt?: ISODate
+  /** 客户级影子模式：他发的每条群消息只有他自己和坐席看得见，与踩没踩敏感词无关 */
+  shadowModeAt?: ISODate
+  /** 为什么把他放进影子模式，后台列表与审计都读这一句 */
+  shadowModeReason?: string
   /** 通用字段值（P1） */
   customFields?: Record<string, string>
 }
@@ -507,6 +511,13 @@ export interface Message {
   /** 群发任务产生的消息（频控按它统计） */
   isBroadcast?: boolean
   hiddenFor?: string[]
+  /**
+   * 影子屏蔽：发送方自己看得见、坐席看得见，群里其他客户看不见。
+   * 记时间点而不是 true，后台要答得上「什么时候开始被屏蔽的」。
+   */
+  shadowedAt?: ISODate
+  /** 因为踩了影子词，还是因为这个客户整个人在影子模式里 */
+  shadowReason?: 'word' | 'customer'
   recipientCustomerId?: string
   channelId?: string
   channelSignature?: string
@@ -564,6 +575,7 @@ export type AuditType =
   | 'message.delete'
   | 'report.handle'
   | 'sensitive.update'
+  | 'customer.shadow'
   | 'export'
   | 'wallet.settings'
   | 'wallet.adjust'
@@ -642,24 +654,41 @@ export interface Report {
   handledAt?: ISODate
 }
 
-export type SensitiveAction = 'block' | 'replace' | 'log'
+/**
+ * shadow = 影子屏蔽：发送方看到消息正常发出去了，坐席也看得见，**群里其他客户看不见**。
+ * 拦截会告诉对方「你这句不行」，于是他换个说法再试一次，直到试出一句能过的；
+ * 影子屏蔽不给任何反馈，他以为发出去了，就不会再换写法。
+ * 只对客户词库开放：屏蔽坐席等于客户收不到客服回复，那是事故不是风控。
+ */
+export type SensitiveAction = 'block' | 'shadow' | 'replace' | 'log'
+
+/** 客户词库查客户发言，坐席合规词库查坐席发言，两套互不干扰 */
+export type SensitiveScope = 'customer' | 'seat'
 
 /** P1：敏感词 */
 export interface SensitiveWord {
   id: string
   word: string
+  /** 缺省按客户词库算 */
+  scope?: SensitiveScope
   action: SensitiveAction
   replaceWith?: string
+  /** 关掉变形匹配，只认原样写法；给那些一模糊就误伤的短词用 */
+  exact?: boolean
 }
 
 export interface SensitiveHit {
   id: string
   at: ISODate
-  customerId: string
+  scope: SensitiveScope
+  /** 客户 ID 或坐席 ID，按 scope 解释 */
+  senderId: string
+  /** 坐席命中时背后的实操员工：合规追责要追到人，不能停在坐席身份 */
+  operatorStaffId?: string
   convId: string
   word: string
   original: string
-  result: 'blocked' | 'replaced' | 'logged'
+  result: 'blocked' | 'shadowed' | 'replaced' | 'logged'
 }
 
 // ---------- 群发、快捷回复、知识库 ----------
