@@ -24,14 +24,19 @@ export function StaffPage() {
     toast(`已撤销 ${st.name} 的全部登录会话，所有设备已登出`)
   }
   const disable = async (st: Staff) => {
-    const held = seatsOfStaff(s, st.id)
-    if (held.length) {
-      toast(`${st.name} 还持有 ${held.map((x) => x.displayName).join('、')}，先去坐席页交接`, 'warn')
+    const blocker = s.staffDisableBlocker(st.id)
+    if (blocker) {
+      toast(blocker, 'warn')
       return
     }
     const ok = await confirm({ title: `停用 ${st.name}？`, body: '保留数据，立即撤销全部 session，停用后无法登录。可随时激活。', okText: '停用', danger: true })
     if (!ok) return
-    s.setStaffStatus(st.id, 'disabled', admin)
+    // 确认前再次检查，防止其他窗口刚刚交接回该员工。
+    const confirmed = s.disableStaff(st.id, admin)
+    if (!confirmed.ok) {
+      toast(confirmed.error, 'warn')
+      return
+    }
     toast(`${st.name} 已停用，全部会话已撤销`)
   }
 
@@ -117,7 +122,7 @@ export function StaffPage() {
                       size="sm"
                       variant="ghost"
                       onClick={() => {
-                        s.setStaffStatus(st.id, 'active', admin)
+                        s.activateStaff(st.id, admin)
                         toast(`${st.name} 已激活，可以重新登录`)
                       }}
                     >

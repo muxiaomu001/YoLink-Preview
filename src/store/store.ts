@@ -49,7 +49,7 @@ import { providerLicensingActions, type ProviderLicensingActions } from './actio
 import { clearStartupSeen } from '@/domain/startupSeen'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
-export const STORAGE_KEY = 'yolink-demo-v11'
+export const STORAGE_KEY = 'yolink-demo-v12'
 
 const now = () => iso(Date.now())
 
@@ -119,7 +119,6 @@ export interface CoreActions {
   updateSeat: (id: string, patch: Partial<Seat>, byStaffId: string) => void
   handoverSeat: (seatId: string, toStaffId: string, reason: string, byStaffId: string) => void
   createStaff: (input: { name: string; username: string; email?: string; roleId: string; withSeat: boolean; roleDesc?: string; assignSeatIds?: string[]; mustChangePassword?: boolean }, byStaffId: string) => Staff
-  setStaffStatus: (id: string, status: Staff['status'], byStaffId: string) => void
   updateRoleCaps: (roleId: string, caps: Capability[]) => void
   /** code 留空则随机生成 */
   createInviteGroup: (input: { name: string; fixedSeatIds: string[]; rotatingSeatIds: string[]; chatGroupIds: string[]; code?: string }, byStaffId: string) => { ok: true; group: InviteGroup } | { ok: false; error: string }
@@ -237,7 +236,7 @@ export const useStore = create<DemoStore>()(
             senderKind: 'seat',
             senderId: seatId,
             seatId,
-            operatorId: seat.operatorStaffId ?? undefined,
+            operatorId: seat.operatorStaffId,
             kind: 'text',
             text: renderWelcome(seat.welcome || s.enterprise.defaultWelcome, customer.nickname, seat.displayName),
             at: welcomeAt,
@@ -546,7 +545,7 @@ export const useStore = create<DemoStore>()(
         const loseSeat = workbenchStaffId === seat.operatorStaffId && s.session.workbenchSeatId === seatId
         const otherSeat = loseSeat ? s.seats.find((x) => x.id !== seatId && x.operatorStaffId === workbenchStaffId) : undefined
         set({
-          seats: s.seats.map((x) => (x.id === seatId ? { ...x, operatorStaffId: toStaffId, status: x.status === 'paused' && x.operatorStaffId === null ? 'accepting' : x.status } : x)),
+          seats: s.seats.map((x) => (x.id === seatId ? { ...x, operatorStaffId: toStaffId } : x)),
           handovers: [...s.handovers, { id: newId('ho'), seatId, fromStaffId: seat.operatorStaffId, toStaffId, at, byStaffId, reason }],
           audit: [{ id: newId('au'), at, actorStaffId: byStaffId, type: 'seat.handover', detail: `坐席「${seat.displayName}」由 ${from?.name ?? '无'} 交接给 ${to?.name}；原因：${reason}` }, ...s.audit],
           session: loseSeat ? { ...s.session, workbenchSeatId: otherSeat?.id ?? null } : s.session,
@@ -571,7 +570,7 @@ export const useStore = create<DemoStore>()(
           return { id: newId('ho'), seatId, fromStaffId: seat.operatorStaffId, toStaffId: staff.id, at: now(), byStaffId, reason: `创建员工 ${staff.name} 时指派` }
         })
         if (assign.length) {
-          seats = seats.map((x) => (assign.includes(x.id) ? { ...x, operatorStaffId: staff.id, status: x.status === 'paused' && x.operatorStaffId === null ? 'accepting' : x.status } : x))
+          seats = seats.map((x) => (assign.includes(x.id) ? { ...x, operatorStaffId: staff.id } : x))
           notes.push(`指派已有坐席：${assign.map((id) => seats.find((x) => x.id === id)?.displayName).join('、')}`)
         }
         if (!notes.length) notes.push('未创建同名坐席')
@@ -582,15 +581,6 @@ export const useStore = create<DemoStore>()(
           audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'staff.create', detail: `创建员工 ${staff.name}（角色：${s.roles.find((r) => r.id === input.roleId)?.name}），${notes.join('；')}`, ip: DEMO_IP }, ...s.audit],
         })
         return staff
-      },
-
-      setStaffStatus: (id, status, byStaffId) => {
-        const s = get()
-        const st = s.staff.find((x) => x.id === id)
-        set({
-          staff: s.staff.map((x) => (x.id === id ? { ...x, status } : x)),
-          audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'staff.disable', detail: `${status === 'disabled' ? '停用' : '激活'}员工 ${st?.name}${status === 'disabled' ? '，撤销全部登录会话' : ''}` }, ...s.audit],
-        })
       },
 
       updateRoleCaps: (roleId, caps) => set((s) => ({ roles: s.roles.map((r) => (r.id === roleId ? { ...r, caps } : r)) })),

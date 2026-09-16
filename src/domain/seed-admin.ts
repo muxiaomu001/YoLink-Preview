@@ -521,11 +521,10 @@ export function buildAdminSeed(ctx: AdminSeedContext) {
   const community = conversations.find((c) => c.kind === 'group' && c.chatGroupId === 'cg_community')
   const communityMsgs = messages.filter((m) => m.convId === community?.id && m.senderKind === 'customer')
 
-  // 群级 / 用户级覆盖（P1）：私享会员群里客户可看成员、可拉人；一个客户放开建群；公告号收紧转发
+  // 群级 / 用户级覆盖（P1）：私享会员群里客户可看成员、可拉人；一个客户放开建群
   const policyOverrides: PolicyOverride[] = [
     { id: aid('po'), targetKind: 'group', targetId: 'cg_vip', caps: { 'group.view_members': true, 'group.invite': true, 'group.view_member_profile': true }, byStaffId: 'st_admin', createdAt: ago(40) },
     { id: aid('po'), targetKind: 'customer', targetId: funded[0]?.id ?? customers[0].id, caps: { 'group.create': true, 'group.invite': true }, byStaffId: 'st_admin', createdAt: ago(12) },
-    { id: aid('po'), targetKind: 'seat', targetId: 'seat_notice', caps: { 'dm.forward': false, 'group.forward': false }, byStaffId: 'st_admin', createdAt: ago(25) },
   ]
 
   // 举报（P1）

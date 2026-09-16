@@ -4,7 +4,7 @@ import type { Seat } from '@/domain/types'
 import { seatIdsOf } from '@/domain/allocation'
 import { fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
-import { customersOfSeat, holdsPrimary, staffById } from '@/store/selectors'
+import { customersOfSeat, staffById } from '@/store/selectors'
 import { Button } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, SeatAvatar, Table, type Column } from '@/ui/display'
 import { toast } from '@/ui/overlay'
@@ -29,7 +29,6 @@ export function SeatsPage() {
             .filter((g) => seatIdsOf(g).includes(seat.id))
             .map((g) => ({ name: g.name, rotating: g.rotatingSeatIds.includes(seat.id) })),
           customers,
-          primary: holdsPrimary(s, seat.id),
           off: seat.status === 'disabled',
         }
       }),
@@ -44,10 +43,6 @@ export function SeatsPage() {
     toast(`「${seat.displayName}」已暂停接新：不再分新客户，已有客户的会话仍归它`)
   }
   const resume = (seat: Seat) => {
-    if (!seat.operatorStaffId) {
-      toast('该坐席无人实操，先交接给员工再恢复接新', 'warn')
-      return
-    }
     s.updateSeat(seat.id, { status: 'accepting' }, admin)
     toast(`「${seat.displayName}」已恢复接新`)
   }
@@ -105,9 +100,9 @@ export function SeatsPage() {
     },
     {
       key: 'customers',
-      title: <span title="按主归属统计。只做固定坐席的号不占归属，显示为 -">客户数</span>,
+      title: '客户数',
       align: 'right',
-      render: (r) => dim(r, r.primary ? <span className="tabular-nums">{r.customers}</span> : <span className="text-zinc-300">-</span>),
+      render: (r) => dim(r, <span className="tabular-nums">{r.customers}</span>),
     },
     {
       key: 'status',

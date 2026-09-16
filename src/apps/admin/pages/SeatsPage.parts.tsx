@@ -13,7 +13,7 @@ export function HandoverModal({ seat, onClose }: { seat: Seat; onClose: () => vo
   const s = useStore()
   const from = staffById(s, seat.operatorStaffId)
   const candidates = s.staff.filter((x) => x.status === 'active' && x.id !== seat.operatorStaffId)
-  const [to, setTo] = useState(candidates[0]?.id ?? '')
+  const [to, setTo] = useState('')
   const [reason, setReason] = useState('')
   const customers = customersOfSeat(s, seat.id).length
   const convs = s.conversations.filter((c) => c.kind === 'dm' && c.seatId === seat.id).length
@@ -51,6 +51,7 @@ export function HandoverModal({ seat, onClose }: { seat: Seat; onClose: () => vo
         </div>
         <Field label="新实操员工" required>
           <Select value={to} onChange={(e) => setTo(e.target.value)}>
+            <option value="">请选择实操员工</option>
             {candidates.map((st) => (
               <option key={st.id} value={st.id}>
                 {st.name}（{s.roles.find((r) => r.id === st.roleId)?.name}）
@@ -83,6 +84,7 @@ function validate(f: SeatForm): string | null {
   const name = f.displayName.trim()
   if (name.length < 1 || name.length > 32) return '显示名 1 到 32 字'
   if (f.roleDesc.length > 64) return '职能说明最多 64 字'
+  if (!f.operatorStaffId) return '坐席必须有人实操'
   return null
 }
 
@@ -103,7 +105,7 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
     const patch = {
       displayName: form.displayName.trim(),
       roleDesc: form.roleDesc.trim(),
-      operatorStaffId: form.operatorStaffId || null,
+      operatorStaffId: form.operatorStaffId,
       welcome: form.welcome,
       customerDeletable: form.customerDeletable,
     }
@@ -111,7 +113,7 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
       s.updateSeat(seat.id, patch, admin)
       toast('坐席已更新')
     } else {
-      s.createSeat({ ...patch, status: patch.operatorStaffId ? 'accepting' : 'paused' }, admin)
+      s.createSeat({ ...patch, status: 'accepting' }, admin)
       toast('坐席已创建。记得把它放进邀请组，否则新客户不会加到它')
     }
     onClose()
@@ -138,9 +140,9 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
         <Field label="职能说明" hint="0 到 64 字，多个官方号时客户靠它判断该找谁">
           <Input value={form.roleDesc} maxLength={64} onChange={(e) => set('roleDesc', e.target.value)} placeholder="如：资深投资顾问 · 全球资产配置" />
         </Field>
-        <Field label="实操员工" hint="留空则暂停接新">
+        <Field label="实操员工" required hint="坐席必须有人实操">
           <Select value={form.operatorStaffId} onChange={(e) => set('operatorStaffId', e.target.value)}>
-            <option value="">无</option>
+            <option value="">请选择实操员工</option>
             {s.staff
               .filter((x) => x.status === 'active')
               .map((st) => (
@@ -156,11 +158,11 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
         <div className="flex items-center justify-between rounded-md border border-zinc-200 px-3 py-2">
           <div className="text-xs">
             <div className="font-medium text-zinc-800">客户可删除会话</div>
-            <div className="text-zinc-500">关闭时客户删不掉与该坐席的会话（主归属坐席、公告号建议关闭）</div>
+            <div className="text-zinc-500">关闭时客户删不掉与该坐席的会话</div>
           </div>
           <Switch checked={form.customerDeletable} onChange={(v) => set('customerDeletable', v)} />
         </div>
-        {error && form.displayName.length > 0 && <p className="text-[11px] text-red-600">{error}</p>}
+        {error && <p className="text-[11px] text-red-600">{error}</p>}
       </div>
     </Modal>
   )

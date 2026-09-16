@@ -10,6 +10,10 @@ export interface PeopleActions {
   /** 随机生成返回明文一次；手动设置返回 undefined */
   resetPassword: (id: string, input: { mode: 'random' } | { mode: 'manual'; password: string; mustChange: boolean }, byStaffId: string) => string | undefined
   forceLogout: (id: string, byStaffId: string) => void
+  staffDisableBlocker: (id: string) => string | null
+  /** 停用前必须完成名下有效坐席的交接 */
+  disableStaff: (id: string, byStaffId: string) => { ok: true } | { ok: false; error: string }
+  activateStaff: (id: string, byStaffId: string) => void
   createRole: (input: { name: string; desc: string; caps: Role['caps'] }, byStaffId: string) => Role
   updateRole: (id: string, patch: Partial<Pick<Role, 'name' | 'desc' | 'caps'>>, byStaffId: string) => void
   /** 内置角色或还有成员的角色不能删，返回 false */
@@ -17,6 +21,11 @@ export interface PeopleActions {
 }
 
 export function peopleActions(set: Set, get: Get): PeopleActions {
+  const disableBlocker = (id: string) => {
+    const held = get().seats.filter((x) => x.operatorStaffId === id && x.status !== 'disabled')
+    return held.length ? `该员工还实操着 ${held.length} 个坐席（${held.map((x) => x.displayName).join('、')}），请先交接` : null
+  }
+
   return {
     updateStaff: (id, patch, byStaffId) =>
       set((s) => {
@@ -46,6 +55,29 @@ export function peopleActions(set: Set, get: Get): PeopleActions {
         return {
           staff: s.staff.map((x) => (x.id === id ? { ...x, sessionsRevokedAt: now() } : x)),
           audit: withAudit(s.audit, 'staff.force_logout', `强制下线 ${st?.name}：撤销全部登录 session 与 token`, byStaffId),
+        }
+      }),
+
+    staffDisableBlocker: disableBlocker,
+
+    disableStaff: (id, byStaffId) => {
+      const s = get()
+      const st = s.staff.find((x) => x.id === id)
+      const blocker = disableBlocker(id)
+      if (blocker) return { ok: false, error: blocker }
+      set({
+        staff: s.staff.map((x) => (x.id === id ? { ...x, status: 'disabled', sessionsRevokedAt: now() } : x)),
+        audit: withAudit(s.audit, 'staff.disable', `停用员工 ${st?.name}，撤销全部登录会话`, byStaffId),
+      })
+      return { ok: true }
+    },
+
+    activateStaff: (id, byStaffId) =>
+      set((s) => {
+        const st = s.staff.find((x) => x.id === id)
+        return {
+          staff: s.staff.map((x) => (x.id === id ? { ...x, status: 'active' } : x)),
+          audit: withAudit(s.audit, 'staff.disable', `激活员工 ${st?.name}`, byStaffId),
         }
       }),
 

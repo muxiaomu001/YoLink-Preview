@@ -258,19 +258,6 @@ export const SEATS: Seat[] = [
     customerDeletable: true,
     createdAt: ago(105),
   },
-  {
-    id: 'seat_notice',
-    displayName: '恒信合规通知',
-    avatarText: '恒',
-    avatarColor: '#b45309',
-    roleDesc: '官方通知 · 合规提示 · 系统公告',
-    operatorStaffId: 'st_zhao',
-    status: 'accepting',
-    welcome:
-      '【恒信财富】欢迎加入。本账号发送官方通知与合规提示。投资有风险，本平台任何内容不构成投资建议，请以正式文件为准。',
-    customerDeletable: false,
-    createdAt: ago(105),
-  },
 ]
 
 export const HANDOVERS: SeatHandover[] = [
@@ -312,12 +299,12 @@ export const TAGS: Tag[] = [
 const CHAT_GROUPS_BASE: Omit<ChatGroup, keyof ReturnType<typeof groupDefaults>>[] = [
   {
     id: 'cg_strategy',
-    name: '每日策略',
+    name: '恒信官方通知',
     kind: 'channel',
     official: true,
-    desc: '恒信研究部每个交易日的市场观点，只读',
-    ownerSeatId: 'seat_notice',
-    memberSeatIds: ['seat_notice', 'seat_lin', 'seat_chen'],
+    desc: '合规提示、系统维护与活动安排，只读',
+    ownerSeatId: 'seat_cs',
+    memberSeatIds: ['seat_cs', 'seat_lin', 'seat_chen'],
     memberCustomerIds: [],
     requiredTitleId: null,
     maxMembers: null,
@@ -330,7 +317,7 @@ const CHAT_GROUPS_BASE: Omit<ChatGroup, keyof ReturnType<typeof groupDefaults>>[
     official: true,
     desc: '客户交流与顾问答疑',
     ownerSeatId: 'seat_lin',
-    memberSeatIds: ['seat_lin', 'seat_chen', 'seat_cs', 'seat_notice'],
+    memberSeatIds: ['seat_lin', 'seat_chen', 'seat_cs'],
     memberCustomerIds: [],
     requiredTitleId: null,
     maxMembers: 500,
@@ -361,8 +348,8 @@ export const INVITE_GROUPS: InviteGroup[] = [
     id: 'ig_default',
     name: '默认组',
     code: 'HX2026',
-    // 客户服务和合规通知人人都加；两位顾问轮流接
-    fixedSeatIds: ['seat_cs', 'seat_notice'],
+    // 客户服务人人都加；两位顾问轮流接
+    fixedSeatIds: ['seat_cs'],
     rotatingSeatIds: ['seat_chen', 'seat_lin'],
     rotationIndex: 0,
     chatGroupIds: [],
@@ -374,7 +361,7 @@ export const INVITE_GROUPS: InviteGroup[] = [
     id: 'ig_live',
     name: '直播间组',
     code: 'LIVE88',
-    fixedSeatIds: ['seat_notice'],
+    fixedSeatIds: [],
     rotatingSeatIds: ['seat_lin', 'seat_chen'],
     rotationIndex: 0,
     chatGroupIds: ['cg_community'],
@@ -748,18 +735,6 @@ function buildCustomers() {
       })
       conv.lastMessageAt = iso(welcomeAt)
 
-      if (seatId === 'seat_notice') {
-        // 公告号：按时间线补几条官方通知
-        NOTICE_TEXTS.forEach((t, i) => {
-          const at = registeredMs + 86400000 * (i * 3 + 1)
-          if (at < Date.now()) {
-            messages.push({ id: sid('msg'), convId: conv.id, senderKind: 'seat', senderId: seatId, seatId, operatorId: 'st_zhao', kind: 'text', text: t, at: iso(at) })
-            conv.lastMessageAt = iso(at)
-          }
-        })
-        return
-      }
-
       if (seatId !== alloc.primarySeatId) {
         // 非主归属坐席：偶尔有一两句
         if (seatId === 'seat_cs' && chance(0.5)) {
@@ -826,7 +801,7 @@ function buildGroupMessages(customers: Customer[], chatGroups: ChatGroup[]) {
   const conversations: Conversation[] = []
   const messages: Message[] = []
 
-  // 成员：所有客户进社群与策略频道；私享会员进 VIP 群
+  // 成员：所有客户进社群与官方通知频道；私享会员进 VIP 群
   const community = chatGroups.find((g) => g.id === 'cg_community')!
   const strategy = chatGroups.find((g) => g.id === 'cg_strategy')!
   const vip = chatGroups.find((g) => g.id === 'cg_vip')!
@@ -834,18 +809,11 @@ function buildGroupMessages(customers: Customer[], chatGroups: ChatGroup[]) {
   strategy.memberCustomerIds = customers.map((c) => c.id)
   vip.memberCustomerIds = customers.filter((c) => c.titleIds.includes('t_vip')).map((c) => c.id)
 
-  // 频道：每日策略
+  // 频道：承接原私聊通知的历史消息
   const convStrategy: Conversation = { id: sid('conv'), kind: 'channel', chatGroupId: strategy.id, lastMessageAt: ago(30) }
-  const STRATEGY_POSTS = [
-    '【每日策略 · 周一】美联储降息预期回落，美元短端收益率仍有吸引力。组合层面维持均衡，不追高权益。',
-    '【每日策略 · 周二】港股科技板块反弹，属于超跌修复而非趋势反转。已持有者不加仓，未持有者不追。',
-    '【每日策略 · 周三】黄金回到区间上沿，配置比例建议区间 5% 到 12%，超出上限的账户建议再平衡。',
-    '【每日策略 · 周四】美股财报季进入尾声，波动率抬升。分批建仓的客户按原计划执行，不因单日涨跌改节奏。',
-    '【每日策略 · 周五】本周回顾：全球均衡组合 +0.6%，美元短债 +0.1%，港股科技 -1.8%。周末休市，下周一见。',
-  ]
-  STRATEGY_POSTS.forEach((t, i) => {
+  NOTICE_TEXTS.forEach((t, i) => {
     const at = agoMs(4 - i, 14 - i)
-    messages.push({ id: sid('msg'), convId: convStrategy.id, senderKind: 'seat', senderId: 'seat_notice', seatId: 'seat_notice', operatorId: 'st_zhao', kind: 'text', text: t, at: iso(at) })
+    messages.push({ id: sid('msg'), convId: convStrategy.id, senderKind: 'seat', senderId: 'seat_cs', seatId: 'seat_cs', operatorId: 'st_chen', kind: 'text', text: t, at: iso(at) })
     convStrategy.lastMessageAt = iso(at)
   })
   conversations.push(convStrategy)
@@ -871,7 +839,7 @@ function buildGroupMessages(customers: Customer[], chatGroups: ChatGroup[]) {
     t += 60000 * between(3, 40)
     if ('s' in line && line.s) {
       const seat = SEATS.find((x) => x.id === line.s)!
-      messages.push({ id: sid('msg'), convId: convCommunity.id, senderKind: 'seat', senderId: seat.id, seatId: seat.id, operatorId: seat.operatorStaffId ?? undefined, kind: 'text', text: line.text, at: iso(t) })
+      messages.push({ id: sid('msg'), convId: convCommunity.id, senderKind: 'seat', senderId: seat.id, seatId: seat.id, operatorId: seat.operatorStaffId, kind: 'text', text: line.text, at: iso(t) })
     } else if ('c' in line && typeof line.c === 'number') {
       const cus = members[line.c % members.length]
       const mentions = line.text.includes('@林顾问') ? ['seat_lin'] : undefined

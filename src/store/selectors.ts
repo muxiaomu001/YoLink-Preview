@@ -168,7 +168,7 @@ export function customersOfSeat(s: DemoState, seatId: string): Customer[] {
 
 /**
  * 会不会分到主归属：在任一邀请组的轮询队列里，或手上已经有主归属客户。
- * 只做固定坐席的号（公告号、客服号）不占归属，统计与 KPI 都不该把它们算进去。
+ * 只做固定坐席的号不占主归属，统计与 KPI 都不该把它们算进去。
  */
 export function holdsPrimary(s: DemoState, seatId: string): boolean {
   return s.inviteGroups.some((g) => g.rotatingSeatIds.includes(seatId)) || s.customerSeats.some((cs) => cs.seatId === seatId && cs.primary)

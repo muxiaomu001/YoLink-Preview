@@ -181,7 +181,7 @@ export interface Seat {
   avatarText: string
   avatarColor: string
   roleDesc: string
-  operatorStaffId: string | null
+  operatorStaffId: string
   status: SeatStatus
   welcome: string
   customerDeletable: boolean

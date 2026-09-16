@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fmtAgo } from '@/domain/time'
 import { useStore } from '@/store/store'
-import { dashboardNumbers, holdsPrimary, seatById, staffById } from '@/store/selectors'
+import { dashboardNumbers, holdsPrimary, staffById } from '@/store/selectors'
 import { Card, Note, PageHeader, Stat } from '@/ui/display'
 
 /** 需要管理员动手的事，从各模块汇总到首页 */
@@ -105,7 +105,7 @@ export function AdminHome() {
             .filter((x) => holdsPrimary(s, x.id))
             .map((x) => `${x.displayName} ${s.customerSeats.filter((cs) => cs.seatId === x.id && cs.primary).length} 位`)
             .join('，')}
-          。只做固定坐席的号（如「{seatById(s, 'seat_notice')?.displayName}」）人人都加，但不占归属。
+          。只做固定坐席的号人人都加，但不占归属。
         </Note>
       </div>
     </div>
