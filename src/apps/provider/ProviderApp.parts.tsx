@@ -6,6 +6,7 @@ import { Modal, toast } from '@/ui/overlay'
 import { Note } from '@/ui/display'
 
 const today = () => new Date().toISOString().slice(0, 10)
+const dayAfter = (iso: string) => new Date(new Date(iso).getTime() + 86400000).toISOString().slice(0, 10)
 
 export function BindInstanceModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const bind = useStore((state) => state.bindProviderInstance)
@@ -61,6 +62,7 @@ export function RenewInstanceModal({ instance, onClose }: { instance: ProviderIn
   const renew = useStore((state) => state.renewProviderInstance)
   const [expiresOn, setExpiresOn] = useState('')
   if (!instance) return null
+  const minExpiry = dayAfter(instance.expiresAt) > today() ? dayAfter(instance.expiresAt) : today()
   return (
     <Modal
       open
@@ -69,13 +71,13 @@ export function RenewInstanceModal({ instance, onClose }: { instance: ProviderIn
       footer={
         <>
           <Button onClick={onClose}>取消</Button>
-          <Button variant="primary" disabled={expiresOn < today()} onClick={() => { renew(instance.id, expiresOn); toast(`已更新「${instance.enterpriseName}」的到期日`); onClose() }}>确认续期</Button>
+          <Button variant="primary" disabled={expiresOn < minExpiry} onClick={() => { renew(instance.id, expiresOn); toast(`已更新「${instance.enterpriseName}」的到期日`); onClose() }}>确认续期</Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Field label="新到期日" required hint={`当前到期日 ${instance.expiresAt.slice(0, 10)}`}>
-          <Input type="date" min={today()} value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} />
+        <Field label="新到期日" required hint={`当前到期日 ${instance.expiresAt.slice(0, 10)}，新日期需更晚`}>
+          <Input type="date" min={minExpiry} value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} />
         </Field>
         {instance.stoppedAt && <Note tone="amber">这个实例目前已人工停用。续期只更新到期日，不会自动恢复。</Note>}
       </div>

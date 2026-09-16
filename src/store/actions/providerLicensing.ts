@@ -55,6 +55,7 @@ export function providerLicensingActions(set: Set, get: Get): ProviderLicensingA
       const instance = s.providerInstances.find((x) => x.id === id)
       if (!instance) return
       const expiresAt = expiryIso(expiresOn)
+      if (new Date(expiresAt).getTime() <= Math.max(Date.now(), new Date(instance.expiresAt).getTime())) return
       const license = instance.instanceId === s.license.instanceId
         ? { ...s.license, expiresAt, modules: s.license.modules.map((module) => ({ ...module, expiresAt })) }
         : s.license

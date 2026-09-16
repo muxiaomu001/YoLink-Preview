@@ -17,9 +17,9 @@ const ACCESS_KEY = 'yolink-provider-demo-access'
 
 function StatusPill({ instance }: { instance: ProviderInstance }) {
   const status = providerInstanceStatus(instance)
-  if (status === 'stopped') return <Pill tone="red">人工停用</Pill>
-  if (status === 'expired') return <Pill tone="amber">已到期 · 仍在用</Pill>
-  return <Pill tone="green">授权中</Pill>
+  if (status === 'stopped') return <Pill tone="red">{PROVIDER_STATUS_LABEL.stopped}</Pill>
+  if (status === 'expired') return <Pill tone="amber">{PROVIDER_STATUS_LABEL.expired}</Pill>
+  return <Pill tone="green">{PROVIDER_STATUS_LABEL.active}</Pill>
 }
 
 const ACTION_LABEL = { bind: '绑定', renew: '续期', stop: '停用', resume: '恢复' } as const
@@ -94,9 +94,9 @@ export function ProviderApp() {
 
           <div className="mb-4 grid grid-cols-4 gap-3">
             <Stat label="全部实例" value={s.providerInstances.length} sub="按企业部署实例统计" />
-            <Stat label="授权中" value={counts.active} sub="到期日尚未到达" />
-            <Stat label="已到期 · 仍在用" value={counts.expired} sub="到期不会自动停用" tone={counts.expired ? 'warn' : 'default'} />
-            <Stat label="人工停用" value={counts.stopped} sub="需要供应方明确操作" />
+            <Stat label={PROVIDER_STATUS_LABEL.active} value={counts.active} sub="到期日尚未到达" />
+            <Stat label={PROVIDER_STATUS_LABEL.expired} value={counts.expired} sub="到期不会自动停用" tone={counts.expired ? 'warn' : 'default'} />
+            <Stat label={PROVIDER_STATUS_LABEL.stopped} value={counts.stopped} sub="需要供应方明确操作" />
           </div>
 
           <Card
@@ -105,7 +105,7 @@ export function ProviderApp() {
             extra={
               <div className="flex items-center gap-2">
                 <div className="relative"><Search size={13} className="absolute top-2 left-2.5 text-zinc-400" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索企业、设备码或实例标识" className="w-64 pl-8" /></div>
-                <Select value={filter} onChange={(event) => setFilter(event.target.value as Filter)} className="w-36"><option value="all">全部状态</option><option value="active">授权中</option><option value="expired">已到期</option><option value="stopped">人工停用</option></Select>
+                <Select value={filter} onChange={(event) => setFilter(event.target.value as Filter)} className="w-36"><option value="all">全部状态</option><option value="active">{PROVIDER_STATUS_LABEL.active}</option><option value="expired">{PROVIDER_STATUS_LABEL.expired}</option><option value="stopped">{PROVIDER_STATUS_LABEL.stopped}</option></Select>
               </div>
             }
           >
