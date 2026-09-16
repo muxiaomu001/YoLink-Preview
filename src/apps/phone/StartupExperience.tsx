@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ExternalLink, ShieldCheck, X } from 'lucide-react'
 import type { Announcement } from '@/domain/types'
+import { markStartupSeen, startupSeen } from '@/domain/startupSeen'
 import { useStore } from '@/store/store'
 
 function activeAnnouncements(items: Announcement[]) {
@@ -8,12 +9,8 @@ function activeAnnouncements(items: Announcement[]) {
   return items.filter((item) => item.startAt <= now && item.endAt >= now)
 }
 
-function seenKey(customerId: string, announcementId: string) {
-  return `yolink-announcement-seen:${customerId}:${announcementId}`
-}
-
 function canShowToCustomer(item: Announcement, customerId: string) {
-  return item.showMode === 'every' || localStorage.getItem(seenKey(customerId, item.id)) !== 'yes'
+  return item.showMode === 'every' || !startupSeen(customerId, item.id)
 }
 
 function popupFor(items: Announcement[], customerId?: string) {
@@ -26,17 +23,23 @@ export function StartupExperience({ customerId, onAnnouncementShown }: { custome
   const announcements = useStore((state) => state.announcements)
   const popup = useMemo(() => popupFor(announcements, customerId), [announcements, customerId])
   const [stage, setStage] = useState<'brand' | 'popup' | 'done'>(() => (enterprise.startupBrand.enabled ? 'brand' : popup ? 'popup' : 'done'))
+  const [brandFilled, setBrandFilled] = useState(false)
 
   const finishBrand = useCallback(() => setStage(popup ? 'popup' : 'done'), [popup])
   const closePopup = useCallback(() => {
-    if (popup && customerId && popup.showMode === 'once') localStorage.setItem(seenKey(customerId, popup.id), 'yes')
+    if (popup && customerId && popup.showMode === 'once') markStartupSeen(customerId, popup.id)
     setStage('done')
   }, [customerId, popup])
 
   useEffect(() => {
     if (stage !== 'brand') return
+    // 下一帧再把进度条拉满，让它按配置的秒数真的走完；直接设 100% 会没有过渡
+    const frame = window.requestAnimationFrame(() => setBrandFilled(true))
     const timer = window.setTimeout(finishBrand, enterprise.startupBrand.durationSeconds * 1000)
-    return () => window.clearTimeout(timer)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.clearTimeout(timer)
+    }
   }, [enterprise.startupBrand.durationSeconds, finishBrand, stage])
 
   useEffect(() => {
@@ -57,7 +60,7 @@ export function StartupExperience({ customerId, onAnnouncementShown }: { custome
         <p className="relative mt-3 text-xs tracking-[0.08em] text-white/65">{enterprise.startupBrand.tagline}</p>
         <div className="absolute bottom-10 flex flex-col items-center gap-4">
           <div className="h-1 w-24 overflow-hidden rounded-full bg-white/15">
-            <div className="h-full animate-pulse rounded-full bg-white/55" style={{ width: '64%' }} />
+            <div className="h-full rounded-full bg-white/55 transition-[width] ease-linear" style={{ width: brandFilled ? '100%' : '0%', transitionDuration: `${enterprise.startupBrand.durationSeconds}s` }} />
           </div>
           {enterprise.startupBrand.allowSkip && (
             <button type="button" onClick={finishBrand} className="rounded-full border border-white/20 px-4 py-1.5 text-[11px] text-white/75 hover:bg-white/10 hover:text-white">
@@ -72,13 +75,20 @@ export function StartupExperience({ customerId, onAnnouncementShown }: { custome
   if (!popup) return null
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-zinc-950/55 px-5 backdrop-blur-[2px]">
-      <section className="w-full overflow-hidden rounded-2xl bg-white shadow-2xl" aria-modal="true" role="dialog" aria-labelledby="startup-announcement-title">
-        <div className="relative flex h-36 items-center justify-center text-white" style={{ background: popup.imageColor || enterprise.brandColor }}>
-          <ShieldCheck size={48} strokeWidth={1.5} />
-          <button type="button" onClick={closePopup} className="absolute top-3 right-3 flex h-7 w-7 items-center justify-center rounded-full bg-black/15 text-white/80 hover:bg-black/25" aria-label="关闭启动公告">
+      <section className="relative w-full overflow-hidden rounded-2xl bg-white shadow-2xl" aria-modal="true" role="dialog" aria-labelledby="startup-announcement-title">
+        {/* 配图位跟后台公告列表的缩略图同一套：色块 + 标题首字。不放固定图标，免得维护通知和活动通知都顶着同一个盾牌 */}
+        {popup.imageColor ? (
+          <div className="relative flex h-28 items-center justify-center text-white" style={{ background: popup.imageColor }}>
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 text-xl font-semibold ring-1 ring-white/25">{popup.title.slice(0, 1)}</span>
+            <button type="button" onClick={closePopup} className="absolute top-3 right-3 flex h-7 w-7 items-center justify-center rounded-full bg-black/15 text-white/80 hover:bg-black/25" aria-label="关闭启动公告">
+              <X size={15} />
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={closePopup} className="absolute top-2.5 right-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" aria-label="关闭启动公告">
             <X size={15} />
           </button>
-        </div>
+        )}
         <div className="px-5 pt-5 pb-6 text-center">
           <h2 id="startup-announcement-title" className="text-base font-semibold text-zinc-900">{popup.title}</h2>
           <p className="mt-2 text-xs leading-6 text-zinc-600">{popup.body}</p>
@@ -110,7 +120,7 @@ export function ActiveAnnouncementBar({ customerId, dismissedIds, onDismiss, onA
   if (!item || dismissed) return null
 
   const close = () => {
-    if (item.showMode === 'once') localStorage.setItem(seenKey(customerId, item.id), 'yes')
+    if (item.showMode === 'once') markStartupSeen(customerId, item.id)
     onDismiss(item.id)
   }
 

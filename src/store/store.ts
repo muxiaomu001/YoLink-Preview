@@ -46,18 +46,13 @@ import { aExtraActions, type AExtraActions } from './actions/A-extra'
 import { dExtraActions, type DExtraActions } from './actions/D-extra'
 import { quickReplyActions, type QuickReplyActions } from './actions/quickReplies'
 import { providerLicensingActions, type ProviderLicensingActions } from './actions/providerLicensing'
+import { clearStartupSeen } from '@/domain/startupSeen'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
 export const STORAGE_KEY = 'yolink-demo-v11'
 
 const now = () => iso(Date.now())
 
-function clearStartupSeenState() {
-  if (typeof window === 'undefined') return
-  for (const key of Object.keys(localStorage)) {
-    if (key.startsWith('yolink-announcement-seen:')) localStorage.removeItem(key)
-  }
-}
 
 function renderWelcome(tpl: string, nickname: string, seatName: string): string {
   return tpl.replace('{{customer.nickname}}', nickname).replace('{{seat.name}}', seatName)
@@ -148,7 +143,7 @@ export const useStore = create<DemoStore>()(
       ...buildSeed(),
 
       resetDemo: () => {
-        clearStartupSeenState()
+        clearStartupSeen()
         set({ ...buildSeed() })
       },
 
@@ -724,6 +719,12 @@ export const useStore = create<DemoStore>()(
             ...saved.enterprise,
             startupBrand: { ...current.enterprise.startupBrand, ...saved.enterprise?.startupBrand },
           },
+          // 公告的起止时间是相对种子生成时刻算的，旧浏览器里存的那份一定是过期的。
+          // 种子里已有的公告只把时间窗刷成当前种子的值，标题正文等用户改过的内容照旧保留。
+          announcements: (saved.announcements ?? current.announcements).map((a) => {
+            const seeded = current.announcements.find((x) => x.id === a.id)
+            return seeded ? { ...a, startAt: seeded.startAt, endAt: seeded.endAt } : a
+          }),
           providerInstances: saved.providerInstances ?? current.providerInstances,
           providerLicenseActions: saved.providerLicenseActions ?? current.providerLicenseActions,
           roles: (saved.roles??current.roles).map((role)=>role.id==='role_admin'?{...role,caps:[...role.caps.filter((c)=>c!=='manage_messages'),'manage_messages' as const]}:role),

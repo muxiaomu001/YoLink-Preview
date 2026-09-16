@@ -11,7 +11,6 @@ const CARDS = [
   { to: '/phone', icon: Smartphone, title: '客户手机屏', who: '客户这边看到什么', desc: '扫码注册、加上官方联系人、聊天和查资料。客户全程只看到「顾问」，看不到背后是谁在操作。' },
   { to: '/workbench', icon: MonitorSmartphone, title: '客服工作台', who: '员工每天在这里干活', desc: '待我回复、AI 推荐回复、话术一键发、客户资料和群发。右下角可以切换成别的员工试。' },
   { to: '/admin', icon: Settings2, title: '管理后台', who: '老板和管理员管什么', desc: '邀请组、员工与坐席、知识库、权限开关、人员交接、经营看板。这里改一个开关，前面两屏立刻生效。' },
-  { to: '/provider', icon: KeyRound, title: '供应方授权中心', who: 'YoLink 供应方管理什么', desc: '绑定企业部署实例，查看到期状态，并执行续期、人工停用和恢复。到期不会自动停用。' },
 ]
 
 const FLOWS = [
@@ -33,7 +32,7 @@ export function Landing() {
         <header className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-[-0.02em] text-zinc-900">YoLink 交互演示</h1>
-            <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-zinc-600">一套自己的客户沟通系统：客户在手机上聊，员工在工作台接，老板在后台管，供应方在授权中心管理企业实例。下方入口可以分别打开，改一边看另一边。</p>
+            <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-zinc-600">一套自己的客户沟通系统：客户在手机上聊，员工在工作台接，老板在后台管。三个入口下面都打开，改一边看另一边。</p>
             <p className="mt-1 text-xs text-zinc-400">演示环境以虚构企业「{enterprise.name}」为例（{enterprise.slogan}）。</p>
           </div>
           <Button
@@ -55,14 +54,14 @@ export function Landing() {
             <span className="mx-1.5 text-zinc-300">|</span>
             {notes
               ? '灰色虚线框里的说明、标题旁的 P1 / P2 排期标记，都是给看演示的人看的，不属于产品。关掉即可看到正式产品应有的界面。'
-              : '已关闭。现在各入口显示的每一个字，都是正式产品应该有的样子。'}
+              : '已关闭。现在三个入口显示的每一个字，都是正式产品应该有的样子。'}
           </div>
           <DemoNoteToggle className="self-start sm:self-auto" />
         </div>
 
-        <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
           {CARDS.map((c) => (
-            <Link key={c.to} to={c.to} onClick={() => { if (c.to === '/provider') sessionStorage.setItem(PROVIDER_DEMO_ACCESS_KEY, 'yes') }} className="group rounded-xl border border-zinc-200 bg-white p-5 transition-shadow hover:shadow-md">
+            <Link key={c.to} to={c.to} className="group rounded-xl border border-zinc-200 bg-white p-5 transition-shadow hover:shadow-md">
               <c.icon className="mb-3 text-brand-700" size={22} />
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-zinc-900">{c.title}</h2>
@@ -92,8 +91,22 @@ export function Landing() {
           ))}
         </div>
 
+        {/* 供应方授权中心是 YoLink 自己用的后台，不是企业客户买到的东西：单独一条，不进上面那三张卡 */}
+        <Link
+          to="/provider"
+          onClick={() => sessionStorage.setItem(PROVIDER_DEMO_ACCESS_KEY, 'yes')}
+          className="group mt-8 flex items-center gap-3 rounded-lg border border-zinc-200 bg-white/60 px-4 py-3 transition-colors hover:bg-white"
+        >
+          <KeyRound size={16} className="shrink-0 text-zinc-400 group-hover:text-zinc-600" />
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-medium text-zinc-700">供应方授权中心<span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-normal text-zinc-500">YoLink 内部</span></div>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">绑定企业部署实例、查看到期状态、续期与人工停用。企业客户看不到这一层，给客户演示时不用打开。</p>
+          </div>
+          <ArrowRight size={14} className="shrink-0 text-zinc-300 transition-transform group-hover:translate-x-0.5 group-hover:text-zinc-500" />
+        </Link>
+
         <footer className="mt-10 border-t border-zinc-200 pt-4 text-[11px] leading-relaxed text-zinc-400">
-          <p>用法：各入口可以在不同窗口同时打开，数据实时同步。建议把客户屏放一侧，工作台或后台放另一侧，边操作边看客户侧的变化。</p>
+          <p>用法：三个入口可以在不同窗口同时打开，数据实时同步。建议把客户屏放一侧，工作台或后台放另一侧，边操作边看客户侧的变化。</p>
           <p className="mt-1.5">关于本演示：企业、人物、对话、金额全部虚构。AI 用本地知识库匹配，不连外部模型；App 推送、账单与经营报表为样例数据，不代表真实接入效果。标题旁带 P1 / P2 排期标记的页面是后续需求的讨论稿，不属于第一版范围。</p>
         </footer>
       </div>

@@ -118,7 +118,7 @@ export function ProviderApp() {
                 { key: 'enterprise', title: '企业', render: (instance) => <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-50 text-brand-700"><Building2 size={15} /></span><div><div className="font-medium text-zinc-900">{instance.enterpriseName}</div><div className="font-mono text-[10px] text-zinc-400">{instance.enterpriseCode}</div></div></div> },
                 { key: 'device', title: '绑定实例', render: (instance) => <KV items={[{ k: '设备码', v: <span className="font-mono text-[11px]">{instance.deviceCode}</span> }, { k: '实例标识', v: <span className="font-mono text-[10px] text-zinc-500">{instance.instanceId.slice(0, 13)}…</span> }]} /> },
                 { key: 'version', title: '版本', render: (instance) => <span className="font-mono text-xs">{instance.version}</span> },
-                { key: 'expiry', title: '本期到期日', render: (instance) => <div><div className="tabular-nums">{fmtDate(instance.expiresAt)}</div>{providerInstanceStatus(instance) === 'expired' && <div className="text-[10px] text-amber-700">{PROVIDER_STATUS_LABEL.expired}</div>}</div> },
+                { key: 'expiry', title: '本期到期日', render: (instance) => <span className="tabular-nums">{fmtDate(instance.expiresAt)}</span> },
                 { key: 'status', title: '状态', render: (instance) => <div><StatusPill instance={instance} />{instance.stopReason && <div className="mt-1 max-w-36 truncate text-[10px] text-zinc-400" title={instance.stopReason}>{instance.stopReason}</div>}</div> },
                 { key: 'ops', title: '操作', align: 'right', render: (instance) => <div className="flex justify-end gap-1"><Button size="sm" variant="ghost" onClick={() => setRenewing(instance)}>续期</Button>{instance.stoppedAt ? <Button size="sm" variant="secondary" onClick={() => void resume(instance)}>恢复</Button> : <Button size="sm" variant="danger" onClick={() => setStopping(instance)}>停用</Button>}</div> },
               ]}
@@ -134,7 +134,12 @@ export function ProviderApp() {
               columns={[
                 { key: 'time', title: '时间', render: (item) => <span className="tabular-nums text-zinc-500">{fmtDateTime(item.at)}</span> },
                 { key: 'action', title: '操作', render: (item) => <Pill tone={item.action === 'stop' ? 'red' : item.action === 'renew' ? 'blue' : 'green'}>{ACTION_LABEL[item.action]}</Pill> },
-                { key: 'instance', title: '实例', render: (item) => <span className="font-mono text-[11px]">{item.instanceId.slice(0, 18)}…</span> },
+                { key: 'instance', title: '实例', render: (item) => {
+                  const target = s.providerInstances.find((instance) => instance.instanceId === item.instanceId)
+                  return target
+                    ? <div><div className="text-zinc-900">{target.enterpriseName}</div><div className="font-mono text-[10px] text-zinc-400">{target.deviceCode}</div></div>
+                    : <span className="font-mono text-[11px] text-zinc-400">{item.instanceId.slice(0, 18)}…</span>
+                } },
                 { key: 'detail', title: '结果', render: (item) => <span className="text-zinc-700">{item.detail}</span> },
                 { key: 'operator', title: '操作者', render: (item) => <span className="inline-flex items-center gap-1 text-zinc-600"><ShieldCheck size={12} />{item.operatorName}</span> },
               ]}

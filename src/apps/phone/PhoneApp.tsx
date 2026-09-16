@@ -16,6 +16,7 @@ import { ContactsScreen } from './screens/ContactsScreen'
 import { MeScreen } from './screens/MeScreen'
 import { ChatScreen } from './screens/ChatScreen'
 import { ActiveAnnouncementBar, StartupExperience } from './StartupExperience'
+import { clearStartupSeen } from '@/domain/startupSeen'
 
 type Tab = 'chats' | 'contacts' | 'me'
 
@@ -45,6 +46,8 @@ export function PhoneApp() {
   }, [recordAnnouncementImpression])
 
   const restartStartup = () => {
+    // 「仅一次」的公告看过就写了本地标记，不清掉的话重播只剩品牌开屏，演示一个浏览器只能放一次
+    clearStartupSeen()
     shownAnnouncementIds.current.clear()
     setDismissedBarIds([])
     setStartupRun((value) => value + 1)
