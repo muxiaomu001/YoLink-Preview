@@ -1,3 +1,4 @@
+import { runSensitiveGate } from './sensitiveGate'
 /**
  * 演示状态仓库：全部数据在浏览器里，持久化到 localStorage，
  * 多个窗口（管理后台 / 工作台 / 客户屏）通过 storage 事件同步。
@@ -104,9 +105,9 @@ export interface CoreActions {
   setNote: (customerId: string, note: string) => void
   updateSeatWelcome: (seatId: string, welcome: string) => void
   /** 群发：返回实际发送数与因频控/拉黑/注销跳过数；频控超限返回 null（按钮应禁用） */
-  sendBroadcast: (input: { name: string; seatId: string; operatorId: string; targetKind: BroadcastTargetKind; targetDesc: string; contentKind?: 'text' | 'image' | 'file'; media?: MessageMedia; text: string; customerIds: string[]; chatGroupId?: string; scheduledAt?: string | null }) => { sent: number; skipped: number } | null
+  sendBroadcast: (input: { name: string; seatId: string; operatorId: string; targetKind: BroadcastTargetKind; targetDesc: string; contentKind?: 'text' | 'image' | 'file'; media?: MessageMedia; text: string; customerIds: string[]; chatGroupId?: string; scheduledAt?: string | null }) => { sent: number; skipped: number; reason?: string } | null
   /** 多坐席全覆盖群发：每个客户只收一条，发送身份优先用他的主归属坐席。频控超限返回 null */
-  sendCoverageBroadcast: (input: { name: string; seatIds: string[]; operatorId: string; text: string; scheduledAt?: string | null }) => { sent: number; skipped: number } | null
+  sendCoverageBroadcast: (input: { name: string; seatIds: string[]; operatorId: string; text: string; scheduledAt?: string | null }) => { sent: number; skipped: number; reason?: string } | null
   /** code 留空则随机生成；自定义码重复或不合法时返回 error */
   createInviteLink: (input: { name: string; inviteGroupId: string; creatorStaffId: string; expiresAt: string | null; maxUses: number | null; chatGroupIds?: string[]; code?: string }) => { ok: true; link: InviteLink } | { ok: false; error: string }
   revokeInviteLink: (id: string, byStaffId: string) => void
@@ -352,6 +353,13 @@ export const useStore = create<DemoStore>()(
         const s = get()
         const at = now()
         const today = at.slice(0, 10)
+        // 第一版群发只发送填写的正文，不展开昵称、坐席或企业变量。
+        if (/\{\{[^}]+\}\}/.test(input.text)) return { sent: 0, skipped: 0, reason: '群发不支持变量，请填写完整正文后再发送' }
+        const gate = runSensitiveGate(s, { text: input.text, scope: 'seat', senderId: input.seatId, operatorStaffId: input.operatorId, convId: '', at })
+        if (gate.blocked) {
+          set({ sensitiveHits: [...s.sensitiveHits, ...gate.hits] })
+          return { sent: 0, skipped: 0, reason: gate.blocked }
+        }
         const seat = s.seats.find((x) => x.id === input.seatId)
         // 频控一：每个实操员工每天任务数，跨其持有的坐席合并
         const myToday = s.broadcasts.filter((b) => b.operatorId === input.operatorId && b.sentAt.slice(0, 10) === today).length
@@ -364,11 +372,10 @@ export const useStore = create<DemoStore>()(
           const conv = convs.find((c) => c.kind !== 'dm' && c.chatGroupId === input.chatGroupId)
           if (conv) {
             conv.lastMessageAt = at
-            newMsgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.contentKind ?? 'text', text: input.text, media: input.media, at })
+            newMsgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.contentKind ?? 'text', text: gate.text, media: input.media, at })
           }
         } else {
           // 频控二：每客户每天最多收到的群发条数，跨坐席、跨任务合并
-          const seatName = s.seats.find((x) => x.id === input.seatId)?.displayName ?? ''
           input.customerIds.forEach((cid) => {
             const c = s.customers.find((x) => x.id === cid)
             if (!c || c.deletedAt || c.blacklistedAt || c.blockedSeatIds.includes(input.seatId)) {
@@ -386,8 +393,7 @@ export const useStore = create<DemoStore>()(
               return
             }
             conv.lastMessageAt = at
-            // 变量逐人替换：客户收到的是带自己昵称的私聊
-            const text = input.text.replaceAll('{{customer.nickname}}', c.nickname).replaceAll('{{staff.name}}', seatName).replaceAll('{{company.name}}', s.enterprise.name)
+            const text = gate.text
             newMsgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.contentKind ?? 'text', text, media: input.media, at, isBroadcast: true })
           })
         }
@@ -409,6 +415,7 @@ export const useStore = create<DemoStore>()(
           readCount: 0,
         }
         set({
+          sensitiveHits: input.scheduledAt ? s.sensitiveHits : [...s.sensitiveHits, ...newMsgs.flatMap((m) => gate.hits.map((h) => ({ ...h, id: newId('sh'), senderId: m.senderId, convId: m.convId })))],
           messages: input.scheduledAt ? s.messages : [...s.messages, ...newMsgs],
           conversations: input.scheduledAt ? s.conversations : convs,
           broadcasts: [record, ...s.broadcasts],
@@ -421,6 +428,13 @@ export const useStore = create<DemoStore>()(
         const s = get()
         const at = now()
         const today = at.slice(0, 10)
+        // 第一版群发只发送填写的正文，不展开昵称、坐席或企业变量。
+        if (/\{\{[^}]+\}\}/.test(input.text)) return { sent: 0, skipped: 0, reason: '群发不支持变量，请填写完整正文后再发送' }
+        const gate = runSensitiveGate(s, { text: input.text, scope: 'seat', senderId: input.seatIds[0] ?? '', operatorStaffId: input.operatorId, convId: '', at })
+        if (gate.blocked) {
+          set({ sensitiveHits: [...s.sensitiveHits, ...gate.hits] })
+          return { sent: 0, skipped: 0, reason: gate.blocked }
+        }
         // 频控归属：全覆盖只算发起人（后台管理员）的一个任务。
         // 若按投递坐席去扣各自实操员工的额度，管理员发一条全员通知就会把所有顾问当天的
         // 群发额度吃光，他们自己的营销群发全发不出去——那是运营事故，不是风控。
@@ -436,8 +450,7 @@ export const useStore = create<DemoStore>()(
           seatId: d.seatId,
           operatorId: input.operatorId,
           kind: 'text',
-          // 变量逐人替换：{{staff.name}} 取的是这一条实际的发送坐席，不是任务里的某一个
-          text: input.text.replaceAll('{{customer.nickname}}', d.customer.nickname).replaceAll('{{staff.name}}', s.seats.find((x) => x.id === d.seatId)?.displayName ?? '').replaceAll('{{company.name}}', s.enterprise.name),
+          text: gate.text,
           at,
           isBroadcast: true,
         }))
@@ -461,6 +474,7 @@ export const useStore = create<DemoStore>()(
           skipReasons: plan.skipReasons,
         }
         set({
+          sensitiveHits: input.scheduledAt ? s.sensitiveHits : [...s.sensitiveHits, ...newMsgs.flatMap((m) => gate.hits.map((h) => ({ ...h, id: newId('sh'), senderId: m.senderId, convId: m.convId })))],
           messages: input.scheduledAt ? s.messages : [...s.messages, ...newMsgs],
           conversations: input.scheduledAt ? s.conversations : s.conversations.map((c) => (convIds.has(c.id) ? { ...c, lastMessageAt: at } : c)),
           broadcasts: [record, ...s.broadcasts],

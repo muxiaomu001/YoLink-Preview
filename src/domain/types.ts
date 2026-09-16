@@ -518,6 +518,10 @@ export interface Message {
   shadowedAt?: ISODate
   /** 因为踩了影子词，还是因为这个客户整个人在影子模式里 */
   shadowReason?: 'word' | 'customer'
+  /** 衍生消息沿用原消息允许查看的客户；坐席转发不能扩大客户可见范围。 */
+  shadowCustomerIds?: string[]
+  /** 置顶通知等复制了原文的载体，用于跟随来源后续的影子状态。 */
+  shadowSourceIds?: string[]
   recipientCustomerId?: string
   channelId?: string
   channelSignature?: string

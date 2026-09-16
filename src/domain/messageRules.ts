@@ -73,12 +73,49 @@ export function actorCanView(s: DemoState, convId: string, actor: ChatActor) {
  * 回复与转发的目标全都走 messageVisibleFor，接在这里才没有漏网的入口——
  * 少接一处，被屏蔽的那句话就会从会话列表的预览里冒出来，影子当场穿帮。
  */
+const messageIndexes = new WeakMap<Message[], Map<string, Message>>()
+
+/**
+ * 回复、转发和置顶通知沿来源收窄可见范围。
+ * 来源后来编辑成影子时，已存在的衍生内容也不能继续公开原文。
+ */
+export function messageShadow(s: DemoState, m: Message): Pick<Message, 'shadowedAt' | 'shadowReason' | 'shadowCustomerIds'> {
+  let index = messageIndexes.get(s.messages)
+  if (!index) {
+    index = new Map(s.messages.map((x) => [x.id, x]))
+    messageIndexes.set(s.messages, index)
+  }
+  const pending = [m], visited = new Set<string>()
+  let shadowedAt: string | undefined, shadowReason: Message['shadowReason'], allowed: string[] | undefined
+  while (pending.length) {
+    const current = pending.pop()!
+    if (visited.has(current.id)) continue
+    visited.add(current.id)
+    if (current.shadowedAt) {
+      const customers = current.shadowCustomerIds ?? (current.senderKind === 'customer' ? [current.senderId] : [])
+      allowed = allowed === undefined ? customers : allowed.filter((id) => customers.includes(id))
+      if (!shadowedAt || current.shadowedAt < shadowedAt) {
+        shadowedAt = current.shadowedAt
+        shadowReason = current.shadowReason
+      }
+    }
+    for (const id of [current.replyToId, current.forwardedFrom?.messageId, ...(current.shadowSourceIds ?? [])]) {
+      const source = id ? index.get(id) : undefined
+      if (source) pending.push(source)
+    }
+  }
+  return shadowedAt ? { shadowedAt, shadowReason, shadowCustomerIds: allowed ?? [] } : {}
+}
+
 export function messageVisibleFor(s: DemoState, m: Message, actor: ChatActor) {
   const conv = s.conversations.find((c) => c.id === m.convId)
   if(m.recipientCustomerId && (actor.kind!=='customer'||actor.id!==m.recipientCustomerId))return false
   // 影子屏蔽：发的人自己看得见（他不知道被屏蔽了），坐席看得见（要能判断这人在干什么），
   // 其他客户看不见。私聊里没有「其他客户」，所以影子屏蔽实际只在群和频道里起作用。
-  if (m.shadowedAt && actor.kind === 'customer' && m.senderId !== actor.id) return false
+  if (actor.kind === 'customer') {
+    const shadow = messageShadow(s, m)
+    if (shadow.shadowedAt && !shadow.shadowCustomerIds?.includes(actor.id)) return false
+  }
   if (!conv || !actorCanView(s, conv.id, actor) || m.deletedAt) return false
   if (m.hiddenFor?.includes(actorKey(actor)) || m.at <= (conv.clearedThroughByViewer?.[actorKey(actor)] ?? '')) return false
   if (m.delivery && m.delivery !== 'sent') return m.senderKind === actor.kind && m.senderId === actor.id && (actor.kind !== 'seat' || m.operatorId === actor.staffId)

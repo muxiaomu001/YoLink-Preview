@@ -219,6 +219,7 @@ export function BroadcastCreateModal({ s, onClose }: { s: DemoStore; onClose: ()
         ? s.sendBroadcast({ name: name.trim(), seatId: seat!.id, operatorId, targetKind: 'friends', targetDesc: '全部好友', text: text.trim(), customerIds: friends.map((c) => c.id), scheduledAt: at })
         : s.sendCoverageBroadcast({ name: name.trim(), seatIds: coverIds, operatorId, text: text.trim(), scheduledAt: at })
     if (!r) return toast(`该实操员工今天的群发任务已达上限 ${perStaff}`, 'warn')
+    if (r.reason) return toast(r.reason, 'warn')
     if (mode === 'scheduled') toast('已创建定时任务，到点按当时人群计算再发', 'info')
     else toast(`已发送 ${r.sent} 人${r.skipped ? `，跳过 ${r.skipped} 人` : ''}`)
     onClose()
@@ -313,7 +314,7 @@ export function BroadcastCreateModal({ s, onClose }: { s: DemoStore; onClose: ()
         <Field label="任务名称" required>
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="内部可见，如：本周市场观点" />
         </Field>
-        <Field label="文本内容" required hint={reach === 'coverage' ? '支持 {{customer.nickname}} 与 {{staff.name}}，逐人替换；{{staff.name}} 取这一条实际的发送坐席' : '支持 {{customer.nickname}}，发送时逐人替换成客户昵称'}>
+        <Field label="文本内容" required hint="所有收件人收到相同的正文">
           <Textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} />
         </Field>
         <div className="grid grid-cols-2 gap-3">

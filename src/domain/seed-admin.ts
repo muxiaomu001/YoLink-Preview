@@ -118,7 +118,7 @@ export const POLICY_ITEMS: PolicyItem[] = [
   { key: 'ai.suggest', label: 'AI 回复推荐', group: '模块 · AI', desc: '工作台输入框上方的草稿', level: 'P0', staffOnly: true },
   { key: 'ai.knowledge', label: 'AI 知识库', group: '模块 · AI', desc: '草稿引用企业知识库', level: 'P0', staffOnly: true },
   { key: 'ai.copywriting', label: 'AI 写文案', group: '模块 · AI', desc: '群发与横幅编辑器里的按钮', level: 'P0', staffOnly: true },
-  { key: 'ai.group_warmup', label: '群活跃助手', group: '模块 · AI', desc: '机器人按剧本或 AI 在群里发言', level: 'P0', staffOnly: true },
+  { key: 'ai.group_warmup', label: '群活跃助手', group: '模块 · AI', desc: '活跃角色按人设与剧本参与群聊', level: 'P0', staffOnly: true },
 ]
 
 /** 客服预设下客户关闭的键：其余默认开 */

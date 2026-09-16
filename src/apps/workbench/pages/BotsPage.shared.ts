@@ -30,10 +30,10 @@ export const RUN_STATUS_TONE: Record<BotRunStatus, 'green' | 'amber' | 'zinc' | 
   rejected: 'red',
 }
 
-/** 机器人头像可选色 */
+/** 活跃角色头像可选色 */
 export const BOT_AVATAR_COLORS = ['#0f766e', '#be123c', '#7e22ce', '#0369a1', '#b45309', '#4d7c0f', '#52525b']
 
-/** 机器人发言后多少分钟内的客户发言算"带动" */
+/** 活跃角色发言后多少分钟内的客户发言算"带动" */
 export const DRIVE_WINDOW_MS = 30 * 60 * 1000
 
 /** 触发条件的一句话描述 */
@@ -43,12 +43,12 @@ export function describeTrigger(rule: { trigger: BotTrigger; silenceMinutes?: nu
   return TRIGGER_LABEL[rule.trigger]
 }
 
-/** 机器人发言数：运行记录里真正进群的 */
+/** 活跃角色发言数：运行记录里真正进群的 */
 export function botSentCount(runs: BotRun[]): number {
   return runs.filter((r) => r.status === 'sent').length
 }
 
-/** 带动率：每次机器人发言后 30 分钟内群里客户发言数 ÷ 机器人发言数，按消息表算 */
+/** 带动率：每次活跃角色发言后 30 分钟内群里客户发言数 ÷ 活跃角色发言数，按消息表算 */
 export function driveRate(s: DemoState): { rate: number; botMsgs: number; driven: number } {
   const botMsgs = s.messages.filter((m) => m.senderKind === 'bot')
   const driven = botMsgs.reduce((sum, bm) => {

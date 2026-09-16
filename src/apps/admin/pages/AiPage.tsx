@@ -162,7 +162,7 @@ function GroupTab() {
   const g = s.aiSettings.group
   const lic = s.license.modules.find((m) => m.key === 'ai')
   const botLimit = lic?.botLimit ?? g.botLimit
-  // 已用按真实机器人账号算：启用中的才占授权名额
+  // 已用按真实活跃角色算：启用中的才占授权名额
   const botUsed = s.bots.filter((b) => b.enabled).length
   const pendingRuns = s.botRuns.filter((r) => r.status === 'pending_review').length
   const [rule, setRule] = useState(g.defaultRule)
@@ -177,12 +177,12 @@ function GroupTab() {
     <div className="space-y-4">
       <DemoNote>群活跃助手还是产品讨论稿：这里只演示形态，首版的触发、节奏和审核细节待确认。</DemoNote>
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="授权机器人账号数" value={botLimit} sub="来自许可证 AI 模块" />
+        <Stat label="授权活跃角色数" value={botLimit} sub="来自许可证 AI 模块" />
         <Stat label="已用" value={botUsed} sub={`剩余 ${Math.max(0, botLimit - botUsed)} 个可绑定到群`} tone={botUsed >= botLimit ? 'warn' : 'default'} />
         <Stat label="许可到期" value={lic ? fmtDateTime(lic.expiresAt).slice(0, 10) : '-'} />
       </div>
       <Card
-        title="机器人账号"
+        title="活跃角色"
         padded={false}
         extra={
           <Link to="/workbench/bots" target="_blank" className="flex items-center gap-1 text-xs text-brand-700 hover:underline">
@@ -194,7 +194,7 @@ function GroupTab() {
           rows={s.bots}
           rowKey={(b) => b.id}
           dense
-          empty="还没有机器人账号，去工作台 → 群活跃助手 新建"
+          empty="还没有活跃角色，去工作台 → 群活跃助手 新建"
           columns={[
             { key: 'name', title: '昵称', render: (b) => <span className="flex items-center gap-1.5"><Avatar text={b.nickname} color={b.avatarColor} size={20} /><span className="font-medium text-zinc-900">{b.nickname}</span></span> },
             { key: 'groups', title: '所属群', render: (b) => b.groupIds.map((id) => s.chatGroups.find((x) => x.id === id)?.name).filter(Boolean).join('、') || <span className="text-zinc-400">未入群</span> },
@@ -204,7 +204,7 @@ function GroupTab() {
           ]}
         />
         <div className="border-t border-zinc-100 px-3 py-1.5 text-[11px] text-zinc-400">
-          规则 {s.botRules.length} 条（启用 {s.botRules.filter((r) => r.enabled).length}）· 待审核 {pendingRuns} 条{s.botsPausedAll ? ' · 全部已暂停' : ''}。机器人账号、剧本与规则在工作台维护，这里只看全局默认规则与授权。
+          规则 {s.botRules.length} 条（启用 {s.botRules.filter((r) => r.enabled).length}）· 待审核 {pendingRuns} 条{s.botsPausedAll ? ' · 全部已暂停' : ''}。活跃角色、剧本与规则在工作台维护，这里只看全局默认规则与授权。
         </div>
       </Card>
       <Card title="全局默认规则" extra={<Button size="sm" variant="primary" disabled={!!error} onClick={save}>保存</Button>}>
@@ -223,7 +223,7 @@ function GroupTab() {
             </div>
           </Field>
           {error && <p className="text-xs text-red-600">{error}</p>}
-          <Note>先审后发：AI 起的话题先进机器人账号实操员工的待办，员工点发送才进群。金融场景建议保持先审后发。</Note>
+          <Note>先审后发：AI 起的话题先进活跃角色实操员工的待办，员工点发送才进群。金融场景建议保持先审后发。</Note>
         </div>
       </Card>
     </div>

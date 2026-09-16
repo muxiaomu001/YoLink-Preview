@@ -6,7 +6,7 @@ import { clsx } from 'clsx'
 import { ChevronDown, ChevronUp, PanelRightClose, PanelRightOpen, Pin, Search, Sparkles, X } from 'lucide-react'
 import type { AiDraft } from '@/domain/ai'
 import type { ChatGroup, Message, Seat } from '@/domain/types'
-import { messageVisibleFor, seatMessageSendAllowed } from '@/domain/messageRules'
+import { messageShadow, messageVisibleFor, seatMessageSendAllowed } from '@/domain/messageRules'
 import { fmtAgo } from '@/domain/time'
 import { seatCan, senderName, visibleText } from '@/store/policy'
 import { conversationsForSeat, type ConvRow } from '@/store/selectors'
@@ -177,16 +177,18 @@ export function ForwardModal({ message, messages, seat, onClose }: { message: Me
 export function PinModal({ message, group, onClose }: { message: Message; group: ChatGroup; onClose: () => void }) {
   const { s, staff, seat } = useWorkbench()
   const [notify, setNotify] = useState(true)
+  const shadowed = !!messageShadow(s, s.messages.find((m) => m.id === message.id) ?? message).shadowedAt
   const submit = () => {
     if (!seat || !staff) return
-    s.pinMessage(group.id, message.id, notify, { seatId: seat.id, staffId: staff.id })
-    toast(notify ? '已置顶，并向成员发出系统消息' : '已置顶')
+    s.pinMessage(group.id, message.id, notify && !shadowed, { seatId: seat.id, staffId: staff.id })
+    toast(notify && !shadowed ? '已置顶，并向成员发出系统消息' : '已置顶')
     onClose()
   }
   return (
     <Modal open onClose={onClose} title="置顶这条消息？" width={420} footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" onClick={submit}>置顶</Button></>}>
       <div className="mb-3 rounded-md bg-zinc-50 px-2.5 py-1.5 text-[12px] text-zinc-600">{senderName(s, message)}：{message.text.slice(0, 80)}</div>
-      <Checkbox checked={notify} onChange={setNotify} label="通知成员（群里发一条「置顶了一条消息」的系统消息）" />
+      <Checkbox checked={notify && !shadowed} disabled={shadowed} onChange={setNotify} label="通知成员（群里发一条「置顶了一条消息」的系统消息）" />
+      {shadowed && <p className="mt-2 text-xs text-purple-700">此消息处于影子屏蔽状态，置顶不会向群成员发送通知。</p>}
       <div className="mt-2 text-[11px] text-zinc-400">置顶数量不限；群顶部显示最新一条，展开可看全部。</div>
     </Modal>
   )

@@ -1,12 +1,12 @@
 /**
  * 单条消息：系统消息灰色居中；文本 URL 自动成链接；图片消息显示缩略图（点开大图）、文件消息显示文件卡，说明文字在下方；
- * 回复条可跳转；已删除的消息不进列表、不留占位；机器人、群发、转发、AI 草稿、欢迎语小标；菜单按权限显示（回复、复制、转发、编辑、置顶、选择多条、删除）。
+ * 回复条可跳转；已删除的消息不进列表、不留占位；活跃角色、群发、转发、AI 草稿、欢迎语小标；菜单按权限显示（回复、复制、转发、编辑、置顶、选择多条、删除）。
  */
 import { useCallback, useState } from 'react'
 import { clsx } from 'clsx'
 import { Bot, CheckSquare, Copy, Forward, MoreHorizontal, Pencil, Pin, Reply, Trash2 } from 'lucide-react'
 import type { ChatGroup, Message, Seat } from '@/domain/types'
-import { channelOf, messageVisibleFor } from '@/domain/messageRules'
+import { channelOf, messageShadow, messageVisibleFor } from '@/domain/messageRules'
 import { fmtDateTime, fmtTime } from '@/domain/time'
 import { botById, seatCan, seatGroupPerm, senderName } from '@/store/policy'
 import { customerById, seatById, staffById } from '@/store/selectors'
@@ -108,7 +108,7 @@ export function MessageItem({
               {senderName(s, m)}
               {senderTitle && <TitleChip title={senderTitle} size="xs" />}
               {otherSeat && <Pill tone="blue">官方</Pill>}
-              {bot && <Pill tone="purple"><Bot size={10} className="mr-0.5" />机器人</Pill>}
+              {bot && <Pill tone="purple"><Bot size={10} className="mr-0.5" />活跃角色</Pill>}
             </div>
           )}
           {replyTo && (
@@ -144,7 +144,7 @@ export function MessageItem({
             {m.isWelcome && <span className="rounded bg-zinc-100 px-1">欢迎语</span>}
             {m.isBroadcast && <span className="rounded bg-amber-50 px-1 text-amber-700">群发</span>}
             {/* 影子屏蔽只有坐席这一侧看得到。客户那边一点提示都不能有，否则整个机制就白做了 */}
-            {m.shadowedAt && (
+            {messageShadow(s, m).shadowedAt && (
               <span className="rounded bg-purple-50 px-1 text-purple-700" title={`${m.shadowReason === 'customer' ? '该客户处于影子模式' : '命中影子屏蔽词'}；群里其他客户看不到这条，他本人以为发出去了`}>
                 影子屏蔽{m.shadowReason === 'customer' ? '（整号）' : ''}
               </span>

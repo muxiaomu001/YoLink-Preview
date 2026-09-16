@@ -80,7 +80,7 @@ export function GroupBasic({ group: g, actor, perm, compact, onJumpMembers }: Gr
       <div className="mt-3">
         <KV
           items={[
-            { k: '成员', v: <button type="button" className="text-brand-700 hover:underline" onClick={jumpMembers}>{memberTotal(g)} 人（{g.memberCustomerIds.length} 客户 · {g.memberSeatIds.length} 坐席{g.memberBotIds.length ? ` · ${g.memberBotIds.length} 机器人` : ''}）</button> },
+            { k: '成员', v: <button type="button" className="text-brand-700 hover:underline" onClick={jumpMembers}>{memberTotal(g)} 人（{g.memberCustomerIds.length} 客户 · {g.memberSeatIds.length} 坐席{g.memberBotIds.length ? ` · ${g.memberBotIds.length} 活跃角色` : ''}）</button> },
             { k: '创建者', v: owner ? <span className="inline-flex items-center gap-1"><SeatAvatar seat={owner} size={16} />{owner.displayName}（群主坐席）</span> : '-' },
             { k: '创建时间', v: <span className="tabular-nums">{fmtDateTime(g.createdAt)}</span> },
             { k: '类型', v: `${GROUP_KIND_TEXT[g.kind]}${g.kind === 'channel' ? '，客户只读' : ''}` },

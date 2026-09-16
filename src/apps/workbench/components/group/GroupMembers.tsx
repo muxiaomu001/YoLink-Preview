@@ -1,5 +1,5 @@
 /**
- * 成员列表：坐席（群主 / 管理员 / 成员，标"官方"）、机器人、客户（管理员在前），可搜索。
+ * 成员列表：坐席（群主 / 管理员 / 成员，标"官方"）、活跃角色、客户（管理员在前），可搜索。
  * 每项操作按 12 文档权限：任免管理员 can_promote_members；移出 / 禁言 / 封禁 / 解除 can_restrict_members；
  * 加坐席与批量拉人 can_invite_users。客户也可被设为管理员（"助教"）。
  */
@@ -99,7 +99,7 @@ export function GroupMembers({ group: g, actor, perm, compact, canViewAll }: Gro
           )
         })}
         {shownBots.map((b) => (
-          <Row key={b.id} avatar={<Avatar text={b.nickname} size={22} color={b.avatarColor} />} name={b.nickname} role="bot" extra={<Pill tone="purple"><Bot size={10} className="mr-0.5" />机器人</Pill>} perms={[]} menuOpen={false} onMenu={() => toast('机器人账号在「群活跃助手」页管理', 'info')} />
+          <Row key={b.id} avatar={<Avatar text={b.nickname} size={22} color={b.avatarColor} />} name={b.nickname} role="bot" extra={<Pill tone="purple"><Bot size={10} className="mr-0.5" />活跃角色</Pill>} perms={[]} menuOpen={false} onMenu={() => toast('活跃角色在「群活跃助手」页管理', 'info')} />
         ))}
         {customers.slice(0, limit).map((c) => {
           const role = groupRoleOf(g, 'customer', c.id)
@@ -158,7 +158,7 @@ const ROLE_TEXT: Record<string, { label: string; tone: 'amber' | 'blue' | 'zinc'
   owner: { label: '群主', tone: 'amber' },
   admin: { label: '管理员', tone: 'blue' },
   member: { label: '成员', tone: 'zinc' },
-  bot: { label: '机器人', tone: 'purple' },
+  bot: { label: '活跃角色', tone: 'purple' },
 }
 
 function Row({ avatar, name, role, extra, status, perms, menuOpen, onMenu, children }: { avatar: React.ReactNode; name: string; role: string; extra?: React.ReactNode; status?: string; perms: string[]; menuOpen: boolean; onMenu: () => void; children?: React.ReactNode }) {

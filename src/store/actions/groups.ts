@@ -1,3 +1,4 @@
+import { messageShadow } from '@/domain/messageRules'
 /**
  * 群管理（工作台群信息卡与管理后台群管理页共用）：
  * 建群、群设置、公告、置顶、成员增删、管理员任免、禁言封禁、群邀请链接、批量拉人。
@@ -133,7 +134,7 @@ export function groupActions(set: Set, get: Get): GroupActions {
         const m = s.messages.find((x) => x.id === messageId)
         if (!g || !m || g.pinnedMessageIds.includes(messageId)) return {}
         const at = now()
-        const sys: Message[] = notify ? [{ id: newId('msg'), convId: m.convId, senderKind: 'system', senderId: '', kind: 'system', text: `置顶了一条消息：${m.text.slice(0, 30)}`, at }] : []
+        const sys: Message[] = notify && !messageShadow(s, m).shadowedAt ? [{ id: newId('msg'), convId: m.convId, senderKind: 'system', senderId: '', kind: 'system', text: `置顶了一条消息：${m.text.slice(0, 30)}`, at, shadowSourceIds: [m.id] }] : []
         return {
           chatGroups: patchGroup(groupId, (x) => ({ ...x, pinnedMessageIds: [messageId, ...x.pinnedMessageIds] }))(s.chatGroups),
           messages: sys.length ? [...s.messages, ...sys] : s.messages,

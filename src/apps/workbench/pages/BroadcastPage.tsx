@@ -15,7 +15,7 @@ import { toast } from '@/ui/overlay'
 import { FileCard, ImageThumb, readFileAsMedia } from '@/ui/media'
 import { useWorkbench } from '../useWorkbench'
 import { BroadcastDetailModal, BroadcastRecords, QuickReplyPickerModal } from './BroadcastPage.parts'
-import { DELIVERY_RULES, TARGET_LABEL, renderVars } from './BroadcastPage.shared'
+import { DELIVERY_RULES, TARGET_LABEL } from './BroadcastPage.shared'
 
 type ContentKind = Broadcast['contentKind']
 type SendMode = 'now' | 'scheduled'
@@ -148,6 +148,7 @@ export function BroadcastPage() {
     if (mode === 'scheduled' && new Date(scheduledAt).getTime() <= Date.now()) return toast('定时时间要晚于现在', 'warn')
     const r = s.sendBroadcast({ name: name.trim(), seatId: seat.id, operatorId: staff.id, targetKind, targetDesc, contentKind, media: needMedia ? media : undefined, text: text.trim(), customerIds: targets.map((c) => c.id), chatGroupId: targetKind === 'group' ? groupId : undefined, scheduledAt: mode === 'scheduled' ? new Date(scheduledAt).toISOString() : null })
     if (!r) return toast(`超过频控：每个实操员工每天 ${perStaff} 个任务，明天再发`, 'warn')
+    if (r.reason) return toast(r.reason, 'warn')
     if (mode === 'scheduled') toast('已创建定时任务，到点按当时人群发送', 'info')
     else if (targetKind === 'group') toast(r.sent ? `已以「${seat.displayName}」身份往群「${group?.name}」发了一条群消息` : '群会话不存在，未发送', r.sent ? 'ok' : 'warn')
     else toast(`已以「${seat.displayName}」身份发给 ${r.sent} 位客户${r.skipped ? `，跳过 ${r.skipped} 位（注销 / 拉黑 / 屏蔽 / 频控）` : ''}`)
@@ -286,12 +287,11 @@ export function BroadcastPage() {
                   </div>
                 </Field>
               )}
-              <Field label={needMedia ? '随附说明' : '文本内容'} required={!needMedia} hint={needMedia ? '可空；和附件一起发出' : '支持 {{customer.nickname}}，发送时逐人替换'}>
+              <Field label={needMedia ? '随附说明' : '文本内容'} required={!needMedia} hint={needMedia ? '可空；和附件一起发出' : '所有收件人收到相同的正文'}>
                 <div ref={textWrapRef}>
                   <Textarea rows={needMedia ? 3 : 5} value={text} onChange={(e) => setText(e.target.value)} placeholder={needMedia ? '一句说明，可不填' : ''} />
                 </div>
               </Field>
-              {text.includes('{{customer.nickname}}') && targets[0] && <div className="text-[11px] text-zinc-500">预览（以「{targets[0].nickname}」为例）：{renderVars(text, targets[0].nickname).slice(0, 80)}</div>}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1">
                   {!needMedia && (

@@ -25,7 +25,7 @@ export function RulesTab() {
   const simulate = (r: BotRule) => {
     const run = s.simulateBotRule(r.id, staffId)
     if (!run) return
-    if (run.status === 'sent') toast(`「${r.name}」已触发：机器人发言已进群`, 'ok')
+    if (run.status === 'sent') toast(`「${r.name}」已触发：活跃角色发言已进群`, 'ok')
     else if (run.status === 'pending_review') toast(`「${r.name}」已触发：内容进入待审核，员工放行后才进群`, 'info')
     else toast(`「${r.name}」跳过：${run.reason}`, 'warn')
   }
@@ -49,7 +49,7 @@ export function RulesTab() {
             { key: 'review', title: '审核模式', render: (r) => (r.reviewMode === 'review' ? <Pill tone="amber">先审后发</Pill> : <Pill tone="green">自动发</Pill>) },
             { key: 'groups', title: '群', render: (r) => names(r.groupIds, s.chatGroups) || <span className="text-zinc-400">无</span> },
             { key: 'script', title: '剧本', render: (r) => s.botScripts.find((x) => x.id === r.scriptId)?.name ?? <span className="text-red-600">剧本已删除</span> },
-            { key: 'bots', title: '机器人', render: (r) => names(r.botIds, s.bots) || <span className="text-zinc-400">无</span> },
+            { key: 'bots', title: '活跃角色', render: (r) => names(r.botIds, s.bots) || <span className="text-zinc-400">无</span> },
             { key: 'enabled', title: '启停', render: (r) => <Switch checked={r.enabled} onChange={(v) => { s.saveBotRule({ ...r, enabled: v }, staffId); toast(v ? `已启用「${r.name}」` : `已停用「${r.name}」`) }} /> },
             {
               key: 'ops',
@@ -86,7 +86,7 @@ function RuleModal({ rule, onClose }: { rule?: BotRule; onClose: () => void }) {
   const [botIds, setBotIds] = useState<string[]>(rule?.botIds ?? [])
   const timeList = times.split(/[,，\s]+/).map((t) => t.trim()).filter(Boolean)
   const timeOk = timeList.every((t) => /^\d{2}:\d{2}$/.test(t))
-  const error = !name.trim() ? '名称不能为空' : trigger === 'silence' && silence < 5 ? '沉默时长至少 5 分钟' : trigger === 'schedule' && (!timeList.length || !timeOk) ? '时段格式 HH:MM，多个用逗号分隔' : hourly < 1 ? '每小时上限至少 1' : !scriptId ? '请选择剧本' : groupIds.length === 0 ? '至少选一个群' : botIds.length === 0 ? '至少选一个机器人' : ''
+  const error = !name.trim() ? '名称不能为空' : trigger === 'silence' && silence < 5 ? '沉默时长至少 5 分钟' : trigger === 'schedule' && (!timeList.length || !timeOk) ? '时段格式 HH:MM，多个用逗号分隔' : hourly < 1 ? '每小时上限至少 1' : !scriptId ? '请选择剧本' : groupIds.length === 0 ? '至少选一个群' : botIds.length === 0 ? '至少选一个活跃角色' : ''
   const groups = s.chatGroups.filter((g) => g.kind !== 'channel')
   const botsInGroups = s.bots.filter((b) => b.enabled)
   const submit = () => {
@@ -131,7 +131,7 @@ function RuleModal({ rule, onClose }: { rule?: BotRule; onClose: () => void }) {
               <Input value={times} onChange={(e) => setTimes(e.target.value)} placeholder="10:00, 20:00" />
             </Field>
           )}
-          <Field label="每小时上限" required hint="每群每小时机器人发言次数">
+          <Field label="每小时上限" required hint="每群每小时活跃角色发言次数">
             <Input type="number" min={1} value={hourly} onChange={(e) => setHourly(num(e.target.value))} />
           </Field>
           <Field label="审核模式" hint="金融场景建议先审后发">
@@ -156,12 +156,12 @@ function RuleModal({ rule, onClose }: { rule?: BotRule; onClose: () => void }) {
             ))}
           </div>
         </Field>
-        <Field label="机器人" required hint="多选则轮换；只列出启用中的">
+        <Field label="活跃角色" required hint="多选则轮换；只列出启用中的">
           <div className="grid grid-cols-2 gap-1.5">
             {botsInGroups.map((b) => (
               <Checkbox key={b.id} checked={botIds.includes(b.id)} onChange={(v) => setBotIds((ids) => (v ? [...ids, b.id] : ids.filter((x) => x !== b.id)))} label={`${b.nickname}${b.groupIds.length ? '' : '（未入群）'}`} />
             ))}
-            {botsInGroups.length === 0 && <span className="text-[12px] text-zinc-400">没有启用中的机器人</span>}
+            {botsInGroups.length === 0 && <span className="text-[12px] text-zinc-400">没有启用中的活跃角色</span>}
           </div>
         </Field>
         {error && name && <p className="text-[12px] text-red-600">{error}</p>}
@@ -188,12 +188,14 @@ export function ReviewAndRuns() {
       toast(`「${g.name}」全员禁言中，放行也不会进群，请先解除禁言`, 'warn')
       return
     }
-    s.reviewBotRun(r.id, true, staffId)
+    const error = s.reviewBotRun(r.id, true, staffId)
+    if (error) return toast(error, 'warn')
     toast(`已放行，「${botOf(r.botId)?.nickname}」的发言已进「${groupName(r.groupId)}」`)
   }
   const reject = () => {
     if (!rejecting || !reason.trim()) return
-    s.reviewBotRun(rejecting.id, false, staffId, reason.trim())
+    const error = s.reviewBotRun(rejecting.id, false, staffId, reason.trim())
+    if (error) return toast(error, 'warn')
     toast('已驳回，不会进群')
     setRejecting(null)
     setReason('')
@@ -206,9 +208,9 @@ export function ReviewAndRuns() {
           rows={pending}
           rowKey={(r) => r.id}
           dense
-          empty="没有待审核的机器人发言"
+          empty="没有待审核的活跃角色发言"
           columns={[
-            { key: 'bot', title: '机器人', render: (r) => <span className="flex items-center gap-1.5"><Avatar text={botOf(r.botId)?.nickname ?? '?'} color={botOf(r.botId)?.avatarColor} size={20} />{botOf(r.botId)?.nickname}</span> },
+            { key: 'bot', title: '活跃角色', render: (r) => <span className="flex items-center gap-1.5"><Avatar text={botOf(r.botId)?.nickname ?? '?'} color={botOf(r.botId)?.avatarColor} size={20} />{botOf(r.botId)?.nickname}</span> },
             { key: 'group', title: '群', render: (r) => groupName(r.groupId) },
             { key: 'text', title: '内容', render: (r) => <span className="line-clamp-2 max-w-[240px] text-[12px] text-zinc-700">{r.text}</span> },
             { key: 'at', title: '时间', render: (r) => <span className="tabular-nums text-zinc-500">{fmtDateTime(r.at)}</span> },
@@ -234,7 +236,7 @@ export function ReviewAndRuns() {
           columns={[
             { key: 'at', title: '时间', render: (r) => <span className="tabular-nums text-zinc-500">{fmtDateTime(r.at)}</span> },
             { key: 'rule', title: '规则', render: (r) => <span className="text-[12px]">{ruleName(r.ruleId)}</span> },
-            { key: 'bot', title: '机器人', render: (r) => botOf(r.botId)?.nickname ?? <span className="text-zinc-400">已删除</span> },
+            { key: 'bot', title: '活跃角色', render: (r) => botOf(r.botId)?.nickname ?? <span className="text-zinc-400">已删除</span> },
             { key: 'group', title: '群', render: (r) => groupName(r.groupId) },
             { key: 'status', title: '状态', render: (r) => <Pill tone={RUN_STATUS_TONE[r.status]}>{RUN_STATUS_LABEL[r.status]}</Pill> },
             { key: 'detail', title: '原因 / 内容', render: (r) => <span className="line-clamp-1 max-w-[220px] text-[12px] text-zinc-600" title={r.reason ?? r.text}>{r.status === 'skipped' || r.status === 'rejected' ? r.reason : r.text}</span> },
@@ -245,7 +247,7 @@ export function ReviewAndRuns() {
         <Modal
           open
           onClose={() => setRejecting(null)}
-          title="驳回这条机器人发言"
+          title="驳回这条活跃角色发言"
           width={440}
           footer={
             <>

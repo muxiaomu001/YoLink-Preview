@@ -1,12 +1,12 @@
+import { runSensitiveGate } from '../sensitiveGate'
 /**
  * 工作台动作：消息操作（回复、转发、坐席删群消息）、会话操作（已读、置顶、静音）、
  * 客户操作（重置密码、拉黑、全群禁言）、个人设置、客户手机端的社交动作。话术库见 quickReplies.ts。
  */
-import type { Message, MessageMedia, StaffPrefs } from '@/domain/types'
+import type { MessageMedia, StaffPrefs } from '@/domain/types'
 import { messageLimitSeconds, messageVisibleFor, mentionsIn, seatConversationAllowed, seatMessageSendAllowed } from '@/domain/messageRules'
 import { customerCan } from '../policy'
 import { seatCan } from '../policy'
-import { newId } from '@/domain/ids'
 import { DEFAULT_STAFF_PREFS } from '@/domain/seed-groups'
 import { type Get, type Set, now, randomPassword, withAudit } from './helpers'
 
@@ -56,7 +56,12 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
       const mentions = mentionsIn(s, m.convId, body, { mentionSeatIds: m.mentionSeatIds ?? [], mentionCustomerIds: m.mentionCustomerIds ?? [] })
       if (mentions.mentionAll && !seatCan(s, m.seatId, 'group.mention_all')) return '当前策略不允许 @所有人'
       const at = now()
-      set({ messages: s.messages.map((x) => x.id === m.id ? { ...x, text: body, editedAt: at, editHistory: [...(x.editHistory ?? []), { text: x.text, at, operatorId: byStaffId }], ...mentions } : x), audit: withAudit(s.audit, 'message.edit', `编辑消息 ${m.id}，修改前的内容已保留`, byStaffId) })
+      const scan = runSensitiveGate(s, { text: body, scope: 'seat', senderId: m.seatId, operatorStaffId: byStaffId, convId: m.convId, at })
+      if (scan.blocked) {
+        set({ sensitiveHits: [...s.sensitiveHits, ...scan.hits] })
+        return scan.blocked
+      }
+      set({ sensitiveHits: [...s.sensitiveHits, ...scan.hits], messages: s.messages.map((x) => x.id === m.id ? { ...x, text: scan.text, shadowedAt: x.shadowedAt ?? (scan.shadowByWord ? at : undefined), shadowReason: x.shadowReason ?? (scan.shadowByWord ? 'word' : undefined), editedAt: at, editHistory: [...(x.editHistory ?? []), { text: x.text, at, operatorId: byStaffId }], ...mentionsIn(s, m.convId, scan.text, { mentionSeatIds: m.mentionSeatIds ?? [], mentionCustomerIds: m.mentionCustomerIds ?? [] }) } : x), audit: withAudit(s.audit, 'message.edit', `编辑消息 ${m.id}，修改前的内容已保留`, byStaffId) })
       return null
     },
 
@@ -70,11 +75,7 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
       if (!m || !messageVisibleFor(s,m,{kind:'seat',id:seatId,staffId:operatorId}) || (m.delivery&&m.delivery!=='sent') || m.kind === 'system' || !seatConversationAllowed(s, m.convId, seatId, operatorId) || !seatMessageSendAllowed(s, toConvId, seatId, operatorId, !!m.media)) return false
       const source = s.conversations.find((c) => c.id === m.convId)!
       if (!seatCan(s, seatId, source.kind === 'dm' ? 'dm.forward' : 'group.forward', source.chatGroupId)) return false
-      const at = now()
-      const group = s.chatGroups.find((g) => g.id === s.conversations.find((c) => c.id === toConvId)?.chatGroupId)
-      const copy: Message = { id: newId('msg'), convId: toConvId, senderKind: 'seat', senderId: seatId, seatId, operatorId, kind: m.kind, text: m.text, media: m.media, at, receiptMemberSeatIds: group?.memberSeatIds, receiptMemberCustomerIds: group?.memberCustomerIds, forwardedFrom: { convId: m.convId, messageId: m.id } }
-      set({ messages: [...s.messages, copy], conversations: s.conversations.map((c) => c.id === toConvId ? { ...c, lastMessageAt: at } : c) })
-      return true
+      return get().queueChatMessage({ convId: toConvId, actor: { kind: 'seat', id: seatId, staffId: operatorId }, text: m.text, kind: m.kind, media: m.media, forwardedFrom: { convId: m.convId, messageId: m.id } }).ok
     },
 
     markRead: (convId, seatId, throughAt) => {
@@ -191,7 +192,12 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
       const mentions = mentionsIn(s, m.convId, body, { mentionSeatIds: m.mentionSeatIds ?? [], mentionCustomerIds: m.mentionCustomerIds ?? [] })
       if (mentions.mentionAll && !customerCan(s, customerId, 'group.mention_all', conv?.chatGroupId)) return '当前策略不允许 @所有人'
       const at = now()
-      set({ messages: s.messages.map((x) => x.id === m.id ? { ...x, text: body, editedAt: at, editHistory: [...(x.editHistory ?? []), { text: x.text, at, operatorId: customerId }], ...mentions } : x), audit: withAudit(s.audit, 'message.edit', `客户编辑消息 ${m.id}，修改前的内容已保留`, null) })
+      const scan = runSensitiveGate(s, { text: body, scope: 'customer', senderId: customerId, operatorStaffId: undefined, convId: m.convId, at })
+      if (scan.blocked) {
+        set({ sensitiveHits: [...s.sensitiveHits, ...scan.hits] })
+        return scan.blocked
+      }
+      set({ sensitiveHits: [...s.sensitiveHits, ...scan.hits], messages: s.messages.map((x) => x.id === m.id ? { ...x, text: scan.text, shadowedAt: x.shadowedAt ?? (scan.shadowByWord ? at : undefined), shadowReason: x.shadowReason ?? (scan.shadowByWord ? 'word' : undefined), editedAt: at, editHistory: [...(x.editHistory ?? []), { text: x.text, at, operatorId: customerId }], ...mentionsIn(s, m.convId, scan.text, { mentionSeatIds: m.mentionSeatIds ?? [], mentionCustomerIds: m.mentionCustomerIds ?? [] }) } : x), audit: withAudit(s.audit, 'message.edit', `客户编辑消息 ${m.id}，修改前的内容已保留`, null) })
       return null
     },
 

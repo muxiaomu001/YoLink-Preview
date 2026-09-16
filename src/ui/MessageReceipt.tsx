@@ -38,7 +38,7 @@ function GroupReceipt({ m, conv, group }: { m: Message; conv: Conversation; grou
   return <>
     <button type="button" className="inline-flex items-center gap-0.5 text-brand-600 hover:underline" title="查看已读和未读名单，仅员工可见" onClick={() => { setTab('read'); setQ(''); setOpen(true) }}><CheckCheck size={13} />{read}/{recipients.length} 人已读</button>
     {open && <Modal open onClose={() => setOpen(false)} title="消息阅读情况" width={440}>
-      <p className="mb-3 text-xs text-zinc-500">{m.receiptMemberSeatIds ? '按发送时的成员统计' : '这条历史消息按当前成员统计'}，不含发送者和机器人。客户看不到这份名单。</p>
+      <p className="mb-3 text-xs text-zinc-500">{m.receiptMemberSeatIds ? '按发送时的成员统计' : '这条历史消息按当前成员统计'}，不含发送者和活跃角色。客户看不到这份名单。</p>
       <Tabs value={tab} onChange={setTab} items={[{ key: 'read', label: '已读', count: read }, { key: 'unread', label: '未读', count: recipients.length - read }]} />
       <Input aria-label="搜索回执成员" placeholder="搜索成员" className="my-3" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="max-h-72 overflow-auto text-left">

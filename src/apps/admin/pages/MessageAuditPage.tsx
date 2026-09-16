@@ -23,7 +23,7 @@ export function MessageAuditPage() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [ctxId, setCtxId] = useState<string | null>(null)
-  /** 发送者类型：全部 / 只看坐席 / 只看客户 / 只看机器人（14 文档：消息审计可按机器人消息筛选） */
+  /** 发送者类型：全部 / 只看坐席 / 只看客户 / 只看活跃角色（14 文档：消息审计可按活跃角色消息筛选） */
   const [senderKind, setSenderKind] = useState<'' | 'seat' | 'customer' | 'bot'>('')
 
   // 会话下拉：私聊显示「客户 ↔ 坐席」，群显示群名，按最近活跃排
@@ -93,8 +93,8 @@ export function MessageAuditPage() {
           return (
             <div>
               <div className="flex items-center gap-1">
-                <span className="font-medium text-zinc-900">{b?.nickname ?? '未知机器人'}</span>
-                <Pill tone="purple">机器人</Pill>
+                <span className="font-medium text-zinc-900">{b?.nickname ?? '未知活跃角色'}</span>
+                <Pill tone="purple">活跃角色</Pill>
               </div>
               <div className="text-[11px] text-zinc-500">{m.botRuleId ? '规则触发' : `手动：${staffById(s, m.operatorId)?.name ?? '未记录'}`}</div>
             </div>
@@ -174,7 +174,7 @@ export function MessageAuditPage() {
             <option value="">全部发送者</option>
             <option value="seat">只看坐席</option>
             <option value="customer">只看客户</option>
-            <option value="bot">只看机器人</option>
+            <option value="bot">只看活跃角色</option>
           </Select>
           <Select value={convFilter} onChange={(e) => setConvFilter(e.target.value)} className="w-56">
             <option value="">全部会话</option>

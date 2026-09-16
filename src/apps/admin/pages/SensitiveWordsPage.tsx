@@ -121,7 +121,7 @@ export function SensitiveWordsPage() {
       },
     },
     { key: 'scope', title: '词库', width: '110px', render: (h) => <Pill tone={h.scope === 'seat' ? 'blue' : 'zinc'}>{SENSITIVE_SCOPE_LABEL[h.scope]}</Pill> },
-    { key: 'conv', title: '会话', render: (h) => <span className="text-zinc-600">{convName(s, h.convId)}</span> },
+    { key: 'conv', title: '会话', render: (h) => <span className="text-zinc-600">{h.convId ? convName(s, h.convId) : '群发'}</span> },
     { key: 'word', title: '命中词', render: (h) => <span className="font-medium text-red-700">{h.word}</span> },
     { key: 'original', title: '原消息', render: (h) => <span className="line-clamp-2 max-w-md text-zinc-800">{h.original}</span> },
     { key: 'result', title: '处理结果', render: (h) => <Pill tone={RESULT_META[h.result].tone}>{RESULT_META[h.result].label}</Pill> },

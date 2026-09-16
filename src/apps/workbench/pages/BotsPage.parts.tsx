@@ -1,5 +1,6 @@
+import { botSendBlock } from '@/store/actions/bots'
 /**
- * 群活跃助手页：机器人账号标签、剧本库标签及其弹窗。
+ * 群活跃助手页：活跃角色标签、剧本库标签及其弹窗。
  */
 import { useState } from 'react'
 import { Plus, Send } from 'lucide-react'
@@ -11,7 +12,7 @@ import { Modal, toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
 import { BOT_AVATAR_COLORS, SCRIPT_TEMPLATES, SOURCE_LABEL } from './BotsPage.shared'
 
-/** 机器人账号标签 */
+/** 活跃角色标签 */
 export function BotsTab({ botLimit }: { botLimit: number }) {
   const { s, staff } = useWorkbench()
   const staffId = staff?.id ?? ''
@@ -31,7 +32,7 @@ export function BotsTab({ botLimit }: { botLimit: number }) {
     toast(b.enabled ? `已停用「${b.nickname}」，规则不再用它发言` : `已启用「${b.nickname}」`)
   }
   const remove = async (b: BotAccount) => {
-    const ok = await confirm({ title: `删除机器人「${b.nickname}」`, body: '会从所属群移除，并从引用它的规则里去掉；历史消息与运行记录保留。', okText: '删除', danger: true })
+    const ok = await confirm({ title: `删除活跃角色「${b.nickname}」`, body: '会从所属群移除，并从引用它的规则里去掉；历史消息与运行记录保留。', okText: '删除', danger: true })
     if (!ok) return
     s.deleteBot(b.id, staffId)
     toast(`已删除「${b.nickname}」`)
@@ -40,15 +41,15 @@ export function BotsTab({ botLimit }: { botLimit: number }) {
   return (
     <div className="space-y-3">
       <Card
-        title={`机器人账号（已启用 ${used} / 授权 ${botLimit}）`}
+        title={`活跃角色（已启用 ${used} / 授权 ${botLimit}）`}
         padded={false}
         extra={
-          <Button size="sm" variant="primary" disabled={full} title={full ? `许可证 AI 模块授权 ${botLimit} 个机器人账号，已用完` : undefined} onClick={() => setCreating(true)}>
-            <Plus size={13} /> 新建机器人
+          <Button size="sm" variant="primary" disabled={full} title={full ? `许可证 AI 模块授权 ${botLimit} 个活跃角色，已用完` : undefined} onClick={() => setCreating(true)}>
+            <Plus size={13} /> 新建活跃角色
           </Button>
         }
       >
-        {full && <div className="border-b border-amber-100 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-800">已达许可证授权上限（{botLimit} 个启用中的机器人账号），不能再新建或启用；需要更多请在管理后台 → 许可证 里升级。</div>}
+        {full && <div className="border-b border-amber-100 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-800">已达许可证授权上限（{botLimit} 个启用中的活跃角色），不能再新建或启用；需要更多请在管理后台 → 许可证 里升级。</div>}
         <Table
           rows={s.bots}
           rowKey={(b) => b.id}
@@ -67,7 +68,7 @@ export function BotsTab({ botLimit }: { botLimit: number }) {
                 <div className="flex items-center justify-end gap-1">
                   <Button size="sm" variant="ghost" onClick={() => setEditing(b)}>编辑</Button>
                   <Switch checked={b.enabled} onChange={() => toggle(b)} />
-                  <Button size="sm" variant="ghost" disabled={!b.enabled || b.groupIds.length === 0} title={!b.enabled ? '已停用的机器人不能发言' : b.groupIds.length === 0 ? '先给它分配所属群' : undefined} onClick={() => setManual(b)}>
+                  <Button size="sm" variant="ghost" disabled={!b.enabled || b.groupIds.length === 0} title={!b.enabled ? '已停用的活跃角色不能发言' : b.groupIds.length === 0 ? '先给它分配所属群' : undefined} onClick={() => setManual(b)}>
                     <Send size={12} /> 手动发一条
                   </Button>
                   <Button size="sm" variant="danger" onClick={() => void remove(b)}>删除</Button>
@@ -91,19 +92,19 @@ function BotModal({ bot, onClose }: { bot?: BotAccount; onClose: () => void }) {
   const [groupIds, setGroupIds] = useState<string[]>(bot?.groupIds ?? [])
   const [operator, setOperator] = useState(bot?.operatorStaffId ?? staff?.id ?? '')
   const dup = s.bots.some((b) => b.id !== bot?.id && b.nickname.trim() === nickname.trim())
-  const error = !nickname.trim() ? '昵称不能为空' : nickname.trim().length > 16 ? '昵称最多 16 字' : dup ? '已有同名机器人' : !persona.trim() ? '人设不能为空，AI 生成时要靠它保持口吻' : ''
+  const error = !nickname.trim() ? '昵称不能为空' : nickname.trim().length > 16 ? '昵称最多 16 字' : dup ? '已有同名活跃角色' : !persona.trim() ? '人设不能为空，AI 生成时要靠它保持口吻' : ''
   const groups = s.chatGroups.filter((g) => g.kind !== 'channel')
   const submit = () => {
     if (error) return
     s.saveBot({ id: bot?.id, nickname: nickname.trim(), avatarColor: color, persona: persona.trim(), groupIds, operatorStaffId: operator || null, enabled: bot?.enabled ?? true }, staff?.id ?? '')
-    toast(bot ? `已更新「${nickname.trim()}」` : `已新建机器人「${nickname.trim()}」，已加入 ${groupIds.length} 个群`)
+    toast(bot ? `已更新「${nickname.trim()}」` : `已新建活跃角色「${nickname.trim()}」，已加入 ${groupIds.length} 个群`)
     onClose()
   }
   return (
     <Modal
       open
       onClose={onClose}
-      title={bot ? `编辑机器人：${bot.nickname}` : '新建机器人账号'}
+      title={bot ? `编辑活跃角色：${bot.nickname}` : '新建活跃角色'}
       width={560}
       footer={
         <>
@@ -154,10 +155,11 @@ function ManualSendModal({ bot, onClose }: { bot: BotAccount; onClose: () => voi
   const [groupId, setGroupId] = useState(bot.groupIds[0] ?? '')
   const [text, setText] = useState('')
   const g = s.chatGroups.find((x) => x.id === groupId)
-  const error = !g ? '请选择群' : g.settings.allMuted ? '该群全员禁言中，机器人一律不发' : !text.trim() ? '内容不能为空' : text.includes('@') ? '不 @ 真实客户' : ''
+  const error = botSendBlock(s, bot.id, groupId) ?? (!text.trim() ? '内容不能为空' : text.includes('@') ? '不 @ 真实客户' : '')
   const submit = () => {
     if (error || !staff) return
-    s.botManualSend(bot.id, groupId, text.trim(), staff.id)
+    const blocked = s.botManualSend(bot.id, groupId, text.trim(), staff.id)
+    if (blocked) return toast(blocked, 'warn')
     toast(`已以「${bot.nickname}」身份发到「${g?.name}」，消息记录操作者 ${staff.name}`)
     onClose()
   }
@@ -309,7 +311,7 @@ function ScriptModal({ script, onClose }: { script?: BotScript; onClose: () => v
           </Field>
         )}
         {needTopic && (
-          <Field label="主题提示" required hint="写给模型看的话题范围；人设来自机器人账号，全局边界来自管理后台 AI 页">
+          <Field label="主题提示" required hint="写给模型看的话题范围；人设来自活跃角色，全局边界来自管理后台 AI 页">
             <Textarea rows={2} maxLength={300} value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="围绕当天市场热点提一个开放式问题，不给结论" />
           </Field>
         )}
