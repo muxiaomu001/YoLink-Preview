@@ -7,8 +7,10 @@ import { THEME_LABEL } from '@/domain/labels'
 import { useStore } from '@/store/store'
 import { customerById } from '@/store/selectors'
 import { customerCan } from '@/store/policy'
+import { NICKNAME_MAX, NICKNAME_MIN } from '@/domain/register'
 import { Avatar, TitleChip } from '@/ui/display'
 import { Button, Input, Switch } from '@/ui/primitives'
+import { toast } from '@/ui/overlay'
 import { demoToast } from '@/ui/DemoNote'
 import { DemoHint, LevelTag, Row, ScreenHeader, SectionLabel } from '../parts'
 
@@ -18,12 +20,13 @@ export function ProfileScreen({ customerId, onBack }: { customerId: string; onBa
   const canEdit = customerCan(s, customerId, 'account.edit_profile')
   const [nick, setNick] = useState(c.nickname)
   const titles = c.titleIds.map((id) => s.titles.find((t) => t.id === id && t.enabled)).filter((t) => !!t)
-  const valid = nick.trim().length >= 1 && nick.trim().length <= 32
+  const valid = nick.trim().length >= NICKNAME_MIN && nick.trim().length <= NICKNAME_MAX
   return (
     <div className="flex h-full flex-col bg-zinc-50">
       <ScreenHeader onBack={onBack} title="个人资料" />
       <div className="flex flex-col items-center bg-white py-4">
         <Avatar text={c.nickname} size={64} />
+        {c.nicknameAuto && <p className="mt-2 px-6 text-center text-[10px] text-zinc-400">当前昵称是注册时系统发的，改成你自己的名字客服更好认。</p>}
         {canEdit && (
           <button type="button" onClick={() => demoToast('更换头像')} className="mt-1 text-[11px] text-brand-700">
             更换头像
@@ -33,7 +36,7 @@ export function ProfileScreen({ customerId, onBack }: { customerId: string; onBa
       <div className="mt-2 bg-white">
         <div className="flex items-center gap-2 border-b border-zinc-100 px-4 py-2.5 text-[13px]">
           <span className="w-16 text-zinc-600">昵称</span>
-          {canEdit ? <Input value={nick} onChange={(e) => setNick(e.target.value)} className="h-8 flex-1" maxLength={32} /> : <span className="flex-1 text-right text-zinc-900">{c.nickname}</span>}
+          {canEdit ? <Input value={nick} onChange={(e) => setNick(e.target.value)} className="h-8 flex-1" maxLength={NICKNAME_MAX} /> : <span className="flex-1 text-right text-zinc-900">{c.nickname}</span>}
         </div>
         <Row label="账号 ID" value={c.accountId} hint="注册时生成，不可修改" />
         <Row label="用户名" value={c.phone ?? c.accountId} hint="注册时填写或即手机号，不可修改" />
@@ -58,8 +61,17 @@ export function ProfileScreen({ customerId, onBack }: { customerId: string; onBa
       <div className="px-4 py-3">
         {canEdit ? (
           <>
-            {!valid && <p className="mb-1 text-[11px] text-red-600">昵称 1 到 32 字符</p>}
-            <Button variant="primary" className="h-9 w-full" disabled={!valid || nick.trim() === c.nickname} onClick={() => demoToast('保存资料')}>
+            {!valid && <p className="mb-1 text-[11px] text-red-600">昵称 {NICKNAME_MIN} 到 {NICKNAME_MAX} 字符</p>}
+            <Button
+              variant="primary"
+              className="h-9 w-full"
+              disabled={!valid || nick.trim() === c.nickname}
+              onClick={() => {
+                // 改昵称是真写回去的：软引导刚把客户领到这一页，这里再假保存就是自己拆自己的台
+                const r = s.renameCustomer(customerId, nick)
+                toast(r.ok ? '昵称已更新' : (r.error ?? '保存失败'), r.ok ? 'ok' : 'warn')
+              }}
+            >
               保存
             </Button>
           </>

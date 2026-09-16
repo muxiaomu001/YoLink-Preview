@@ -26,6 +26,7 @@ import { groupWelcomeMessages } from '@/domain/groupWelcome'
 import { buildSeed } from '@/domain/seed'
 import { newId } from '@/domain/ids'
 import { allocateSeats } from '@/domain/allocation'
+import { NICKNAME_MAX, NICKNAME_MIN, deviceRegisterCount, resolveRegisterNickname, watchUntilOf } from '@/domain/register'
 import { planCoverage } from '@/domain/broadcastCoverage'
 import { inviteCodeError, newInviteCode, normalizeInviteCode } from '@/domain/inviteCode'
 import { iso } from '@/domain/time'
@@ -45,7 +46,7 @@ import { dExtraActions, type DExtraActions } from './actions/D-extra'
 import { quickReplyActions, type QuickReplyActions } from './actions/quickReplies'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
-export const STORAGE_KEY = 'yolink-demo-v9'
+export const STORAGE_KEY = 'yolink-demo-v10'
 
 const now = () => iso(Date.now())
 
@@ -54,9 +55,12 @@ function renderWelcome(tpl: string, nickname: string, seatName: string): string 
 }
 
 export interface RegisterInput {
+  /** 「不问」档下客户端传空串，由 resolveRegisterNickname 发默认昵称 */
   nickname: string
   inviteCode: string
   phone?: string
+  /** 设备指纹；演示里手机屏固定传 DEMO_DEVICE_ID，所以连着注册几次就能看到风控拦人 */
+  deviceId?: string
 }
 
 export interface RegisterResult {
@@ -66,7 +70,14 @@ export interface RegisterResult {
   addedSeatIds?: string[]
   /** 注册时自动加入的群与频道 */
   addedGroupIds?: string[]
+  /** 昵称是系统发的默认名，注册成功页要提示客户改 */
+  nicknameAuto?: boolean
+  /** 新号观察期到期时间，没有观察期时为空 */
+  watchUntil?: string
 }
+
+/** 演示里手机屏只有一台设备，同设备注册风控才演示得出来 */
+export const DEMO_DEVICE_ID = 'dev_demo_iphone15'
 
 export interface CoreActions {
   resetDemo: () => void
@@ -77,6 +88,10 @@ export interface CoreActions {
   registerCustomer: (input: RegisterInput) => RegisterResult
   customerSend: (convId: string, text: string) => void
   customerBlockSeat: (customerId: string, seatId: string, block: boolean) => void
+  /** 客户关掉注册后的完善资料引导；软引导只提醒一次，关了就不再出现 */
+  dismissProfileGuide: (customerId: string) => void
+  /** 客户自己改昵称。改完就不再是系统发的默认名，软引导里那一条随之消失 */
+  renameCustomer: (customerId: string, nickname: string) => { ok: boolean; error?: string }
   // 工作台
   seatSend: (convId: string, seatId: string, operatorId: string, text: string, aiDraftUsed?: boolean) => void
   recordAi: (staffId: string, convId: string, result: 'adopted' | 'edited' | 'ignored') => void
@@ -149,20 +164,39 @@ export const useStore = create<DemoStore>()(
           group = s.inviteGroups.find((g) => g.isDefault)
           if (!group) return { ok: false, error: '企业未配置默认邀请组' }
         }
+        const at = now()
+        const deviceId = input.deviceId ?? DEMO_DEVICE_ID
+        // 同设备注册风控：先拦，再看别的。批量注册的号进来之后每一步都要占资源
+        // （轮询坐席被吃掉、群人数被撑满），所以这一刀必须落在建号之前。
+        const perDevice = s.enterprise.registerPerDevicePerDay
+        if (perDevice > 0) {
+          const used = deviceRegisterCount(s.customers, deviceId, at)
+          if (used >= perDevice) {
+            set({
+              audit: [{ id: newId('au'), at, actorStaffId: null, type: 'customer.register_blocked' as AuditType, detail: `同设备注册风控拦截：设备 ${deviceId} 24 小时内已注册 ${used} 个账号，上限 ${perDevice} 个`, ip: DEMO_IP }, ...s.audit],
+            })
+            return { ok: false, error: `这台设备 24 小时内已注册 ${used} 个账号（上限 ${perDevice} 个），请稍后再试或联系客服` }
+          }
+        }
         // 昵称不做全企业唯一：客户之间本来就互不相干，撞名是常态，注册时因为别人先叫了「张先生」而被拦下没有道理。
         // 同名带来的歧义只发生在同一个会话里，由 @ 提及那边处理（同名时不自动识别，必须从列表点选）。
-        const nickname = input.nickname.trim()
-        if (nickname.length < 1 || nickname.length > 32) return { ok: false, error: '昵称 1 到 32 字' }
+        const accountId = `HX${String(90000 + s.customers.length).padStart(6, '0')}`
+        const nick = resolveRegisterNickname(s.enterprise.nicknamePolicy, s.enterprise.defaultNicknameTemplate, input.nickname, accountId)
+        if (!nick.ok) return { ok: false, error: nick.error }
+        const nickname = nick.nickname
+        const watchUntil = watchUntilOf(at, s.enterprise.newAccountWatchHours)
 
-        const at = now()
         const customer: Customer = {
           id: newId('cus'),
           nickname,
-          accountId: `HX${String(90000 + s.customers.length).padStart(6, '0')}`,
+          accountId,
           phone: input.phone,
           registeredAt: at,
           lastActiveAt: at,
           device: 'iPhone 15 · iOS 18（演示）',
+          deviceId,
+          nicknameAuto: nick.auto || undefined,
+          watchUntil,
           inviteGroupId: group.id,
           inviteLinkId: link?.id,
           tagIds: ['tag_new'],
@@ -208,7 +242,7 @@ export const useStore = create<DemoStore>()(
         for(const gid of joinGroupIds){const g=s.chatGroups.find((x)=>x.id===gid),conv=s.conversations.find((x)=>x.chatGroupId===gid);if(g&&conv)messages.push(...groupWelcomeMessages(g,conv.id,[customer],at))}
         const inviteLinks = link ? s.inviteLinks.map((l) => (l.id === link!.id ? { ...l, uses: l.uses + 1 } : l)) : s.inviteLinks
         const auditEntries = [
-          { id: newId('au'), at, actorStaffId: null, type: 'customer.register' as AuditType, detail: `客户「${customer.nickname}」通过${link ? `邀请链接「${link.name}」（${group.name}）` : `邀请组「${group.name}」`}注册，轮询分配接待员：${primarySeatId ? seatById[primarySeatId]?.displayName : '无'}；自动添加：${usable.map((id) => seatById[id]?.displayName).join('、')}${skipped.length ? `；跳过（停用或暂停接新）：${skipped.map((id) => seatById[id]?.displayName).join('、')}` : ''}${joinGroupIds.length ? `；自动入群：${joinGroupIds.map((gid) => s.chatGroups.find((g) => g.id === gid)?.name).join('、')}` : ''}` },
+          { id: newId('au'), at, actorStaffId: null, type: 'customer.register' as AuditType, detail: `客户「${customer.nickname}」通过${link ? `邀请链接「${link.name}」（${group.name}）` : `邀请组「${group.name}」`}注册，轮询分配接待员：${primarySeatId ? seatById[primarySeatId]?.displayName : '无'}；自动添加：${usable.map((id) => seatById[id]?.displayName).join('、')}${skipped.length ? `；跳过（停用或暂停接新）：${skipped.map((id) => seatById[id]?.displayName).join('、')}` : ''}${joinGroupIds.length ? `；自动入群：${joinGroupIds.map((gid) => s.chatGroups.find((g) => g.id === gid)?.name).join('、')}` : ''}${nick.auto ? '；昵称未填，发默认昵称' : ''}${watchUntil ? `；新号观察期至 ${watchUntil.slice(0, 16).replace('T', ' ')}` : ''}` },
         ]
         set({
           customers: [customer, ...s.customers],
@@ -222,7 +256,7 @@ export const useStore = create<DemoStore>()(
           audit: [...auditEntries, ...s.audit],
           session: { ...s.session, phoneCustomerId: customer.id },
         })
-        return { ok: true, customerId: customer.id, addedSeatIds: usable, addedGroupIds: joinGroupIds }
+        return { ok: true, customerId: customer.id, addedSeatIds: usable, addedGroupIds: joinGroupIds, nicknameAuto: nick.auto, watchUntil }
       },
 
       customerSend: (convId, text) => {
@@ -248,6 +282,16 @@ export const useStore = create<DemoStore>()(
             c.id === customerId ? { ...c, blockedSeatIds: block ? Array.from(new Set([...c.blockedSeatIds, seatId])) : c.blockedSeatIds.filter((x) => x !== seatId) } : c,
           ),
         })),
+
+      renameCustomer: (customerId, nickname) => {
+        const v = nickname.trim()
+        if (v.length < NICKNAME_MIN || v.length > NICKNAME_MAX) return { ok: false, error: `昵称 ${NICKNAME_MIN} 到 ${NICKNAME_MAX} 字` }
+        set((s) => ({ customers: s.customers.map((c) => (c.id === customerId ? { ...c, nickname: v, nicknameAuto: undefined } : c)) }))
+        return { ok: true }
+      },
+
+      dismissProfileGuide: (customerId) =>
+        set((s) => ({ customers: s.customers.map((c) => (c.id === customerId ? { ...c, profileGuideDismissedAt: now() } : c)) })),
 
       seatSend: (convId, seatId, operatorId, text, aiDraftUsed) => {
         const at = now()

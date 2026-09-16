@@ -10,6 +10,7 @@ import { useStore } from '@/store/store'
 import { customerById } from '@/store/selectors'
 import { DemoPanel } from './DemoPanel'
 import { RegisterScreen, WelcomeScreen, type JustAdded } from './screens/RegisterScreen'
+import { ProfileGuide, shouldShowProfileGuide } from './screens/ProfileGuide'
 import { ChatsScreen } from './screens/ChatsScreen'
 import { ContactsScreen } from './screens/ContactsScreen'
 import { MeScreen } from './screens/MeScreen'
@@ -58,6 +59,8 @@ export function PhoneApp() {
               <ChatScreen convId={openConv} customerId={customer.id} onBack={() => setOpenConv(null)} />
             ) : (
               <>
+                {/* 软引导只在「消息」页顶上出现一条：可关、关了不再来、任何时候都不挡路 */}
+                {tab === 'chats' && shouldShowProfileGuide(customer) && <ProfileGuide customer={customer} onGoProfile={() => setTab('me')} />}
                 <div className="min-h-0 flex-1">
                   {tab === 'chats' && <ChatsScreen customerId={customer.id} onOpen={setOpenConv} />}
                   {tab === 'contacts' && <ContactsScreen customerId={customer.id} onOpen={setOpenConv} />}

@@ -39,6 +39,7 @@ export const AUDIT_LABEL: Record<AuditType, string> = {
   'settings.update': '企业设置',
   'module.toggle': '模块启停',
   'customer.register': '客户注册',
+  'customer.register_blocked': '注册被风控拦截',
   'customer.reassign': '改主归属',
   'customer.delete': '注销客户',
   'broadcast.send': '群发',

@@ -10,6 +10,8 @@
  * 举报与敏感词、钱包/签到/推荐奖励、横幅与公告、AI 模块、客户画像、日报、插件与开放 API、系统。
  */
 
+import type { NicknamePolicy } from './register'
+
 export type ISODate = string
 
 /** 员工角色能力键（工作台与管理后台功能，作用在员工上） */
@@ -109,6 +111,14 @@ export interface Enterprise {
   broadcastPerCustomerPerDay: number
   /** 是否允许员工在工作台建个人话术（企业话术库始终可用） */
   allowPersonalQuickReply: boolean
+  /** 注册时昵称怎么问：必填 / 选填 / 不问，见 domain/register */
+  nicknamePolicy: NicknamePolicy
+  /** 客户没填昵称时用的默认昵称模板，{n} = 账号 ID 后四位 */
+  defaultNicknameTemplate: string
+  /** 同一设备 24 小时内最多注册几个账号；0 = 不限 */
+  registerPerDevicePerDay: number
+  /** 新号观察期小时数；0 = 关闭。观察期内只能私聊官方联系人，不能在群里发言 */
+  newAccountWatchHours: number
 }
 
 /** 员工个人设置：跟人走，不跟坐席走 */
@@ -218,6 +228,14 @@ export interface Customer {
   mustChangePassword?: boolean
   /** 最近一次强制下线的时间；下线是一次性动作，不是持续状态 */
   sessionsRevokedAt?: ISODate
+  /** 注册设备指纹，同设备注册风控按它计数 */
+  deviceId?: string
+  /** 昵称是注册时系统给的默认名，不是客户自己起的；软引导据此提示改名 */
+  nicknameAuto?: boolean
+  /** 新号观察期到期时间；按注册时的企业设置算死，后来改设置不追溯已有客户 */
+  watchUntil?: ISODate
+  /** 客户关掉了注册后的完善资料引导，关了就不再出现 */
+  profileGuideDismissedAt?: ISODate
   /** 通用字段值（P1） */
   customFields?: Record<string, string>
 }
@@ -538,6 +556,7 @@ export type AuditType =
   | 'settings.update'
   | 'module.toggle'
   | 'customer.register'
+  | 'customer.register_blocked'
   | 'customer.reassign'
   | 'customer.delete'
   | 'broadcast.send'

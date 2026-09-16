@@ -1,13 +1,15 @@
 /**
  * 企业设置：八个分页，字段与 PRD 05「企业设置」表格一一对应（群发频控来自 04 文档）。
- * 本文件放分页壳 + 基本信息 / 外观 / 注册方式；其余分页在 SettingsPage.parts.tsx 与 SettingsPage.webtabs.tsx。
+ * 本文件放分页壳 + 基本信息 / 外观 / 注册与风控；其余分页在 SettingsPage.parts.tsx 与 SettingsPage.webtabs.tsx。
  */
 import { useState } from 'react'
+import { clsx } from 'clsx'
 import type { Language, RegisterMethod, ThemeKey } from '@/domain/types'
 import { THEME_LABEL } from '@/domain/labels'
+import { DEFAULT_NICKNAME_TEMPLATE, NICKNAME_MAX, NICKNAME_POLICY_OPTIONS, NICKNAME_TOKEN, WATCH_LIMIT_TEXT, nicknamePolicyLabel, renderDefaultNickname, type NicknamePolicy } from '@/domain/register'
 import { useStore } from '@/store/store'
 import { Button, Checkbox, Field, Input, Select, Switch } from '@/ui/primitives'
-import { Card, PageHeader, Pill, Tabs } from '@/ui/display'
+import { Avatar, Card, Note, PageHeader, Pill, Tabs } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 import { BroadcastPane, PushPane, QuickReplyPane, SmsPane, StoragePane } from './SettingsPage.parts'
 import { WebTabsPane } from './SettingsPage.webtabs'
@@ -18,7 +20,7 @@ type TabKey = 'basic' | 'appearance' | 'register' | 'sms' | 'push' | 'storage' |
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'basic', label: '基本信息' },
   { key: 'appearance', label: '外观' },
-  { key: 'register', label: '注册方式' },
+  { key: 'register', label: '注册与风控' },
   { key: 'sms', label: '短信与邮件服务商' },
   { key: 'push', label: '推送配置' },
   { key: 'storage', label: '对象存储' },
@@ -198,6 +200,16 @@ function AppearancePane() {
 }
 
 function RegisterPane() {
+  return (
+    <div className="space-y-4">
+      <RegisterMethodCard />
+      <RegisterProfileCard />
+      <RegisterRiskCard />
+    </div>
+  )
+}
+
+function RegisterMethodCard() {
   const s = useStore()
   const admin = s.session.adminStaffId!
   const e = s.enterprise
@@ -231,6 +243,107 @@ function RegisterPane() {
         </Button>
         <DemoNote>
           第一版只做账号 + 密码；验证码、邮箱注册、强制绑手机号跟短信与邮件服务商一起排在后续版本<DemoLevelTag level="P2" />。
+        </DemoNote>
+      </div>
+    </Card>
+  )
+}
+
+/** 注册资料规则：昵称三档 + 默认昵称模板 + 默认头像口径 */
+function RegisterProfileCard() {
+  const s = useStore()
+  const admin = s.session.adminStaffId!
+  const e = s.enterprise
+  const [policy, setPolicy] = useState<NicknamePolicy>(e.nicknamePolicy)
+  const [tpl, setTpl] = useState(e.defaultNicknameTemplate)
+  const preview = renderDefaultNickname(tpl, 'HX098231')
+  const tplNeeded = policy !== 'required'
+  const tplOk = !tplNeeded || (tpl.trim().length > 0 && tpl.includes(NICKNAME_TOKEN))
+  return (
+    <Card title="注册资料规则" level="P0">
+      <div className="space-y-4">
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-zinc-600">昵称怎么问</div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {NICKNAME_POLICY_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => setPolicy(o.value)}
+                className={clsx(
+                  'rounded-md border px-3 py-2 text-left transition-colors',
+                  policy === o.value ? 'border-brand-400 bg-brand-50/70 text-brand-900' : 'border-zinc-200 text-zinc-700 hover:bg-zinc-50',
+                )}
+              >
+                <div className="text-xs font-medium">{o.label}</div>
+                <div className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">{o.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+        <Field label="默认昵称模板" hint={`${NICKNAME_TOKEN} = 账号 ID 后四位`}>
+          <Input value={tpl} maxLength={NICKNAME_MAX} disabled={!tplNeeded} onChange={(ev) => setTpl(ev.target.value)} className="w-56" placeholder={DEFAULT_NICKNAME_TEMPLATE} />
+        </Field>
+        <div className="flex items-center gap-2.5 rounded-md border border-zinc-200 px-3 py-2">
+          <Avatar text={preview} size={32} />
+          <div className="text-xs">
+            <div className="font-medium text-zinc-800">{tplNeeded ? `预览：${preview}` : '昵称必填时不发默认昵称'}</div>
+            <div className="text-[11px] text-zinc-500">默认头像按昵称首字生成固定色块，注册不要求上传；客户进 App 后随时能换。</div>
+          </div>
+        </div>
+        {tplNeeded && !tplOk && <div className="text-[11px] text-red-600">模板不能为空，且要含 {NICKNAME_TOKEN}，否则所有默认昵称会撞成同一个词</div>}
+        <Button
+          variant="primary"
+          disabled={!tplOk}
+          onClick={() => {
+            s.updateEnterprise({ nicknamePolicy: policy, defaultNicknameTemplate: tpl.trim() || DEFAULT_NICKNAME_TEMPLATE }, admin)
+            toast(`已保存：昵称${nicknamePolicyLabel(policy)}${tplNeeded ? `，默认昵称如「${preview}」` : ''}`)
+          }}
+        >
+          保存
+        </Button>
+        <DemoNote>
+          注册页会立刻跟着变：「不问」档下客户端连昵称框都不渲染。改规则只作用于之后注册的客户，已注册的昵称不动。
+        </DemoNote>
+      </div>
+    </Card>
+  )
+}
+
+/** 注册风控：同设备注册上限 + 新号观察期 */
+function RegisterRiskCard() {
+  const s = useStore()
+  const admin = s.session.adminStaffId!
+  const e = s.enterprise
+  const [perDevice, setPerDevice] = useState(String(e.registerPerDevicePerDay))
+  const [watchHours, setWatchHours] = useState(String(e.newAccountWatchHours))
+  const d = Number(perDevice)
+  const h = Number(watchHours)
+  const ok = Number.isInteger(d) && d >= 0 && d <= 50 && Number.isInteger(h) && h >= 0 && h <= 168
+  return (
+    <Card title="注册风控" level="P0">
+      <div className="space-y-4">
+        <Field label="同设备 24 小时注册上限" hint="0 = 不限">
+          <Input type="number" min={0} max={50} value={perDevice} onChange={(ev) => setPerDevice(ev.target.value)} className="w-32" />
+        </Field>
+        <Field label="新号观察期（小时）" hint="0 = 关闭">
+          <Input type="number" min={0} max={168} value={watchHours} onChange={(ev) => setWatchHours(ev.target.value)} className="w-32" />
+        </Field>
+        <Note>观察期内的客户{WATCH_LIMIT_TEXT}，客户列表的状态列会显示「新号观察期」，可按它筛选。观察期按注册那一刻的设置算死，改这里不追溯已注册的客户。</Note>
+        {!ok && <div className="text-[11px] text-red-600">注册上限填 0-50 的整数，观察期填 0-168 小时的整数</div>}
+        <Button
+          variant="primary"
+          disabled={!ok}
+          onClick={() => {
+            s.updateEnterprise({ registerPerDevicePerDay: d, newAccountWatchHours: h }, admin)
+            toast(`已保存：同设备每天最多 ${d === 0 ? '不限' : `${d} 个`}，新号观察期 ${h === 0 ? '关闭' : `${h} 小时`}`)
+          }}
+        >
+          保存
+        </Button>
+        <DemoNote>
+          提速和风控必须一起开：注册门槛降下去之后，拦批量注册的活儿就全压在这两项上。
+          风控拦下的每一次注册都会记一条审计日志（注册被风控拦截），演示时在「系统 › 审计日志」能翻到。
         </DemoNote>
       </div>
     </Card>

@@ -27,6 +27,7 @@ import type {
 } from './types'
 import { ago, agoMs, iso } from './time'
 import { allocateSeats } from './allocation'
+import { DEFAULT_NICKNAME_TEMPLATE, watchUntilOf } from './register'
 import { buildAdminSeed } from './seed-admin'
 import { MEDIA, QUICK_REPLIES, QUICK_REPLY_CATEGORIES } from './seed-quick-replies'
 import { BOTS, BOT_RULES, BOT_SCRIPTS, DEFAULT_STAFF_PREFS, GROUP_EXTRAS, botMessagesFor, buildBotRuns, buildGroupLogs, groupDefaults } from './seed-groups'
@@ -87,6 +88,11 @@ export const ENTERPRISE: Enterprise = {
   broadcastPerStaffPerDay: 3,
   allowPersonalQuickReply: true,
   broadcastPerCustomerPerDay: 2,
+  // 注册提速：昵称选填，不填就发「客户1234」；风控与提速同批开，不然就是把闸门单向拆了
+  nicknamePolicy: 'optional',
+  defaultNicknameTemplate: DEFAULT_NICKNAME_TEMPLATE,
+  registerPerDevicePerDay: 3,
+  newAccountWatchHours: 24,
 }
 
 export const ALL_CAPS: Role['caps'] = [
@@ -694,6 +700,13 @@ function buildCustomers() {
     if (s === 'complaint_refund') c.blacklistedAt = iso(registeredMs + 86400000 * 12)
     if (s === 'quiet_long' && idx % 7 === 3) c.mutedAllUntil = iso(Date.now() + 86400000 * 2)
     if (s === 'onboarding_pending' && idx % 5 === 1) c.mustChangePassword = true
+    // 最近两天注册的当新号看：观察期与「系统发的默认昵称」不种上，
+    // 状态列的「新号观察期」和软引导在演示数据里就永远是空的
+    if (plan.daysAgo <= 2) {
+      c.deviceId = `dev_seed_${idx}`
+      c.watchUntil = watchUntilOf(iso(registeredMs), ENTERPRISE.newAccountWatchHours)
+      if (idx % 3 === 0) c.nicknameAuto = true
+    }
 
     c.titleIds.forEach((tid) => {
       titleAssignments.push({ id: sid('ta'), customerId: c.id, titleId: tid, action: 'assign', byStaffId: alloc.primarySeatId === 'seat_lin' ? 'st_lin' : 'st_chen', at: iso(registeredMs + 3600000 * between(2, 48)) })
