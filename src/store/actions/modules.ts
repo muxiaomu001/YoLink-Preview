@@ -18,6 +18,7 @@ export interface ModuleActions {
   deleteBanner: (id: string, byStaffId: string) => void
   saveAnnouncement: (a: Announcement, byStaffId: string) => void
   deleteAnnouncement: (id: string, byStaffId: string) => void
+  recordAnnouncementImpression: (id: string) => void
 }
 
 /** 某客户当前积分余额：最近一条流水的 balanceAfter */
@@ -127,5 +128,8 @@ export function moduleActions(set: Set, get: Get): ModuleActions {
         const a = s.announcements.find((x) => x.id === id)
         return { announcements: s.announcements.filter((x) => x.id !== id), audit: withAudit(s.audit, 'announcement.update', `删除公告「${a?.title}」`, byStaffId) }
       }),
+
+    recordAnnouncementImpression: (id) =>
+      set((s) => ({ announcements: s.announcements.map((item) => (item.id === id ? { ...item, impressions: item.impressions + 1 } : item)) })),
   }
 }

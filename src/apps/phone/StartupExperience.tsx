@@ -21,7 +21,7 @@ function popupFor(items: Announcement[], customerId?: string) {
   return activeAnnouncements(items).find((item) => item.kind === 'popup' && canShowToCustomer(item, customerId))
 }
 
-export function StartupExperience({ customerId }: { customerId?: string }) {
+export function StartupExperience({ customerId, onAnnouncementShown }: { customerId?: string; onAnnouncementShown: (id: string) => void }) {
   const enterprise = useStore((state) => state.enterprise)
   const announcements = useStore((state) => state.announcements)
   const popup = useMemo(() => popupFor(announcements, customerId), [announcements, customerId])
@@ -38,6 +38,10 @@ export function StartupExperience({ customerId }: { customerId?: string }) {
     const timer = window.setTimeout(finishBrand, enterprise.startupBrand.durationSeconds * 1000)
     return () => window.clearTimeout(timer)
   }, [enterprise.startupBrand.durationSeconds, finishBrand, stage])
+
+  useEffect(() => {
+    if (stage === 'popup' && popup) onAnnouncementShown(popup.id)
+  }, [onAnnouncementShown, popup, stage])
 
   if (stage === 'done') return null
 
@@ -94,15 +98,20 @@ export function StartupExperience({ customerId }: { customerId?: string }) {
   )
 }
 
-export function ActiveAnnouncementBar({ customerId }: { customerId: string }) {
+export function ActiveAnnouncementBar({ customerId, dismissedIds, onDismiss, onAnnouncementShown }: { customerId: string; dismissedIds: string[]; onDismiss: (id: string) => void; onAnnouncementShown: (id: string) => void }) {
   const announcements = useStore((state) => state.announcements)
   const item = useMemo(() => activeAnnouncements(announcements).find((announcement) => announcement.kind === 'bar' && canShowToCustomer(announcement, customerId)), [announcements, customerId])
-  const [hiddenId, setHiddenId] = useState<string | null>(null)
-  if (!item || hiddenId === item.id) return null
+  const dismissed = !!item && dismissedIds.includes(item.id)
+
+  useEffect(() => {
+    if (item && !dismissed) onAnnouncementShown(item.id)
+  }, [dismissed, item, onAnnouncementShown])
+
+  if (!item || dismissed) return null
 
   const close = () => {
     if (item.showMode === 'once') localStorage.setItem(seenKey(customerId, item.id), 'yes')
-    setHiddenId(item.id)
+    onDismiss(item.id)
   }
 
   return (

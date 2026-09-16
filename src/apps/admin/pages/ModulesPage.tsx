@@ -23,7 +23,7 @@ export function ModulesPage() {
     <div>
       <PageHeader title="模块启停" desc="按企业需要开关功能模块。关掉的模块，管理后台侧边栏与客户端对应入口一起隐藏。" extra={<span className="text-xs text-zinc-500">已启用 {onCount} / {rows.length}</span>} />
       <Note>
-        <b>停用不删数据</b>：关掉钱包，积分与提现记录都还在，重新启用后数据仍可见。侧边栏对应入口隐藏，客户端对应页面也不再显示。未获许可授权的模块不能启用，去「版本与许可」上传新许可。
+        <b>停用不删数据</b>：关掉钱包，积分与提现记录都还在，重新启用后数据仍可见。侧边栏对应入口隐藏，客户端对应页面也不再显示。未获许可授权的模块不能启用，请联系 YoLink 供应方处理。
       </Note>
       <Card className="mt-4" padded={false}>
         <Table

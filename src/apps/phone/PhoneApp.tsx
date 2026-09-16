@@ -2,7 +2,7 @@
  * 客户手机屏：手机壳 + 底部三个标签 + 右侧演示控制面板。
  * 所有"能不能"都由 customerCan / customerCanSpeakIn 决定，管理后台改了策略这里立刻变。
  */
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { Contact, MessageCircle, UserRound } from 'lucide-react'
@@ -34,12 +34,27 @@ export function PhoneApp() {
   const [openConv, setOpenConv] = useState<string | null>(() => params.get('conversation'))
   const [justAdded, setJustAdded] = useState<JustAdded | null>(null)
   const [startupRun, setStartupRun] = useState(0)
+  const [dismissedBarIds, setDismissedBarIds] = useState<string[]>([])
+  const shownAnnouncementIds = useRef(new Set<string>())
+  const recordAnnouncementImpression = s.recordAnnouncementImpression
+
+  const onAnnouncementShown = useCallback((id: string) => {
+    if (shownAnnouncementIds.current.has(id)) return
+    shownAnnouncementIds.current.add(id)
+    recordAnnouncementImpression(id)
+  }, [recordAnnouncementImpression])
+
+  const restartStartup = () => {
+    shownAnnouncementIds.current.clear()
+    setDismissedBarIds([])
+    setStartupRun((value) => value + 1)
+  }
 
   const reset = () => {
     setParams({}, { replace: true })
     setOpenConv(null)
     setTab('chats')
-    setStartupRun((value) => value + 1)
+    restartStartup()
   }
   const logout = () => {
     s.setSession({ phoneCustomerId: null })
@@ -63,7 +78,7 @@ export function PhoneApp() {
             ) : (
               <>
                 {/* 软引导只在「消息」页顶上出现一条：可关、关了不再来、任何时候都不挡路 */}
-                {tab === 'chats' && <ActiveAnnouncementBar customerId={customer.id} />}
+                {tab === 'chats' && <ActiveAnnouncementBar customerId={customer.id} dismissedIds={dismissedBarIds} onDismiss={(id) => setDismissedBarIds((ids) => ids.includes(id) ? ids : [...ids, id])} onAnnouncementShown={onAnnouncementShown} />}
                 {tab === 'chats' && shouldShowProfileGuide(customer) && <ProfileGuide customer={customer} onGoProfile={() => setTab('me')} />}
                 <div className="min-h-0 flex-1">
                   {tab === 'chats' && <ChatsScreen customerId={customer.id} onOpen={setOpenConv} />}
@@ -81,10 +96,10 @@ export function PhoneApp() {
               </>
             )}
           </div>
-          <StartupExperience key={startupRun} customerId={customer?.id} />
+          <StartupExperience key={startupRun} customerId={customer?.id} onAnnouncementShown={onAnnouncementShown} />
         </div>
 
-        <DemoPanel customerId={customer?.id} onSwitch={reset} onReplayStartup={() => setStartupRun((value) => value + 1)} />
+        <DemoPanel customerId={customer?.id} onSwitch={reset} onReplayStartup={restartStartup} />
       </div>
     </div>
   )

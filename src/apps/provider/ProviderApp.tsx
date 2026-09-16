@@ -11,9 +11,9 @@ import { confirm } from '@/ui/confirm'
 import { toast } from '@/ui/overlay'
 import { DemoNote, DemoNoteToggle } from '@/ui/DemoNote'
 import { BindInstanceModal, RenewInstanceModal, StopInstanceModal } from './ProviderApp.parts'
+import { PROVIDER_DEMO_ACCESS_KEY } from '@/domain/demoAccess'
 
 type Filter = 'all' | 'active' | 'expired' | 'stopped'
-const ACCESS_KEY = 'yolink-provider-demo-access'
 
 function StatusPill({ instance }: { instance: ProviderInstance }) {
   const status = providerInstanceStatus(instance)
@@ -26,7 +26,7 @@ const ACTION_LABEL = { bind: '绑定', renew: '续期', stop: '停用', resume: 
 
 export function ProviderApp() {
   const s = useStore()
-  const [hasAccess] = useState(() => sessionStorage.getItem(ACCESS_KEY) === 'yes')
+  const [hasAccess] = useState(() => sessionStorage.getItem(PROVIDER_DEMO_ACCESS_KEY) === 'yes')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const [binding, setBinding] = useState(false)
@@ -52,7 +52,8 @@ export function ProviderApp() {
         <section className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
           <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-950 text-white"><LockKeyhole size={21} /></span>
           <h1 className="mt-5 text-lg font-semibold text-zinc-900">仅限供应方账号</h1>
-          <p className="mt-2 text-xs leading-5 text-zinc-500">企业管理员和员工不能进入授权中心。请从演示首页选择供应方身份进入。</p>
+          <p className="mt-2 text-xs leading-5 text-zinc-500">企业管理员和员工不能进入授权中心，请使用供应方管理员账号登录。</p>
+          <DemoNote compact className="mt-4 text-left">演示时请返回首页，从「供应方授权中心」入口切换身份。</DemoNote>
           <Link to="/" className="mt-5 inline-flex h-8 items-center justify-center rounded-md bg-brand-700 px-4 text-xs font-medium text-white hover:bg-brand-800">返回演示首页</Link>
         </section>
       </div>
@@ -79,7 +80,7 @@ export function ProviderApp() {
         </nav>
         <div className="mt-auto space-y-2 border-t border-white/10 p-4 text-xs">
           <Link to="/admin/license" target="_blank" className="flex items-center gap-1.5 text-zinc-300 hover:text-white"><ExternalLink size={12} /> 查看企业许可页</Link>
-          <Link to="/" onClick={() => sessionStorage.removeItem(ACCESS_KEY)} className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-300"><LogOut size={12} /> 退出授权中心</Link>
+          <Link to="/" onClick={() => sessionStorage.removeItem(PROVIDER_DEMO_ACCESS_KEY)} className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-300"><LogOut size={12} /> 退出授权中心</Link>
         </div>
       </aside>
 
