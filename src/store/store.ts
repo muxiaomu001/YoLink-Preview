@@ -26,6 +26,7 @@ import { groupWelcomeMessages } from '@/domain/groupWelcome'
 import { buildSeed } from '@/domain/seed'
 import { newId } from '@/domain/ids'
 import { allocateSeats } from '@/domain/allocation'
+import { planCoverage } from '@/domain/broadcastCoverage'
 import { inviteCodeError, newInviteCode, normalizeInviteCode } from '@/domain/inviteCode'
 import { iso } from '@/domain/time'
 import { DEMO_IP } from './actions/helpers'
@@ -44,7 +45,7 @@ import { dExtraActions, type DExtraActions } from './actions/D-extra'
 import { quickReplyActions, type QuickReplyActions } from './actions/quickReplies'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
-export const STORAGE_KEY = 'yolink-demo-v8'
+export const STORAGE_KEY = 'yolink-demo-v9'
 
 const now = () => iso(Date.now())
 
@@ -89,6 +90,8 @@ export interface CoreActions {
   updateSeatWelcome: (seatId: string, welcome: string) => void
   /** 群发：返回实际发送数与因频控/拉黑/注销跳过数；频控超限返回 null（按钮应禁用） */
   sendBroadcast: (input: { name: string; seatId: string; operatorId: string; targetKind: BroadcastTargetKind; targetDesc: string; contentKind?: 'text' | 'image' | 'file'; media?: MessageMedia; text: string; customerIds: string[]; chatGroupId?: string; scheduledAt?: string | null }) => { sent: number; skipped: number } | null
+  /** 多坐席全覆盖群发：每个客户只收一条，发送身份优先用他的主归属坐席。频控超限返回 null */
+  sendCoverageBroadcast: (input: { name: string; seatIds: string[]; operatorId: string; text: string; scheduledAt?: string | null }) => { sent: number; skipped: number } | null
   /** code 留空则随机生成；自定义码重复或不合法时返回 error */
   createInviteLink: (input: { name: string; inviteGroupId: string; creatorStaffId: string; expiresAt: string | null; maxUses: number | null; chatGroupIds?: string[]; code?: string }) => { ok: true; link: InviteLink } | { ok: false; error: string }
   revokeInviteLink: (id: string, byStaffId: string) => void
@@ -368,6 +371,58 @@ export const useStore = create<DemoStore>()(
           audit: [{ id: newId('au'), at, actorStaffId: input.operatorId, type: 'broadcast.send', detail: `以「${seat?.displayName}」身份群发「${input.name}」，目标：${input.targetDesc}，${input.scheduledAt ? `定时 ${input.scheduledAt.slice(0, 16).replace('T', ' ')}` : `${newMsgs.length} 人，跳过 ${skipped} 人`}`, ip: DEMO_IP }, ...s.audit],
         })
         return { sent: newMsgs.length, skipped }
+      },
+
+      sendCoverageBroadcast: (input) => {
+        const s = get()
+        const at = now()
+        const today = at.slice(0, 10)
+        // 频控归属：全覆盖只算发起人（后台管理员）的一个任务。
+        // 若按投递坐席去扣各自实操员工的额度，管理员发一条全员通知就会把所有顾问当天的
+        // 群发额度吃光，他们自己的营销群发全发不出去——那是运营事故，不是风控。
+        const myToday = s.broadcasts.filter((b) => b.operatorId === input.operatorId && b.sentAt.slice(0, 10) === today).length
+        if (myToday >= s.enterprise.broadcastPerStaffPerDay) return null
+        const plan = planCoverage(s, input.seatIds, at)
+        const convIds = new Set(plan.deliveries.map((d) => d.convId))
+        const newMsgs: Message[] = plan.deliveries.map((d) => ({
+          id: newId('msg'),
+          convId: d.convId,
+          senderKind: 'seat',
+          senderId: d.seatId,
+          seatId: d.seatId,
+          operatorId: input.operatorId,
+          kind: 'text',
+          // 变量逐人替换：{{staff.name}} 取的是这一条实际的发送坐席，不是任务里的某一个
+          text: input.text.replaceAll('{{customer.nickname}}', d.customer.nickname).replaceAll('{{staff.name}}', s.seats.find((x) => x.id === d.seatId)?.displayName ?? '').replaceAll('{{company.name}}', s.enterprise.name),
+          at,
+          isBroadcast: true,
+        }))
+        const seatNames = input.seatIds.map((id) => s.seats.find((x) => x.id === id)?.displayName ?? '?').join('、')
+        const record: Broadcast = {
+          id: newId('bc'),
+          name: input.name,
+          seatId: [...plan.bySeat].sort((a, b) => b.count - a.count)[0]?.seatId ?? input.seatIds[0],
+          operatorId: input.operatorId,
+          targetKind: 'coverage',
+          targetDesc: `多坐席覆盖 · ${input.seatIds.length} 个坐席（${seatNames}）`,
+          contentKind: 'text',
+          text: input.text,
+          sentAt: at,
+          scheduledAt: input.scheduledAt ?? null,
+          status: input.scheduledAt ? 'scheduled' : 'done',
+          sentCount: input.scheduledAt ? 0 : newMsgs.length,
+          skippedCount: plan.skips.length,
+          readCount: 0,
+          coverage: plan.bySeat,
+          skipReasons: plan.skipReasons,
+        }
+        set({
+          messages: input.scheduledAt ? s.messages : [...s.messages, ...newMsgs],
+          conversations: input.scheduledAt ? s.conversations : s.conversations.map((c) => (convIds.has(c.id) ? { ...c, lastMessageAt: at } : c)),
+          broadcasts: [record, ...s.broadcasts],
+          audit: [{ id: newId('au'), at, actorStaffId: input.operatorId, type: 'broadcast.send', detail: `多坐席覆盖群发「${input.name}」，坐席：${seatNames}，${input.scheduledAt ? `定时 ${input.scheduledAt.slice(0, 16).replace('T', ' ')}` : `${newMsgs.length} 人，跳过 ${plan.skips.length} 人`}`, ip: DEMO_IP }, ...s.audit],
+        })
+        return { sent: newMsgs.length, skipped: plan.skips.length }
       },
 
       createInviteLink: (input) => {

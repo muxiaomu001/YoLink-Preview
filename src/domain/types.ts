@@ -216,6 +216,8 @@ export interface Customer {
   mutedAllUntil?: ISODate | null
   /** 员工重置过密码，首次登录强制修改 */
   mustChangePassword?: boolean
+  /** 最近一次强制下线的时间；下线是一次性动作，不是持续状态 */
+  sessionsRevokedAt?: ISODate
   /** 通用字段值（P1） */
   customFields?: Record<string, string>
 }
@@ -579,6 +581,7 @@ export type AuditType =
   | 'customer.block'
   | 'customer.mute'
   | 'customer.reset_password'
+  | 'customer.force_logout'
   | 'bot.update'
   | 'bot.run'
   | 'quick_reply.update'
@@ -643,12 +646,13 @@ export interface SensitiveHit {
 // ---------- 群发、快捷回复、知识库 ----------
 
 /** friends：本坐席全部好友（所有把它加为官方联系人的客户），一键群发的默认目标；mine：只算主归属 */
-export type BroadcastTargetKind = 'friends' | 'mine' | 'tag' | 'title' | 'purchase' | 'role' | 'group'
+export type BroadcastTargetKind = 'friends' | 'mine' | 'tag' | 'title' | 'purchase' | 'role' | 'group' | 'coverage'
 export type BroadcastStatus = 'scheduled' | 'sending' | 'done' | 'failed'
 
 export interface Broadcast {
   id: string
   name: string
+  /** 单坐席任务的发送身份；多坐席覆盖时记主力坐席（发得最多的那个），明细看 coverage */
   seatId: string
   operatorId: string
   targetKind: BroadcastTargetKind
@@ -665,6 +669,10 @@ export interface Broadcast {
   /** 因频控、拉黑、注销跳过的人数 */
   skippedCount: number
   readCount: number
+  /** 多坐席覆盖：参与的坐席（按选择顺序）与各自实际发出的条数 */
+  coverage?: { seatId: string; count: number }[]
+  /** 跳过原因分布，键见 domain/broadcastCoverage 的 SkipReason */
+  skipReasons?: Record<string, number>
 }
 
 // ---------- 话术库（易歪歪式：分类 + 文字 / 图片 / 文件 + 全文匹配，不设关键词字段） ----------

@@ -27,6 +27,8 @@ export interface WorkbenchActions {
   setCustomerBlacklist: (customerId: string, on: boolean, byStaffId: string) => void
   /** 所有群禁言；hours 为 null 表示永久，0 表示解除 */
   muteCustomerAll: (customerId: string, hours: number | null, byStaffId: string) => void
+  /** 强制下线：撤销客户全部登录 session，账号不停用，可重新登录 */
+  forceLogoutCustomer: (customerId: string, byStaffId: string) => void
   updateStaffPrefs: (staffId: string, patch: Partial<StaffPrefs>) => void
   // 客户手机端
   customerEditMessage: (messageId: string, text: string, customerId: string, expectedText: string) => string | null
@@ -140,6 +142,16 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
         return {
           customers: s.customers.map((x) => (x.id === customerId ? { ...x, mutedAllUntil: until } : x)),
           audit: withAudit(s.audit, 'customer.mute', hours === 0 ? `解除客户「${c.nickname}」的全群禁言` : `禁言客户「${c.nickname}」（所有群）${hours == null ? '永久' : `${hours} 小时`}`, byStaffId),
+        }
+      }),
+
+    forceLogoutCustomer: (customerId, byStaffId) =>
+      set((s) => {
+        const c = s.customers.find((x) => x.id === customerId)
+        if (!c) return {}
+        return {
+          customers: s.customers.map((x) => (x.id === customerId ? { ...x, sessionsRevokedAt: now() } : x)),
+          audit: withAudit(s.audit, 'customer.force_logout', `强制下线客户「${c.nickname}」：撤销全部登录 session，账号未停用可重新登录`, byStaffId),
         }
       }),
 

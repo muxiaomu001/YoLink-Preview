@@ -1,11 +1,13 @@
 /**
  * 管理后台的全量客户列表（管理员视角；工作台那个是员工视角）。
- * 筛选、批量挂头衔、详情（改主归属、注销）。
+ * 筛选（含账号状态）、批量挂头衔、详情（账号管控、改主归属、注销）。
+ * 状态口径与工作台资料卡共用 domain/customerStatus，不再是后台只认「正常 / 已注销」两种。
  */
 import { useMemo, useState } from 'react'
 import { Award } from 'lucide-react'
 import type { Customer, InviteGroup, Seat, Tag, Title } from '@/domain/types'
 import { fmtAgo, fmtDate } from '@/domain/time'
+import { STATUS_FILTER_OPTIONS, customerStatusFlags, matchesStatusFilter, type CustomerStatusFilter } from '@/domain/customerStatus'
 import { useStore } from '@/store/store'
 import { holdsPrimary, primarySeatOfCustomer } from '@/store/selectors'
 import { Button, Checkbox, Input, Select } from '@/ui/primitives'
@@ -14,8 +16,6 @@ import { toast } from '@/ui/overlay'
 import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 import { confirm } from '@/ui/confirm'
 import { CustomerDetailModal } from './CustomersAdminPage.parts'
-
-type Status = '' | 'active' | 'deleted'
 
 interface Row {
   c: Customer
@@ -36,7 +36,7 @@ export function CustomersAdminPage() {
   const [seatId, setSeatId] = useState('')
   const [titleId, setTitleId] = useState('')
   const [tagId, setTagId] = useState('')
-  const [status, setStatus] = useState<Status>('')
+  const [status, setStatus] = useState<CustomerStatusFilter>('')
   const [selected, setSelected] = useState<string[]>([])
   const [bulkTitle, setBulkTitle] = useState('')
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -56,7 +56,7 @@ export function CustomersAdminPage() {
       .filter((r) => !seatId || r.primarySeat?.id === seatId)
       .filter((r) => !titleId || r.c.titleIds.includes(titleId))
       .filter((r) => !tagId || r.c.tagIds.includes(tagId))
-      .filter((r) => !status || (status === 'deleted' ? !!r.c.deletedAt : !r.c.deletedAt))
+      .filter((r) => matchesStatusFilter(r.c, status))
       .sort((a, b) => b.c.registeredAt.localeCompare(a.c.registeredAt))
   }, [s, q, groupId, seatId, titleId, tagId, status])
 
@@ -137,7 +137,24 @@ export function CustomersAdminPage() {
     { key: 'group', title: '邀请组', render: (r) => <span className="text-zinc-600">{r.group?.name ?? '-'}</span> },
     { key: 'reg', title: '注册时间', width: '100px', render: (r) => <span className="tabular-nums text-zinc-500">{fmtDate(r.c.registeredAt)}</span> },
     { key: 'active', title: '最近活跃', width: '90px', render: (r) => <span className="text-zinc-500">{fmtAgo(r.c.lastActiveAt)}</span> },
-    { key: 'status', title: '状态', width: '70px', render: (r) => (r.c.deletedAt ? <Pill tone="red">已注销</Pill> : <Pill tone="green">正常</Pill>) },
+    {
+      key: 'status',
+      title: '状态',
+      width: '132px',
+      render: (r) => {
+        const flags = customerStatusFlags(r.c)
+        if (!flags.length) return <Pill tone="green">正常</Pill>
+        return (
+          <span className="flex flex-wrap gap-1">
+            {flags.map((f) => (
+              <span key={f.key} title={f.title}>
+                <Pill tone={f.tone}>{f.label}</Pill>
+              </span>
+            ))}
+          </span>
+        )
+      },
+    },
     {
       key: 'ops',
       title: '操作',
@@ -154,9 +171,9 @@ export function CustomersAdminPage() {
   return (
     <div>
       <PageHeader title="客户列表" desc="全企业客户。员工在工作台只能看到自己坐席主归属的客户。" />
-      <Note>头衔是官方发给客户、所有人可见的；内部标签只有员工看得到。批量挂头衔每个客户最多 5 个，超了自动跳过。改主归属与注销在「详情」里。</Note>
+      <Note>头衔是官方发给客户、所有人可见的；内部标签只有员工看得到。批量挂头衔每个客户最多 5 个，超了自动跳过。重置密码、强制下线、禁言、拉黑、改主归属与注销都在「详情」里。</Note>
       <DemoNote className="mt-2">
-        改主归属与注销排在第二版<DemoLevelTag level="P1" />。
+        状态列与工作台资料卡是同一份判断：拉黑、全群禁言、待首次改密会同时显示，一个客户可以同时占几项。改主归属与注销排在第二版<DemoLevelTag level="P1" />。
       </DemoNote>
 
       <Card className="mt-4" title="筛选">
@@ -196,10 +213,12 @@ export function CustomersAdminPage() {
               </option>
             ))}
           </Select>
-          <Select value={status} onChange={(e) => setStatus(e.target.value as Status)} className="w-28">
-            <option value="">全部状态</option>
-            <option value="active">正常</option>
-            <option value="deleted">已注销</option>
+          <Select value={status} onChange={(e) => setStatus(e.target.value as CustomerStatusFilter)} className="w-32" title="正常 = 没有拉黑、禁言、待改密、注销中的任何一项">
+            {STATUS_FILTER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </Select>
           <span className="ml-auto text-xs text-zinc-500">共 {rows.length} 位</span>
         </div>

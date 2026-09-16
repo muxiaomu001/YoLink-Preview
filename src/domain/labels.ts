@@ -81,6 +81,7 @@ export const AUDIT_LABEL: Record<AuditType, string> = {
   'customer.block': '拉黑客户',
   'customer.mute': '禁言客户',
   'customer.reset_password': '重置客户密码',
+  'customer.force_logout': '强制下线客户',
   'bot.update': '群活跃助手',
   'bot.run': '机器人发言',
   'quick_reply.update': '个人话术',

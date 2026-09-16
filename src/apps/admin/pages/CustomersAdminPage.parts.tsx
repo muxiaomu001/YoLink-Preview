@@ -1,10 +1,12 @@
 /**
- * 客户列表的详情弹窗：基本信息、官方联系人、改主归属坐席（P1）、注销客户（P1）。
+ * 客户列表的详情弹窗：基本信息、官方联系人、账号管控（重置密码 / 强制下线 / 禁言 / 拉黑）、
+ * 改主归属坐席（P1）、注销客户（P1）。状态标记与列表同一口径，见 domain/customerStatus。
  */
 import { useState } from 'react'
 import { Star, UserX } from 'lucide-react'
 import type { CustomerSeat } from '@/domain/types'
 import { fmtDateTime } from '@/domain/time'
+import { customerStatusFlags } from '@/domain/customerStatus'
 import { useStore } from '@/store/store'
 import { customerById, seatsOfCustomer } from '@/store/selectors'
 import { Button, Field, Select } from '@/ui/primitives'
@@ -12,6 +14,7 @@ import { KV, Note, Pill, SeatAvatar, TagChip, TitleChip } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { DemoLevelTag } from '@/ui/DemoNote'
+import { CustomerControlSection } from './CustomersAdminPage.controls'
 
 const SOURCE_LABEL: Record<CustomerSeat['source'], string> = { register: '注册时添加', backfill: '补加', reassign: '改主归属时添加' }
 
@@ -28,6 +31,7 @@ export function CustomerDetailModal({ customerId, onClose }: { customerId: strin
   if (!c) return null
   const deleted = !!c.deletedAt
   const group = s.inviteGroups.find((g) => g.id === c.inviteGroupId)
+  const flags = customerStatusFlags(c)
   const titles = c.titleIds.map((id) => s.titles.find((t) => t.id === id)).filter((t) => !!t)
   const tags = c.tagIds.map((id) => s.tags.find((t) => t.id === id)).filter((t) => !!t)
 
@@ -82,7 +86,20 @@ export function CustomerDetailModal({ customerId, onClose }: { customerId: strin
               { k: '头衔', v: titles.length ? <span className="flex flex-wrap gap-1">{titles.map((t) => <TitleChip key={t.id} title={t} size="xs" />)}{c.primaryTitleId && <span className="text-[11px] text-zinc-400">（主头衔：{titles.find((t) => t.id === c.primaryTitleId)?.name}）</span>}</span> : <span className="text-zinc-400">无</span> },
               { k: '内部标签', v: tags.length ? <span className="flex flex-wrap gap-1">{tags.map((t) => <TagChip key={t.id} tag={t} />)}</span> : <span className="text-zinc-400">无</span> },
               { k: '备注', v: c.note || <span className="text-zinc-400">无</span> },
-              { k: '状态', v: deleted ? <Pill tone="red">已注销</Pill> : <Pill tone="green">正常</Pill> },
+              {
+                k: '状态',
+                v: flags.length ? (
+                  <span className="flex flex-wrap gap-1">
+                    {flags.map((f) => (
+                      <span key={f.key} title={f.title}>
+                        <Pill tone={f.tone}>{f.label}</Pill>
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  <Pill tone="green">正常</Pill>
+                ),
+              },
             ]}
           />
         </section>
@@ -113,6 +130,8 @@ export function CustomerDetailModal({ customerId, onClose }: { customerId: strin
             {!seats.length && <div className="text-xs text-zinc-400">没有官方联系人</div>}
           </div>
         </section>
+
+        <CustomerControlSection c={c} />
 
         <section className="rounded-md border border-zinc-200 p-3">
           <h4 className="text-xs font-semibold text-zinc-700">改主归属坐席<DemoLevelTag level="P1" /></h4>

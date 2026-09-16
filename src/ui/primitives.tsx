@@ -29,19 +29,29 @@ export function Button({ variant = 'secondary', size = 'md', className, children
   )
 }
 
-const fieldCls = 'w-full h-8 rounded-md border border-zinc-300 bg-white px-2.5 text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 disabled:bg-zinc-50 disabled:text-zinc-400'
+const FIELD_BASE = 'h-8 rounded-md border border-zinc-300 bg-white px-2.5 text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 disabled:bg-zinc-50 disabled:text-zinc-400'
+
+/**
+ * 传了自己的宽度（w-40 / flex-1 / max-w-*）就不要基础的 w-full。
+ * Tailwind 的同层工具类谁生效看生成顺序、不看 class 属性里的先后，w-full 会压过 w-40，
+ * 于是"筛选栏几个下拉并排"会变成每个都撑满一整行。
+ */
+function fieldCls(className?: string): string {
+  const sized = !!className && /(^|\s)(w-|min-w-|max-w-|basis-|flex-1)/.test(className)
+  return sized ? FIELD_BASE : `w-full ${FIELD_BASE}`
+}
 
 export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={clsx(fieldCls, className)} {...rest} />
+  return <input className={clsx(fieldCls(className), className)} {...rest} />
 }
 
 export function Textarea({ className, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={clsx(fieldCls, 'h-auto py-2 leading-relaxed resize-none', className)} {...rest} />
+  return <textarea className={clsx(fieldCls(className), 'h-auto py-2 leading-relaxed resize-none', className)} {...rest} />
 }
 
 export function Select({ className, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={clsx(fieldCls, 'pr-7 appearance-none bg-[url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2371717a%27 stroke-width=%272%27%3E%3Cpath d=%27m6 9 6 6 6-6%27/%3E%3C/svg%3E")] bg-no-repeat bg-[right_8px_center]', className)} {...rest}>
+    <select className={clsx(fieldCls(className), 'pr-7 appearance-none bg-[url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2371717a%27 stroke-width=%272%27%3E%3Cpath d=%27m6 9 6 6 6-6%27/%3E%3C/svg%3E")] bg-no-repeat bg-[right_8px_center]', className)} {...rest}>
       {children}
     </select>
   )
