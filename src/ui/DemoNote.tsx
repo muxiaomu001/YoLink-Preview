@@ -26,6 +26,13 @@ function subscribe(fn: () => void) {
   return () => void listeners.delete(fn)
 }
 
+// 多窗口同步：演示时后台、工作台、手机屏各占一个窗口，任一处切换开关，其余窗口跟着变
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === KEY) listeners.forEach((fn) => fn())
+  })
+}
+
 /** 演示批注是否显示；关掉后界面只剩正式产品该有的文案 */
 export function useDemoNotes() {
   return useSyncExternalStore(subscribe, read, () => true)

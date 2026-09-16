@@ -47,9 +47,15 @@ export function useLongPress(onTrigger: () => void) {
   }
 
   return {
-    /** 长按刚触发过，这一次的 click 要吞掉，避免顺带打开图片或跳转 */
-    justFired: () => fired.current,
     handlers: {
+      // 长按刚唤出菜单，松手带出的这一次 click 要吞掉，别顺带打开图片、下载附件或跳链接。
+      // 捕获阶段拦截，事件到不了里面的图片与链接；普通单击不受影响。
+      onClickCapture: (e: React.MouseEvent) => {
+        if (!fired.current) return
+        fired.current = false
+        e.preventDefault()
+        e.stopPropagation()
+      },
       onTouchStart: (e: React.TouchEvent) => start(e.touches[0].clientX, e.touches[0].clientY),
       onTouchMove: (e: React.TouchEvent) => {
         const o = origin.current

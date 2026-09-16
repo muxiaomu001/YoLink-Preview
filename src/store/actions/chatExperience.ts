@@ -77,6 +77,9 @@ export function chatExperienceActions(set: Set, get: Get): ChatExperienceActions
       if(mentions.mentionAll&&!(input.actor.kind==='seat'?seatCan(s,input.actor.id,'group.mention_all',group?.id):customerCan(s,input.actor.id,'group.mention_all',group?.id)))return{ok:false,reason:'当前不允许 @所有人'}
       if(input.replyToId&&!s.messages.some((m)=>m.id===input.replyToId&&m.convId===input.convId&&messageVisibleFor(s,m,input.actor)))return{ok:false,reason:'要回复的消息已不可用，请取消回复后发送'}
       if(input.quoteText&&input.replyToId&&!s.messages.find((m)=>m.id===input.replyToId)?.text.includes(input.quoteText))return{ok:false,reason:'所引用的原文已变化，请重新选择'}
+      // 转发按来源会话再查一次转发能力：挑目标的弹层开着时管理员可能刚关掉这项能力
+      if(input.forwardedFrom){const from=s.conversations.find((c)=>c.id===input.forwardedFrom!.convId),fwdKey=from?.chatGroupId?'group.forward':'dm.forward'
+        if(!(input.actor.kind==='seat'?seatCan(s,input.actor.id,fwdKey,from?.chatGroupId):customerCan(s,input.actor.id,fwdKey,from?.chatGroupId)))return{ok:false,reason:'当前不允许转发这条消息'}}
       const id=newId('msg'),attemptId=newId('attempt'),at=now()
       const m:Message={id,convId:input.convId,senderKind:input.actor.kind,senderId:input.actor.id,seatId:input.actor.kind==='seat'?input.actor.id:undefined,operatorId:input.actor.staffId,kind:input.kind??'text',text,media:input.media,at,replyToId:input.replyToId,quoteText:input.quoteText,...mentions,delivery:'pending',attemptId,aiDraftUsed:input.aiDraftUsed,forwardedFrom:input.forwardedFrom,
         channelId:group?.kind==='channel'?group.id:undefined,channelSignature:group?.kind==='channel'&&input.signature?s.seats.find((x)=>x.id===input.actor.id)?.displayName:undefined,receiptMemberSeatIds:group?.memberSeatIds,receiptMemberCustomerIds:group?.memberCustomerIds}
