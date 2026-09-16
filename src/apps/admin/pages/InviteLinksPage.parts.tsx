@@ -4,6 +4,8 @@
 import { useState } from 'react'
 import type { InviteLink, InviteLinkStatus } from '@/domain/types'
 import { fmtDate, fmtDateTime } from '@/domain/time'
+import { seatIdsOf } from '@/domain/allocation'
+import { INVITE_CODE_HINT, INVITE_CODE_MAX, inviteCodeError, normalizeInviteCode } from '@/domain/inviteCode'
 import { useStore } from '@/store/store'
 import { staffById } from '@/store/selectors'
 import { Button, Field, Input, Select } from '@/ui/primitives'
@@ -50,7 +52,7 @@ export function InviteLinkDetailModal({ link, onClose }: { link: InviteLink; onC
           items={[
             { k: '链接名称', v: link.name },
             { k: '短码', v: <span className="font-mono">{link.code}</span> },
-            { k: '邀请组', v: group ? `${group.name}（坐席：${group.seatIds.map((id) => s.seats.find((x) => x.id === id)?.displayName).join('、')}）` : '-' },
+            { k: '邀请组', v: group ? `${group.name}（坐席：${seatIdsOf(group).map((id) => s.seats.find((x) => x.id === id)?.displayName).join('、')}）` : '-' },
             { k: '创建者', v: staffById(s, link.creatorStaffId)?.name ?? '-' },
             { k: '创建时间', v: fmtDateTime(link.createdAt) },
             { k: '有效期', v: link.expiresAt ? fmtDate(link.expiresAt) : '永久' },
@@ -98,19 +100,29 @@ export function InviteLinkCreateModal({ onClose }: { onClose: () => void }) {
   const [groupId, setGroupId] = useState(groups.find((g) => g.isDefault)?.id ?? groups[0]?.id ?? '')
   const [expires, setExpires] = useState('')
   const [maxUses, setMaxUses] = useState('')
+  const [code, setCode] = useState('')
   const trimmed = name.trim()
   const nameOk = trimmed.length >= 1 && trimmed.length <= 32
   const today = fmtDate(new Date().toISOString())
   const expiresOk = expires === '' || expires >= today
   const maxNum = maxUses.trim() === '' ? null : Number(maxUses)
   const maxOk = maxNum == null || (Number.isInteger(maxNum) && maxNum > 0)
-  const error = !expiresOk ? '有效期不能早于今天。' : !maxOk ? '使用上限必须是正整数，留空表示不限。' : ''
-  const ok = nameOk && !!groupId && expiresOk && maxOk
+  const codeErr = code.trim() ? inviteCodeError(code, s.takenInviteCodes()) : undefined
+  const error = !expiresOk ? '有效期不能早于今天。' : !maxOk ? '使用上限必须是正整数，留空表示不限。' : (codeErr ?? '')
+  const ok = nameOk && !!groupId && expiresOk && maxOk && !codeErr
 
   const submit = () => {
     if (!ok) return
-    const link = s.createInviteLink({ name: trimmed, inviteGroupId: groupId, creatorStaffId: admin, expiresAt: expires ? new Date(`${expires}T23:59:59`).toISOString() : null, maxUses: maxNum })
-    toast(`已生成链接「${link.name}」：${linkUrl(link.code)}`)
+    const r = s.createInviteLink({
+      name: trimmed,
+      inviteGroupId: groupId,
+      creatorStaffId: admin,
+      expiresAt: expires ? new Date(`${expires}T23:59:59`).toISOString() : null,
+      maxUses: maxNum,
+      code: code.trim() ? normalizeInviteCode(code) : undefined,
+    })
+    if (!r.ok) return toast(r.error, 'warn')
+    toast(`已生成链接「${r.link.name}」：${linkUrl(r.link.code)}`)
     onClose()
   }
 
@@ -133,7 +145,7 @@ export function InviteLinkCreateModal({ onClose }: { onClose: () => void }) {
         <Field label="链接名称" required hint="1 到 32 字，标明渠道或用途">
           <Input value={name} maxLength={32} onChange={(e) => setName(e.target.value)} placeholder="如：抖音 9 月投放、线下沙龙签到" />
         </Field>
-        <Field label="邀请组" required hint="决定注册后自动添加哪些坐席">
+        <Field label="邀请组" required hint="决定注册后自动添加哪些坐席、由哪位接待员轮到">
           <Select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
@@ -142,6 +154,9 @@ export function InviteLinkCreateModal({ onClose }: { onClose: () => void }) {
               </option>
             ))}
           </Select>
+        </Field>
+        <Field label="短码" hint={`留空自动生成；${INVITE_CODE_HINT}`}>
+          <Input value={code} maxLength={INVITE_CODE_MAX} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="留空自动生成" className="font-mono tracking-wider" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="有效期" hint="留空 = 永久">

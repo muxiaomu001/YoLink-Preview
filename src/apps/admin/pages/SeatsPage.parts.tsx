@@ -8,7 +8,6 @@ import { customersOfSeat, staffById } from '@/store/selectors'
 import { Button, Field, Input, Select, Switch, Textarea } from '@/ui/primitives'
 import { Note, SeatAvatar } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
-import { DemoLevelTag } from '@/ui/DemoNote'
 
 export function HandoverModal({ seat, onClose }: { seat: Seat; onClose: () => void }) {
   const s = useStore()
@@ -78,16 +77,13 @@ interface SeatForm {
   operatorStaffId: string
   welcome: string
   customerDeletable: boolean
-  seatGroupId: string
-  maxCustomers: string
 }
 
-/** 校验：显示名 1-32、职能说明 0-64、上限为空或正整数 */
+/** 校验：显示名 1-32、职能说明 0-64 */
 function validate(f: SeatForm): string | null {
   const name = f.displayName.trim()
   if (name.length < 1 || name.length > 32) return '显示名 1 到 32 字'
   if (f.roleDesc.length > 64) return '职能说明最多 64 字'
-  if (f.maxCustomers.trim() !== '' && !(Number.isInteger(Number(f.maxCustomers)) && Number(f.maxCustomers) > 0)) return '客户数上限须为正整数，留空为无限制'
   return null
 }
 
@@ -101,8 +97,6 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
     operatorStaffId: seat?.operatorStaffId ?? '',
     welcome: seat?.welcome ?? '',
     customerDeletable: seat?.customerDeletable ?? false,
-    seatGroupId: seat?.seatGroupId ?? '',
-    maxCustomers: seat?.maxCustomers != null ? String(seat.maxCustomers) : '',
   })
   const set = <K extends keyof SeatForm>(k: K, v: SeatForm[K]) => setForm((f) => ({ ...f, [k]: v }))
   const error = validate(form)
@@ -115,8 +109,6 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
       operatorStaffId: form.operatorStaffId || null,
       welcome: form.welcome,
       customerDeletable: form.customerDeletable,
-      seatGroupId: form.type === 'assign' && form.seatGroupId ? form.seatGroupId : null,
-      maxCustomers: form.maxCustomers.trim() === '' ? null : Number(form.maxCustomers),
     }
     if (seat) {
       s.updateSeat(seat.id, patch, admin)
@@ -169,21 +161,6 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
             </Select>
           </Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={<>坐席组<DemoLevelTag level="P1" /></>} hint="轮询分摊用，可空">
-            <Select value={form.seatGroupId} disabled={form.type === 'notice'} onChange={(e) => set('seatGroupId', e.target.value)}>
-              <option value="">不加入坐席组</option>
-              {s.seatGroups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={<>客户数上限<DemoLevelTag level="P1" /></>} hint="留空为无限制">
-            <Input type="number" min={1} value={form.maxCustomers} onChange={(e) => set('maxCustomers', e.target.value)} placeholder="达到后不再分新客户" />
-          </Field>
-        </div>
         <Field label="欢迎语" hint="支持 {{customer.nickname}}、{{seat.name}}；留空用企业默认">
           <Textarea rows={3} value={form.welcome} onChange={(e) => set('welcome', e.target.value)} />
         </Field>
@@ -194,7 +171,7 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
           </div>
           <Switch checked={form.customerDeletable} onChange={(v) => set('customerDeletable', v)} />
         </div>
-        {error && (form.displayName.length > 0 || form.maxCustomers.length > 0) && <p className="text-[11px] text-red-600">{error}</p>}
+        {error && form.displayName.length > 0 && <p className="text-[11px] text-red-600">{error}</p>}
       </div>
     </Modal>
   )

@@ -19,7 +19,6 @@ export const AUDIT_LABEL: Record<AuditType, string> = {
   'seat.update': '修改坐席',
   'seat.handover': '坐席交接',
   'seat.pause': '暂停接新',
-  'seat_group.update': '坐席组',
   'invite_group.create': '创建邀请组',
   'invite_group.update': '修改邀请组',
   'invite_group.reset_code': '重置邀请码',

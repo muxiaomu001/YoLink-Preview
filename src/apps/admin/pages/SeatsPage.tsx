@@ -1,13 +1,13 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { ArrowLeftRight, Plus } from 'lucide-react'
 import type { Seat } from '@/domain/types'
+import { seatIdsOf } from '@/domain/allocation'
 import { fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { customersOfSeat, staffById } from '@/store/selectors'
 import { Button } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, SeatAvatar, Table, type Column } from '@/ui/display'
 import { toast } from '@/ui/overlay'
-import { DemoLevelTag } from '@/ui/DemoNote'
 import { confirm } from '@/ui/confirm'
 import { HandoverModal, SeatEditModal } from './SeatsPage.parts'
 
@@ -25,10 +25,10 @@ export function SeatsPage() {
         return {
           seat,
           operator: staffById(s, seat.operatorStaffId),
-          groups: s.inviteGroups.filter((g) => g.seatIds.includes(seat.id)),
-          seatGroup: s.seatGroups.find((g) => g.id === seat.seatGroupId),
+          groups: s.inviteGroups
+            .filter((g) => seatIdsOf(g).includes(seat.id))
+            .map((g) => ({ name: g.name, rotating: g.rotatingSeatIds.includes(seat.id) })),
           customers,
-          full: seat.maxCustomers != null && customers >= seat.maxCustomers,
           off: seat.status === 'disabled',
         }
       }),
@@ -89,34 +89,21 @@ export function SeatsPage() {
       render: (r) =>
         dim(
           r,
-          <span>
-            {r.groups.length ? r.groups.map((g) => g.name).join('、') : <span className="text-zinc-400">未加入任何组</span>}
-            {r.seatGroup && <span className="ml-1 text-[11px] text-zinc-400">· 坐席组：{r.seatGroup.name}</span>}
-          </span>,
-        ),
-    },
-    { key: 'customers', title: '客户数', align: 'right', render: (r) => dim(r, <span className="tabular-nums">{r.seat.type === 'notice' ? '-' : r.customers}</span>) },
-    {
-      key: 'max',
-      title: (
-        <>
-          上限
-          <DemoLevelTag level="P1" />
-        </>
-      ),
-      align: 'right',
-      render: (r) =>
-        dim(
-          r,
-          r.seat.maxCustomers == null ? (
-            <span className="text-zinc-400">无限制</span>
-          ) : r.full ? (
-            <Pill tone="amber">{r.seat.maxCustomers} · 已达上限</Pill>
+          r.groups.length ? (
+            <div className="flex flex-wrap gap-1">
+              {r.groups.map((g) => (
+                <span key={g.name} className="inline-flex items-center gap-1 rounded border border-zinc-200 px-1.5 py-0.5 text-[11px] text-zinc-600">
+                  {g.name}
+                  <span className={g.rotating ? 'text-brand-700' : 'text-zinc-400'}>{g.rotating ? '轮询' : '固定'}</span>
+                </span>
+              ))}
+            </div>
           ) : (
-            <span className="tabular-nums">{r.seat.maxCustomers}</span>
+            <span className="text-zinc-400">未加入任何组</span>
           ),
         ),
     },
+    { key: 'customers', title: '客户数', align: 'right', render: (r) => dim(r, <span className="tabular-nums">{r.seat.type === 'notice' ? '-' : r.customers}</span>) },
     {
       key: 'status',
       title: '状态',

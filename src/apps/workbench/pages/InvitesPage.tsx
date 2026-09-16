@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Copy, Plus } from 'lucide-react'
 import type { InviteLink } from '@/domain/types'
 import { fmtDate } from '@/domain/time'
+import { seatIdsOf } from '@/domain/allocation'
 import { Button } from '@/ui/primitives'
 import { Card, PageHeader, Pill, SeatAvatar, Table } from '@/ui/display'
 import { HelpTip } from '@/ui/help'
@@ -26,7 +27,7 @@ export function InvitesPage() {
   const { s, staff, seat, can } = useWorkbench()
   const [creating, setCreating] = useState(false)
   const mine = s.inviteLinks.filter((l) => l.creatorStaffId === staff?.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  const myGroups = s.inviteGroups.filter((g) => g.enabled && seat && g.seatIds.includes(seat.id))
+  const myGroups = s.inviteGroups.filter((g) => g.enabled && seat && seatIdsOf(g).includes(seat.id))
   const defaults = s.enterprise.defaultChatGroupIds.map((id) => s.chatGroups.find((g) => g.id === id)?.name).filter(Boolean)
 
   const copy = (l: InviteLink) => {
@@ -66,7 +67,7 @@ export function InvitesPage() {
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-zinc-600">
           <span className="text-zinc-500">「{seat?.displayName}」所在的邀请组：</span>
           {myGroups.map((g) => (
-            <span key={g.id} className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 leading-6" title={`成员坐席：${g.seatIds.map((id) => s.seats.find((x) => x.id === id)?.displayName).join('、')}`}>
+            <span key={g.id} className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 leading-6" title={`接待员（轮流分）：${g.rotatingSeatIds.map((id) => s.seats.find((x) => x.id === id)?.displayName).join('、') || '无'}；固定坐席：${g.fixedSeatIds.map((id) => s.seats.find((x) => x.id === id)?.displayName).join('、') || '无'}`}>
               <b className="font-medium text-zinc-800">{g.name}</b>
               <span className="font-mono text-[11px] text-zinc-400">{g.code}</span>
             </span>
@@ -100,7 +101,7 @@ export function InvitesPage() {
                   <div className="flex items-center gap-1.5">
                     <span>{g?.name ?? '-'}</span>
                     <span className="flex -space-x-1">
-                      {g?.seatIds.map((id) => {
+                      {(g ? seatIdsOf(g) : []).map((id) => {
                         const st = s.seats.find((x) => x.id === id)
                         return st ? <SeatAvatar key={id} seat={st} size={18} className="ring-1 ring-white" /> : null
                       })}

@@ -35,7 +35,6 @@ import type {
   ReferralAnomaly,
   ReferralRules,
   Report,
-  SeatGroup,
   SecurityEvent,
   SensitiveHit,
   SensitiveWord,
@@ -71,10 +70,6 @@ const aid = (p: string) => {
 
 const DAY = 86400000
 const dateStr = (ms: number) => iso(ms).slice(0, 10)
-
-// ---------- 坐席组（P1） ----------
-
-export const SEAT_GROUPS: SeatGroup[] = [{ id: 'sg_advisors', name: '投资顾问组', seatIds: ['seat_lin', 'seat_chen'], strategy: 'least', createdAt: ago(30) }]
 
 // ---------- 策略 ----------
 
@@ -554,7 +549,6 @@ export function buildAdminSeed(ctx: AdminSeedContext) {
   ]
 
   return {
-    seatGroups: SEAT_GROUPS,
     policyItems: POLICY_ITEMS,
     policyPresets: POLICY_PRESETS,
     activePresetId: 'preset_cs',

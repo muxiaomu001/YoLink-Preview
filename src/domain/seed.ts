@@ -26,6 +26,7 @@ import type {
   TitleAssignment,
 } from './types'
 import { ago, agoMs, iso } from './time'
+import { allocateSeats } from './allocation'
 import { buildAdminSeed } from './seed-admin'
 import { MEDIA, QUICK_REPLIES, QUICK_REPLY_CATEGORIES } from './seed-quick-replies'
 import { BOTS, BOT_RULES, BOT_SCRIPTS, DEFAULT_STAFF_PREFS, GROUP_EXTRAS, botMessagesFor, buildBotRuns, buildGroupLogs, groupDefaults } from './seed-groups'
@@ -218,8 +219,6 @@ export const SEATS: Seat[] = [
     welcome:
       '{{customer.nickname}}您好，我是您的专属投资顾问林顾问。先花两分钟做个风险测评，我再根据结果给您一版配置思路，可以吗？',
     customerDeletable: false,
-    seatGroupId: 'sg_advisors',
-    maxCustomers: 60,
     createdAt: ago(110),
   },
   {
@@ -234,8 +233,6 @@ export const SEATS: Seat[] = [
     welcome:
       '{{customer.nickname}}您好，我是陈顾问，负责您的账户配置与日常跟进。您先说说这笔资金的用途和期限，我们从这里开始。',
     customerDeletable: false,
-    seatGroupId: 'sg_advisors',
-    maxCustomers: 80,
     createdAt: ago(110),
   },
   {
@@ -249,8 +246,6 @@ export const SEATS: Seat[] = [
     status: 'accepting',
     welcome: '您好，这里是恒信财富客户服务。开户、入金到账、资料修改这类问题直接在这里说，工作时间 15 分钟内回复。',
     customerDeletable: true,
-    seatGroupId: null,
-    maxCustomers: null,
     createdAt: ago(105),
   },
   {
@@ -265,8 +260,6 @@ export const SEATS: Seat[] = [
     welcome:
       '【恒信财富】欢迎加入。本账号发送官方通知与合规提示。投资有风险，本平台任何内容不构成投资建议，请以正式文件为准。',
     customerDeletable: false,
-    seatGroupId: null,
-    maxCustomers: null,
     createdAt: ago(105),
   },
 ]
@@ -359,8 +352,10 @@ export const INVITE_GROUPS: InviteGroup[] = [
     id: 'ig_default',
     name: '默认组',
     code: 'HX2026',
-    seatIds: ['seat_chen', 'seat_cs', 'seat_notice'],
-    primarySeatId: 'seat_chen',
+    // 客户服务和合规通知人人都加；两位顾问轮流接
+    fixedSeatIds: ['seat_cs', 'seat_notice'],
+    rotatingSeatIds: ['seat_chen', 'seat_lin'],
+    rotationIndex: 0,
     chatGroupIds: [],
     isDefault: true,
     enabled: true,
@@ -370,8 +365,9 @@ export const INVITE_GROUPS: InviteGroup[] = [
     id: 'ig_live',
     name: '直播间组',
     code: 'LIVE88',
-    seatIds: ['seat_lin', 'seat_notice'],
-    primarySeatId: 'seat_lin',
+    fixedSeatIds: ['seat_notice'],
+    rotatingSeatIds: ['seat_lin', 'seat_chen'],
+    rotationIndex: 0,
     chatGroupIds: ['cg_community'],
     isDefault: false,
     enabled: true,
@@ -381,8 +377,10 @@ export const INVITE_GROUPS: InviteGroup[] = [
     id: 'ig_lin',
     name: '林顾问专属码',
     code: 'LIN001',
-    seatIds: ['seat_lin'],
-    primarySeatId: 'seat_lin',
+    // 一对一专属码：没有固定坐席，队列里只有他自己
+    fixedSeatIds: [],
+    rotatingSeatIds: ['seat_lin'],
+    rotationIndex: 0,
     chatGroupIds: [],
     isDefault: false,
     enabled: true,
@@ -461,7 +459,6 @@ interface CustomerPlan {
   inviteLinkId?: string
   daysAgo: number
   scenario: ScenarioKey
-  primarySeatId: string
 }
 
 type ScenarioKey =
@@ -547,48 +544,48 @@ const SCENARIOS: Record<ScenarioKey, ScriptLine[]> = {
 
 const PLANS: CustomerPlan[] = [
   // 直播间组（林顾问主归属）
-  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 0.1, scenario: 'just_registered', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 1, scenario: 'onboarding_pending', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 2, scenario: 'us_market_question', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 3, scenario: 'risk_survey_done', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 5, scenario: 'onboarding_pending', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 6, scenario: 'complaint_refund', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 8, scenario: 'deposit_arrival', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 9, scenario: 'us_market_question', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_live', daysAgo: 12, scenario: 'active_investor', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_live', daysAgo: 15, scenario: 'renewal', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_live', daysAgo: 20, scenario: 'quiet_long', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_live', daysAgo: 24, scenario: 'quiet_long', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_live', daysAgo: 30, scenario: 'active_investor', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_live', daysAgo: 38, scenario: 'quiet_long', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_live', daysAgo: 45, scenario: 'deposit_arrival', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_live', daysAgo: 55, scenario: 'renewal', primarySeatId: 'seat_lin' },
+  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 0.1, scenario: 'just_registered' },
+  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 1, scenario: 'onboarding_pending' },
+  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 2, scenario: 'us_market_question' },
+  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 3, scenario: 'risk_survey_done' },
+  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 5, scenario: 'onboarding_pending' },
+  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 6, scenario: 'complaint_refund' },
+  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 8, scenario: 'deposit_arrival' },
+  { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 9, scenario: 'us_market_question' },
+  { inviteGroupId: 'ig_live', daysAgo: 12, scenario: 'active_investor' },
+  { inviteGroupId: 'ig_live', daysAgo: 15, scenario: 'renewal' },
+  { inviteGroupId: 'ig_live', daysAgo: 20, scenario: 'quiet_long' },
+  { inviteGroupId: 'ig_live', daysAgo: 24, scenario: 'quiet_long' },
+  { inviteGroupId: 'ig_live', daysAgo: 30, scenario: 'active_investor' },
+  { inviteGroupId: 'ig_live', daysAgo: 38, scenario: 'quiet_long' },
+  { inviteGroupId: 'ig_live', daysAgo: 45, scenario: 'deposit_arrival' },
+  { inviteGroupId: 'ig_live', daysAgo: 55, scenario: 'renewal' },
   // 林顾问专属码
-  { inviteGroupId: 'ig_lin', inviteLinkId: 'il_referral', daysAgo: 4, scenario: 'referral_intro', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_lin', inviteLinkId: 'il_referral', daysAgo: 11, scenario: 'referral_intro', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_lin', inviteLinkId: 'il_referral', daysAgo: 18, scenario: 'active_investor', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_lin', daysAgo: 26, scenario: 'quiet_long', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_lin', daysAgo: 33, scenario: 'risk_survey_done', primarySeatId: 'seat_lin' },
-  { inviteGroupId: 'ig_lin', daysAgo: 41, scenario: 'active_investor', primarySeatId: 'seat_lin' },
+  { inviteGroupId: 'ig_lin', inviteLinkId: 'il_referral', daysAgo: 4, scenario: 'referral_intro' },
+  { inviteGroupId: 'ig_lin', inviteLinkId: 'il_referral', daysAgo: 11, scenario: 'referral_intro' },
+  { inviteGroupId: 'ig_lin', inviteLinkId: 'il_referral', daysAgo: 18, scenario: 'active_investor' },
+  { inviteGroupId: 'ig_lin', daysAgo: 26, scenario: 'quiet_long' },
+  { inviteGroupId: 'ig_lin', daysAgo: 33, scenario: 'risk_survey_done' },
+  { inviteGroupId: 'ig_lin', daysAgo: 41, scenario: 'active_investor' },
   // 默认组（陈顾问主归属）
-  { inviteGroupId: 'ig_default', inviteLinkId: 'il_xhs', daysAgo: 0.3, scenario: 'just_registered', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', inviteLinkId: 'il_xhs', daysAgo: 1, scenario: 'onboarding_pending', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', inviteLinkId: 'il_xhs', daysAgo: 2, scenario: 'deposit_arrival', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', inviteLinkId: 'il_xhs', daysAgo: 3, scenario: 'us_market_question', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', inviteLinkId: 'il_xhs', daysAgo: 4, scenario: 'risk_survey_done', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', daysAgo: 6, scenario: 'complaint_refund', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', daysAgo: 7, scenario: 'onboarding_pending', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', daysAgo: 10, scenario: 'active_investor', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', daysAgo: 13, scenario: 'renewal', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', daysAgo: 17, scenario: 'quiet_long', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', daysAgo: 22, scenario: 'quiet_long', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', daysAgo: 28, scenario: 'active_investor', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', inviteLinkId: 'il_old', daysAgo: 36, scenario: 'deposit_arrival', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', inviteLinkId: 'il_old', daysAgo: 42, scenario: 'quiet_long', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', inviteLinkId: 'il_old', daysAgo: 48, scenario: 'renewal', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', inviteLinkId: 'il_old', daysAgo: 52, scenario: 'active_investor', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', daysAgo: 58, scenario: 'quiet_long', primarySeatId: 'seat_chen' },
-  { inviteGroupId: 'ig_default', daysAgo: 62, scenario: 'risk_survey_done', primarySeatId: 'seat_chen' },
+  { inviteGroupId: 'ig_default', inviteLinkId: 'il_xhs', daysAgo: 0.3, scenario: 'just_registered' },
+  { inviteGroupId: 'ig_default', inviteLinkId: 'il_xhs', daysAgo: 1, scenario: 'onboarding_pending' },
+  { inviteGroupId: 'ig_default', inviteLinkId: 'il_xhs', daysAgo: 2, scenario: 'deposit_arrival' },
+  { inviteGroupId: 'ig_default', inviteLinkId: 'il_xhs', daysAgo: 3, scenario: 'us_market_question' },
+  { inviteGroupId: 'ig_default', inviteLinkId: 'il_xhs', daysAgo: 4, scenario: 'risk_survey_done' },
+  { inviteGroupId: 'ig_default', daysAgo: 6, scenario: 'complaint_refund' },
+  { inviteGroupId: 'ig_default', daysAgo: 7, scenario: 'onboarding_pending' },
+  { inviteGroupId: 'ig_default', daysAgo: 10, scenario: 'active_investor' },
+  { inviteGroupId: 'ig_default', daysAgo: 13, scenario: 'renewal' },
+  { inviteGroupId: 'ig_default', daysAgo: 17, scenario: 'quiet_long' },
+  { inviteGroupId: 'ig_default', daysAgo: 22, scenario: 'quiet_long' },
+  { inviteGroupId: 'ig_default', daysAgo: 28, scenario: 'active_investor' },
+  { inviteGroupId: 'ig_default', inviteLinkId: 'il_old', daysAgo: 36, scenario: 'deposit_arrival' },
+  { inviteGroupId: 'ig_default', inviteLinkId: 'il_old', daysAgo: 42, scenario: 'quiet_long' },
+  { inviteGroupId: 'ig_default', inviteLinkId: 'il_old', daysAgo: 48, scenario: 'renewal' },
+  { inviteGroupId: 'ig_default', inviteLinkId: 'il_old', daysAgo: 52, scenario: 'active_investor' },
+  { inviteGroupId: 'ig_default', daysAgo: 58, scenario: 'quiet_long' },
+  { inviteGroupId: 'ig_default', daysAgo: 62, scenario: 'risk_survey_done' },
 ]
 
 const NOTICE_TEXTS = [
@@ -622,6 +619,8 @@ function buildCustomers() {
 
   const seatById = Object.fromEntries(SEATS.map((s) => [s.id, s]))
   const groupById = Object.fromEntries(INVITE_GROUPS.map((g) => [g.id, g]))
+  // 历史客户也按轮询分：种子数据跟线上注册走同一套 allocateSeats
+  const rotationAt: Record<string, number> = {}
 
   PLANS.forEach((plan, idx) => {
     let nickname = ''
@@ -632,6 +631,8 @@ function buildCustomers() {
 
     const registeredMs = agoMs(plan.daysAgo, between(0, 10), between(0, 59))
     const group = groupById[plan.inviteGroupId]
+    const alloc = allocateSeats({ ...group, rotationIndex: rotationAt[group.id] ?? 0 }, seatById)
+    rotationAt[group.id] = alloc.rotationIndex
     const c: Customer = {
       id: sid('cus'),
       nickname,
@@ -693,16 +694,16 @@ function buildCustomers() {
       if (c.inviteCount >= 3) c.roleLabel = '推荐大使'
     }
     c.titleIds.forEach((tid) => {
-      titleAssignments.push({ id: sid('ta'), customerId: c.id, titleId: tid, action: 'assign', byStaffId: plan.primarySeatId === 'seat_lin' ? 'st_lin' : 'st_chen', at: iso(registeredMs + 3600000 * between(2, 48)) })
+      titleAssignments.push({ id: sid('ta'), customerId: c.id, titleId: tid, action: 'assign', byStaffId: alloc.primarySeatId === 'seat_lin' ? 'st_lin' : 'st_chen', at: iso(registeredMs + 3600000 * between(2, 48)) })
     })
 
     customers.push(c)
 
-    // 邀请组里的每个坐席都加：放几个加几个
+    // 固定坐席全加，接待员按轮询分到一位
     let lastActivity = registeredMs
-    group.seatIds.forEach((seatId, order) => {
+    alloc.seatIds.forEach((seatId, order) => {
       const seat = seatById[seatId]
-      customerSeats.push({ customerId: c.id, seatId, primary: seatId === group.primarySeatId, addedAt: iso(registeredMs), source: 'register' })
+      customerSeats.push({ customerId: c.id, seatId, primary: seatId === alloc.primarySeatId, addedAt: iso(registeredMs), source: 'register' })
       const conv: Conversation = { id: sid('conv'), kind: 'dm', customerId: c.id, seatId, lastMessageAt: iso(registeredMs) }
       conversations.push(conv)
       const welcomeAt = registeredMs + 1000 * (order + 1)
@@ -732,7 +733,7 @@ function buildCustomers() {
         return
       }
 
-      if (seatId !== group.primarySeatId) {
+      if (seatId !== alloc.primarySeatId) {
         // 非主归属坐席：偶尔有一两句
         if (seatId === 'seat_cs' && chance(0.5)) {
           const at1 = registeredMs + 3600000 * between(2, 30)
@@ -791,7 +792,7 @@ function buildCustomers() {
     }
   })
 
-  return { customers, customerSeats, conversations, messages, titleAssignments }
+  return { customers, customerSeats, conversations, messages, titleAssignments, rotationAt }
 }
 
 function buildGroupMessages(customers: Customer[], chatGroups: ChatGroup[]) {
@@ -894,7 +895,7 @@ function buildBroadcasts(): Broadcast[] {
 function buildAudit(): AuditEvent[] {
   const list: AuditEvent[] = [
     { id: sid('au'), at: ago(45), actorStaffId: 'st_admin', type: 'seat.handover', detail: '坐席「客户服务」由 赵磊 交接给 陈默；原因：赵磊转任运营主管' },
-    { id: sid('au'), at: ago(40), actorStaffId: 'st_admin', type: 'invite_group.create', detail: '创建邀请组「林顾问专属码」，成员：林顾问；主归属：林顾问' },
+    { id: sid('au'), at: ago(40), actorStaffId: 'st_admin', type: 'invite_group.create', detail: '创建邀请组「林顾问专属码」，轮询坐席：林顾问；固定坐席：无' },
     { id: sid('au'), at: ago(35), actorStaffId: 'st_lin', type: 'invite_link.create', detail: '在「林顾问专属码」下创建邀请链接「林薇 · 老客户转介绍」' },
     { id: sid('au'), at: ago(30), actorStaffId: 'st_zhao', type: 'invite_link.create', detail: '在「默认组」下创建邀请链接「小红书投放」' },
     { id: sid('au'), at: ago(20), actorStaffId: 'st_admin', type: 'title.library', detail: '头衔库新增「官方讲师」' },
@@ -964,7 +965,8 @@ export function buildSeed(): DemoState {
     handovers: HANDOVERS,
     customers: c.customers,
     customerSeats: c.customerSeats,
-    inviteGroups: INVITE_GROUPS,
+    // 游标接着历史客户往下走：演示里注册的下一位继续排队，不会从队首重来
+    inviteGroups: INVITE_GROUPS.map((x) => ({ ...x, rotationIndex: c.rotationAt[x.id] ?? 0 })),
     inviteLinks: INVITE_LINKS,
     titles: TITLES,
     tags: TAGS,

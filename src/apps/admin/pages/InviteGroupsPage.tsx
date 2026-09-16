@@ -1,7 +1,14 @@
+/**
+ * 邀请组：客户注册完成那一刻，官方联系人已经在通讯录里了。
+ *
+ * 组里的坐席分两类——固定坐席人人都加，轮询坐席（接待员）按队列轮流分一个。
+ * 分到的那位接待员就是主归属，决定业绩归属与群发的默认发送身份。
+ */
 import { useState } from 'react'
 import { Copy, Plus, RefreshCw, Star } from 'lucide-react'
-import type { InviteGroup } from '@/domain/types'
+import type { InviteGroup, Seat } from '@/domain/types'
 import { useStore } from '@/store/store'
+import { INVITE_CODE_HINT, INVITE_CODE_MAX, inviteCodeError, normalizeInviteCode } from '@/domain/inviteCode'
 import { Button, Checkbox, Field, Input } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, SeatAvatar, Table } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
@@ -11,10 +18,12 @@ export function InviteGroupsPage() {
   const [editing, setEditing] = useState<InviteGroup | null>(null)
   const [creating, setCreating] = useState(false)
   const admin = s.session.adminStaffId!
+  const seatOf = (id: string) => s.seats.find((x) => x.id === id)
 
   const rows = s.inviteGroups.map((g) => ({
     g,
-    seats: g.seatIds.map((id) => s.seats.find((x) => x.id === id)!).filter(Boolean),
+    rotating: g.rotatingSeatIds.map(seatOf).filter((x): x is Seat => !!x),
+    fixed: g.fixedSeatIds.map(seatOf).filter((x): x is Seat => !!x),
     customers: s.customers.filter((c) => c.inviteGroupId === g.id).length,
     links: s.inviteLinks.filter((l) => l.inviteGroupId === g.id).length,
   }))
@@ -23,7 +32,7 @@ export function InviteGroupsPage() {
     <div>
       <PageHeader
         title="邀请组"
-        desc="客户注册完成的那一刻，官方联系人已经在通讯录里了。组里放几个坐席，输这个组的邀请码注册的客户就自动添加这几个：放三个加三个，放一个加一个。"
+        desc="用这个组的邀请码注册的客户，进来就自动加上组里的坐席：固定坐席人人都加，接待员按队列轮流分一个。"
         extra={
           <Button variant="primary" onClick={() => setCreating(true)}>
             <Plus size={14} /> 创建邀请组
@@ -69,7 +78,7 @@ export function InviteGroupsPage() {
                   <button
                     type="button"
                     className="text-zinc-400 hover:text-zinc-700"
-                    title="重置邀请码（旧码立即失效，已注册客户不受影响）"
+                    title="随机换一个（旧码立即失效，已注册客户不受影响）"
                     onClick={() => {
                       s.resetInviteCode(r.g.id, admin)
                       toast('邀请码已重置，旧码立即失效')
@@ -81,19 +90,35 @@ export function InviteGroupsPage() {
               ),
             },
             {
-              key: 'seats',
-              title: '成员（注册即添加，按此顺序）',
-              render: (r) => (
-                <div className="flex flex-wrap gap-1.5">
-                  {r.seats.map((seat) => (
-                    <span key={seat.id} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 py-0.5 pr-2 pl-0.5 text-xs">
-                      <SeatAvatar seat={seat} size={18} />
-                      {seat.displayName}
-                      {seat.id === r.g.primarySeatId && <Star size={11} className="fill-gold-500 text-gold-500" />}
-                    </span>
-                  ))}
-                </div>
-              ),
+              key: 'rotating',
+              title: '接待员（轮流分，一人一个）',
+              render: (r) =>
+                r.rotating.length ? (
+                  <div className="flex flex-wrap items-center gap-1">
+                    {r.rotating.map((seat, i) => (
+                      <span key={seat.id} className="inline-flex items-center gap-1">
+                        {i > 0 && <span className="text-[11px] text-zinc-300">→</span>}
+                        <SeatChip seat={seat} next={i === r.g.rotationIndex % r.rotating.length} />
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-[11px] text-zinc-400">不轮询</span>
+                ),
+            },
+            {
+              key: 'fixed',
+              title: '固定坐席（人人都加）',
+              render: (r) =>
+                r.fixed.length ? (
+                  <div className="flex flex-wrap gap-1">
+                    {r.fixed.map((seat) => (
+                      <SeatChip key={seat.id} seat={seat} />
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-[11px] text-zinc-400">无</span>
+                ),
             },
             { key: 'customers', title: '注册客户', align: 'right', render: (r) => <span className="tabular-nums">{r.customers}</span> },
             { key: 'links', title: '组下链接', align: 'right', render: (r) => <span className="tabular-nums">{r.links}</span> },
@@ -122,7 +147,10 @@ export function InviteGroupsPage() {
           ]}
         />
       </Card>
-      <p className="mt-2 text-[11px] text-zinc-400">★ 主归属：决定客户列表的归属列、业绩归属、群发的默认发送身份。一个组里只能有一个。</p>
+      <p className="mt-2 text-[11px] text-zinc-400">
+        <Star size={10} className="mr-0.5 inline fill-gold-500 align-[1px] text-gold-500" />
+        下一个进来的客户分给谁。轮到停用或暂停接新的坐席会顺延到下一位，跳过的那一轮不补。
+      </p>
 
       {editing && <GroupEditor group={editing} onClose={() => setEditing(null)} />}
       {creating && <GroupEditor onClose={() => setCreating(false)} />}
@@ -130,43 +158,67 @@ export function InviteGroupsPage() {
   )
 }
 
+function SeatChip({ seat, next }: { seat: Seat; next?: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 py-0.5 pr-2 pl-0.5 text-xs">
+      <SeatAvatar seat={seat} size={18} />
+      {seat.displayName}
+      {next && <Star size={11} className="fill-gold-500 text-gold-500" />}
+      {seat.status !== 'accepting' && <span className="text-[10px] text-amber-600">{seat.status === 'paused' ? '暂停接新' : '停用'}</span>}
+    </span>
+  )
+}
+
+type Slot = 'none' | 'fixed' | 'rotating'
+
 function GroupEditor({ group, onClose }: { group?: InviteGroup; onClose: () => void }) {
   const s = useStore()
   const admin = s.session.adminStaffId!
   const [name, setName] = useState(group?.name ?? '')
-  const [seatIds, setSeatIds] = useState<string[]>(group?.seatIds ?? [])
-  const [primary, setPrimary] = useState(group?.primarySeatId ?? '')
+  const [code, setCode] = useState(group?.code ?? '')
+  const [fixedSeatIds, setFixed] = useState<string[]>(group?.fixedSeatIds ?? [])
+  const [rotatingSeatIds, setRotating] = useState<string[]>(group?.rotatingSeatIds ?? [])
   const [chatGroupIds, setChatGroupIds] = useState<string[]>(group?.chatGroupIds ?? [])
   const availableSeats = s.seats.filter((x) => x.status !== 'disabled')
 
-  const toggleSeat = (id: string) => {
-    setSeatIds((list) => {
-      const next = list.includes(id) ? list.filter((x) => x !== id) : [...list, id]
-      if (!next.includes(primary)) setPrimary(next.find((x) => s.seats.find((y) => y.id === x)?.type === 'assign') ?? next[0] ?? '')
-      return next
-    })
+  const slotOf = (id: string): Slot => (rotatingSeatIds.includes(id) ? 'rotating' : fixedSeatIds.includes(id) ? 'fixed' : 'none')
+  // 一个坐席只能占一个槽位：换槽位时先从另一边摘掉
+  const setSlot = (id: string, slot: Slot) => {
+    setFixed((l) => (slot === 'fixed' ? [...l.filter((x) => x !== id), id] : l.filter((x) => x !== id)))
+    setRotating((l) => (slot === 'rotating' ? [...l.filter((x) => x !== id), id] : l.filter((x) => x !== id)))
   }
   const move = (id: string, dir: -1 | 1) => {
-    setSeatIds((list) => {
+    const inRotating = rotatingSeatIds.includes(id)
+    const apply = (list: string[]) => {
       const i = list.indexOf(id)
       const j = i + dir
       if (i < 0 || j < 0 || j >= list.length) return list
       const next = [...list]
       ;[next[i], next[j]] = [next[j], next[i]]
       return next
-    })
+    }
+    if (inRotating) setRotating(apply)
+    else setFixed(apply)
   }
-  const ok = name.trim() && seatIds.length > 0 && primary && seatIds.includes(primary)
-  const newlyAdded = group ? seatIds.filter((id) => !group.seatIds.includes(id)) : []
+
+  // 改码时把自己排除掉，否则「没改」也会被判成重复
+  const codeErr = code.trim() ? inviteCodeError(code, s.takenInviteCodes(group?.id)) : undefined
+  const noSeat = !fixedSeatIds.length && !rotatingSeatIds.length
+  const ok = !!name.trim() && !noSeat && !codeErr
+  const before = group ? [...group.fixedSeatIds, ...group.rotatingSeatIds] : []
+  const newlyAdded = [...fixedSeatIds, ...rotatingSeatIds].filter((id) => !before.includes(id))
 
   const submit = () => {
     if (!ok) return
+    const payload = { name: name.trim(), fixedSeatIds, rotatingSeatIds, chatGroupIds, code: code.trim() ? normalizeInviteCode(code) : undefined }
     if (group) {
-      s.updateInviteGroup(group.id, { name: name.trim(), seatIds, primarySeatId: primary, chatGroupIds }, admin)
+      const r = s.updateInviteGroup(group.id, payload, admin)
+      if (!r.ok) return toast(r.error, 'warn')
       toast(newlyAdded.length ? '已保存。新加的坐席不追溯老客户，需要的话点「补加到已有客户」' : '已保存')
     } else {
-      const g = s.createInviteGroup({ name: name.trim(), seatIds, primarySeatId: primary, chatGroupIds }, admin)
-      toast(`邀请组「${g.name}」已创建，邀请码 ${g.code}`)
+      const r = s.createInviteGroup(payload, admin)
+      if (!r.ok) return toast(r.error, 'warn')
+      toast(`邀请组「${r.group.name}」已创建，邀请码 ${r.group.code}`)
     }
     onClose()
   }
@@ -176,7 +228,7 @@ function GroupEditor({ group, onClose }: { group?: InviteGroup; onClose: () => v
       open
       onClose={onClose}
       title={group ? `编辑邀请组：${group.name}` : '创建邀请组'}
-      width={600}
+      width={640}
       footer={
         <>
           <Button onClick={onClose}>取消</Button>
@@ -187,18 +239,37 @@ function GroupEditor({ group, onClose }: { group?: InviteGroup; onClose: () => v
       }
     >
       <div className="space-y-4">
-        <Field label="组名称" required>
-          <Input value={name} maxLength={32} onChange={(e) => setName(e.target.value)} placeholder="如：抖音投放组、小美老师组" />
-        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="组名称" required>
+            <Input value={name} maxLength={32} onChange={(e) => setName(e.target.value)} placeholder="如：抖音投放组、小美老师组" />
+          </Field>
+          <Field label="邀请码" hint={INVITE_CODE_HINT}>
+            <Input
+              value={code}
+              maxLength={INVITE_CODE_MAX}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder={group ? group.code : '留空自动生成'}
+              className="font-mono tracking-wider"
+            />
+          </Field>
+        </div>
+        {codeErr && <p className="-mt-2 text-[11px] text-red-600">{codeErr}</p>}
+        {group && code.trim() && normalizeInviteCode(code) !== group.code && !codeErr && (
+          <p className="-mt-2 text-[11px] text-amber-600">改码后旧码「{group.code}」立即失效，已投放的物料要同步换掉；已注册客户不受影响。</p>
+        )}
+
         <div>
-          <div className="mb-1 text-xs font-medium text-zinc-600">成员坐席（放几个加几个；顺序决定客户会话列表里的排序）</div>
+          <div className="mb-1 flex items-baseline justify-between">
+            <span className="text-xs font-medium text-zinc-600">坐席</span>
+            <span className="text-[11px] text-zinc-400">接待员轮流分，一个客户只分到一位；固定坐席人人都加</span>
+          </div>
           <div className="divide-y divide-zinc-100 rounded-md border border-zinc-200">
             {availableSeats.map((seat) => {
-              const on = seatIds.includes(seat.id)
-              const idx = seatIds.indexOf(seat.id)
+              const slot = slotOf(seat.id)
+              const list = slot === 'rotating' ? rotatingSeatIds : fixedSeatIds
+              const idx = list.indexOf(seat.id)
               return (
                 <div key={seat.id} className="flex items-center gap-3 px-3 py-2">
-                  <Checkbox checked={on} onChange={() => toggleSeat(seat.id)} />
                   <SeatAvatar seat={seat} size={24} />
                   <div className="min-w-0 flex-1">
                     <div className="text-[13px] text-zinc-900">
@@ -208,31 +279,34 @@ function GroupEditor({ group, onClose }: { group?: InviteGroup; onClose: () => v
                     </div>
                     <div className="truncate text-[11px] text-zinc-500">{seat.roleDesc}</div>
                   </div>
-                  {on && (
-                    <>
-                      <label className="flex items-center gap-1 text-[11px] text-zinc-600">
-                        <input type="radio" name="primary" className="accent-brand-700" checked={primary === seat.id} onChange={() => setPrimary(seat.id)} disabled={seat.type === 'notice'} />
-                        主归属
-                      </label>
-                      <div className="flex gap-0.5">
-                        <Button size="sm" variant="ghost" disabled={idx === 0} onClick={() => move(seat.id, -1)}>
-                          ↑
-                        </Button>
-                        <Button size="sm" variant="ghost" disabled={idx === seatIds.length - 1} onClick={() => move(seat.id, 1)}>
-                          ↓
-                        </Button>
-                      </div>
-                      {group && newlyAdded.includes(seat.id) && <Pill tone="amber">新加，不追溯</Pill>}
-                      {group && group.seatIds.includes(seat.id) && (
-                        <BackfillButton groupId={group.id} seatId={seat.id} />
-                      )}
-                    </>
+                  <SlotPicker
+                    value={slot}
+                    // 通知型坐席只发通知、不接客，放进轮询队列没有意义
+                    rotatingDisabled={seat.type === 'notice'}
+                    onChange={(next) => setSlot(seat.id, next)}
+                  />
+                  {slot !== 'none' && (
+                    <div className="flex gap-0.5">
+                      <Button size="sm" variant="ghost" disabled={idx === 0} onClick={() => move(seat.id, -1)}>
+                        ↑
+                      </Button>
+                      <Button size="sm" variant="ghost" disabled={idx === list.length - 1} onClick={() => move(seat.id, 1)}>
+                        ↓
+                      </Button>
+                    </div>
                   )}
+                  {slot !== 'none' && group && newlyAdded.includes(seat.id) && <Pill tone="amber">新加，不追溯</Pill>}
+                  {slot !== 'none' && group && before.includes(seat.id) && <BackfillButton groupId={group.id} seatId={seat.id} />}
                 </div>
               )
             })}
           </div>
+          {noSeat && <p className="mt-1 text-[11px] text-red-600">至少配一个坐席，否则客户注册进来没有任何官方联系人。</p>}
+          {!noSeat && !rotatingSeatIds.length && (
+            <p className="mt-1 text-[11px] text-amber-600">没有接待员：主归属会落到第一个固定坐席上，这个组不参与轮询。</p>
+          )}
         </div>
+
         <div>
           <div className="mb-1 text-xs font-medium text-zinc-600">附带入群（在企业默认官方群之上叠加）</div>
           <div className="flex flex-wrap gap-3">
@@ -254,6 +328,42 @@ function GroupEditor({ group, onClose }: { group?: InviteGroup; onClose: () => v
         </div>
       </div>
     </Modal>
+  )
+}
+
+const SLOT_LABEL: { key: Slot; label: string }[] = [
+  { key: 'none', label: '不加' },
+  { key: 'rotating', label: '接待员' },
+  { key: 'fixed', label: '固定' },
+]
+
+/** 三选一的槽位选择器：不加 / 轮询接待员 / 固定坐席 */
+function SlotPicker({ value, rotatingDisabled, onChange }: { value: Slot; rotatingDisabled?: boolean; onChange: (v: Slot) => void }) {
+  return (
+    <div className="inline-flex overflow-hidden rounded-md border border-zinc-200">
+      {SLOT_LABEL.map((o) => {
+        const disabled = o.key === 'rotating' && rotatingDisabled
+        const on = value === o.key
+        return (
+          <button
+            key={o.key}
+            type="button"
+            disabled={disabled}
+            title={disabled ? '通知型坐席只发通知，不参与轮询接待' : undefined}
+            onClick={() => onChange(o.key)}
+            className={
+              on
+                ? 'bg-brand-700 px-2.5 py-1 text-[11px] text-white'
+                : disabled
+                  ? 'px-2.5 py-1 text-[11px] text-zinc-300'
+                  : 'px-2.5 py-1 text-[11px] text-zinc-600 hover:bg-zinc-50'
+            }
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 

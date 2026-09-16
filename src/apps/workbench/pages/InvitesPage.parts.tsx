@@ -6,6 +6,8 @@
 import { useState } from 'react'
 import type { DemoState, InviteLink } from '@/domain/types'
 import { fmtDate } from '@/domain/time'
+import { seatIdsOf } from '@/domain/allocation'
+import { INVITE_CODE_HINT, INVITE_CODE_MAX, inviteCodeError, normalizeInviteCode } from '@/domain/inviteCode'
 import { Button, Checkbox, Field, Input, Select } from '@/ui/primitives'
 import { Pill } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
@@ -43,9 +45,9 @@ const EXPIRE_OPTIONS = [
 /** 工作台生成链接：邀请组只列包含当前坐席的组；附带动作里已被企业默认或组覆盖的群打勾禁用 */
 export function InviteCreateModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { s, staff, seat } = useWorkbench()
-  const [form, setForm] = useState({ name: '', groupId: '', expires: 'never', customDate: '', max: '', chatGroupIds: [] as string[] })
+  const [form, setForm] = useState({ name: '', groupId: '', expires: 'never', customDate: '', max: '', code: '', chatGroupIds: [] as string[] })
   const patch = (p: Partial<typeof form>) => setForm((f) => ({ ...f, ...p }))
-  const myGroups = s.inviteGroups.filter((g) => g.enabled && seat && g.seatIds.includes(seat.id))
+  const myGroups = s.inviteGroups.filter((g) => g.enabled && seat && seatIdsOf(g).includes(seat.id))
   const ig = s.inviteGroups.find((g) => g.id === form.groupId)
   const today = fmtDate(new Date().toISOString())
   const coveredBy = (gid: string): AttachLayer | null => (s.enterprise.defaultChatGroupIds.includes(gid) ? 'enterprise' : ig?.chatGroupIds.includes(gid) ? 'group' : null)
@@ -54,16 +56,18 @@ export function InviteCreateModal({ open, onClose }: { open: boolean; onClose: (
   const dateOk = form.expires !== 'custom' || (!!form.customDate && form.customDate >= today)
   const maxNum = form.max.trim() === '' ? null : Number(form.max)
   const maxOk = maxNum == null || (Number.isInteger(maxNum) && maxNum >= 1 && maxNum <= MAX_USES_LIMIT)
-  const error = !dateOk ? '自定义有效期不能早于今天' : !maxOk ? `使用上限须为 1 到 ${MAX_USES_LIMIT} 的整数，留空表示无限制` : ''
-  const ok = nameOk && !!form.groupId && dateOk && maxOk
+  const codeErr = form.code.trim() ? inviteCodeError(form.code, s.takenInviteCodes()) : undefined
+  const error = !dateOk ? '自定义有效期不能早于今天' : !maxOk ? `使用上限须为 1 到 ${MAX_USES_LIMIT} 的整数，留空表示无限制` : (codeErr ?? '')
+  const ok = nameOk && !!form.groupId && dateOk && maxOk && !codeErr
 
   const submit = () => {
     if (!ok || !staff) return
     const expiresAt = form.expires === 'never' ? null : form.expires === 'custom' ? new Date(`${form.customDate}T23:59:59`).toISOString() : new Date(Date.now() + Number(form.expires) * 86400000).toISOString()
     const chatGroupIds = form.chatGroupIds.filter((gid) => !coveredBy(gid))
-    const link = s.createInviteLink({ name: form.name.trim(), inviteGroupId: form.groupId, creatorStaffId: staff.id, expiresAt, maxUses: maxNum, chatGroupIds })
-    toast(`已生成：${LINK_HOST}${link.code}，邀请码 ${link.code}。客户在注册页输码等同点链接`)
-    setForm({ name: '', groupId: '', expires: 'never', customDate: '', max: '', chatGroupIds: [] })
+    const r = s.createInviteLink({ name: form.name.trim(), inviteGroupId: form.groupId, creatorStaffId: staff.id, expiresAt, maxUses: maxNum, chatGroupIds, code: form.code.trim() ? normalizeInviteCode(form.code) : undefined })
+    if (!r.ok) return toast(r.error, 'warn')
+    toast(`已生成：${LINK_HOST}${r.link.code}，邀请码 ${r.link.code}。客户在注册页输码等同点链接`)
+    setForm({ name: '', groupId: '', expires: 'never', customDate: '', max: '', code: '', chatGroupIds: [] })
     onClose()
   }
 
@@ -86,12 +90,15 @@ export function InviteCreateModal({ open, onClose }: { open: boolean; onClose: (
         <Field label="链接名称" required hint="1 到 32 字符">
           <Input value={form.name} maxLength={32} onChange={(e) => patch({ name: e.target.value })} placeholder="如：10 月直播 · 第二场" />
         </Field>
+        <Field label="自定义邀请码" hint={`留空自动生成；${INVITE_CODE_HINT}`}>
+          <Input value={form.code} maxLength={INVITE_CODE_MAX} onChange={(e) => patch({ code: e.target.value.toUpperCase() })} placeholder="留空自动生成" className="font-mono tracking-wider" />
+        </Field>
         <Field label="邀请组" required hint="只列出包含当前坐席的组；组决定自动添加哪几个官方号">
           <Select value={form.groupId} onChange={(e) => patch({ groupId: e.target.value })}>
             <option value="">选择…</option>
             {myGroups.map((g) => (
               <option key={g.id} value={g.id}>
-                {g.name}（{g.seatIds.map((id) => s.seats.find((x) => x.id === id)?.displayName).join('、')}）
+                {g.name}（{seatIdsOf(g).map((id) => s.seats.find((x) => x.id === id)?.displayName).join('、')}）
               </option>
             ))}
           </Select>
@@ -138,7 +145,7 @@ export function InviteCreateModal({ open, onClose }: { open: boolean; onClose: (
           </Field>
         )}
         {error && <div className="text-[12px] text-red-600">{error}</div>}
-        <p className="text-[11px] text-zinc-400">生成后链接与 6 位邀请码同时可用，落点与所选邀请组相同，注册数分开统计。</p>
+        <p className="text-[11px] text-zinc-400">生成后链接与邀请码同时可用，落点与所选邀请组相同，注册数分开统计。</p>
       </div>
     </Modal>
   )

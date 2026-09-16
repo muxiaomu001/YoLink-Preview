@@ -167,21 +167,6 @@ export interface Seat {
   status: SeatStatus
   welcome: string
   customerDeletable: boolean
-  /** P1：坐席组（轮询分摊） */
-  seatGroupId: string | null
-  /** P1：客户数上限，null 为无限制 */
-  maxCustomers: number | null
-  createdAt: ISODate
-}
-
-export type SeatGroupStrategy = 'round_robin' | 'least' | 'random'
-
-/** P1：坐席组，邀请组里的一个位置指向它，注册时从组里挑一个坐席 */
-export interface SeatGroup {
-  id: string
-  name: string
-  seatIds: string[]
-  strategy: SeatGroupStrategy
   createdAt: ISODate
 }
 
@@ -245,13 +230,18 @@ export interface CustomerSeat {
   source: 'register' | 'backfill' | 'reassign'
 }
 
-/** 邀请组：放几个坐席加几个 */
+/** 邀请组：固定坐席人人都加，轮询坐席按顺序轮流分一个 */
 export interface InviteGroup {
   id: string
   name: string
+  /** 邀请码，可自定义；与邀请链接共用一个命名空间 */
   code: string
-  seatIds: string[]
-  primarySeatId: string
+  /** 固定坐席：从这个码进来的客户全部添加，按此顺序排在接待员之后 */
+  fixedSeatIds: string[]
+  /** 轮询坐席（接待员）：排成一队，每个客户按顺序分到其中一位，分到谁谁就是主归属 */
+  rotatingSeatIds: string[]
+  /** 轮询游标：下一个客户从队列的第几位开始取 */
+  rotationIndex: number
   chatGroupIds: string[]
   isDefault: boolean
   enabled: boolean
@@ -528,7 +518,6 @@ export type AuditType =
   | 'seat.update'
   | 'seat.handover'
   | 'seat.pause'
-  | 'seat_group.update'
   | 'invite_group.create'
   | 'invite_group.update'
   | 'invite_group.reset_code'
@@ -1203,7 +1192,6 @@ export interface DemoState {
   roles: Role[]
   staff: Staff[]
   seats: Seat[]
-  seatGroups: SeatGroup[]
   handovers: SeatHandover[]
   customers: Customer[]
   customerSeats: CustomerSeat[]

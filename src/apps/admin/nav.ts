@@ -23,7 +23,6 @@ import {
   HardDriveDownload,
   Image,
   KeyRound,
-  Layers,
   LineChart,
   Link2,
   MessageSquareQuote,
@@ -85,7 +84,6 @@ export const ADMIN_NAV: NavGroup[] = [
       { to: '/admin/seats', label: '坐席', icon: BadgeCheck },
       { to: '/admin/staff', label: '员工账号', icon: UserCog },
       { to: '/admin/roles', label: '员工角色', icon: ShieldCheck },
-      { to: '/admin/seat-groups', label: '坐席组', icon: Layers, level: 'P1' },
     ],
   },
   {

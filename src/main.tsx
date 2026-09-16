@@ -15,7 +15,6 @@ import { ProfileSyncPage } from '@/apps/admin/pages/ProfileSyncPage'
 import { SeatsPage } from '@/apps/admin/pages/SeatsPage'
 import { StaffPage } from '@/apps/admin/pages/StaffPage'
 import { RolesPage } from '@/apps/admin/pages/RolesPage'
-import { SeatGroupsPage } from '@/apps/admin/pages/SeatGroupsPage'
 import { InviteGroupsPage } from '@/apps/admin/pages/InviteGroupsPage'
 import { InviteLinksPage } from '@/apps/admin/pages/InviteLinksPage'
 import { BroadcastsAdminPage } from '@/apps/admin/pages/BroadcastsAdminPage'
@@ -75,7 +74,6 @@ const router = createBrowserRouter([
       { path: 'seats', element: <SeatsPage /> },
       { path: 'staff', element: <StaffPage /> },
       { path: 'roles', element: <RolesPage /> },
-      { path: 'seat-groups', element: <SeatGroupsPage /> },
       // 邀请与分配
       { path: 'invite-groups', element: <InviteGroupsPage /> },
       { path: 'invite-links', element: <InviteLinksPage /> },

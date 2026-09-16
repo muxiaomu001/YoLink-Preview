@@ -1,7 +1,7 @@
 /**
- * 员工账号（编辑、重置密码、强制下线）、员工角色、坐席组（P1）。
+ * 员工账号（编辑、重置密码、强制下线）与员工角色。
  */
-import type { Role, SeatGroup, Staff } from '@/domain/types'
+import type { Role, Staff } from '@/domain/types'
 import { newId } from '@/domain/ids'
 import { type Get, type Set, now, randomPassword, withAudit } from './helpers'
 
@@ -14,9 +14,6 @@ export interface PeopleActions {
   updateRole: (id: string, patch: Partial<Pick<Role, 'name' | 'desc' | 'caps'>>, byStaffId: string) => void
   /** 内置角色或还有成员的角色不能删，返回 false */
   deleteRole: (id: string, byStaffId: string) => boolean
-  createSeatGroup: (input: Omit<SeatGroup, 'id' | 'createdAt'>, byStaffId: string) => SeatGroup
-  updateSeatGroup: (id: string, patch: Partial<Omit<SeatGroup, 'id' | 'createdAt'>>, byStaffId: string) => void
-  deleteSeatGroup: (id: string, byStaffId: string) => void
 }
 
 export function peopleActions(set: Set, get: Get): PeopleActions {
@@ -74,39 +71,5 @@ export function peopleActions(set: Set, get: Get): PeopleActions {
       set({ roles: s.roles.filter((x) => x.id !== id), audit: withAudit(s.audit, 'role.delete', `删除角色「${r.name}」`, byStaffId) })
       return true
     },
-
-    createSeatGroup: (input, byStaffId) => {
-      const g: SeatGroup = { ...input, id: newId('sg'), createdAt: now() }
-      set((s) => ({
-        // 一个坐席只能在一个组：从其他组移出
-        seatGroups: [...s.seatGroups.map((x) => ({ ...x, seatIds: x.seatIds.filter((id) => !g.seatIds.includes(id)) })), g],
-        seats: s.seats.map((x) => (g.seatIds.includes(x.id) ? { ...x, seatGroupId: g.id } : x)),
-        audit: withAudit(s.audit, 'seat_group.update', `创建坐席组「${g.name}」，${g.seatIds.length} 个坐席`, byStaffId),
-      }))
-      return g
-    },
-
-    updateSeatGroup: (id, patch, byStaffId) =>
-      set((s) => {
-        const g = s.seatGroups.find((x) => x.id === id)
-        if (!g) return {}
-        const next = { ...g, ...patch }
-        return {
-          // 一个坐席只能在一个组：从其他组移出
-          seatGroups: s.seatGroups.map((x) => (x.id === id ? next : { ...x, seatIds: x.seatIds.filter((sid) => !next.seatIds.includes(sid)) })),
-          seats: s.seats.map((x) => (next.seatIds.includes(x.id) ? { ...x, seatGroupId: id } : x.seatGroupId === id ? { ...x, seatGroupId: null } : x)),
-          audit: withAudit(s.audit, 'seat_group.update', `修改坐席组「${next.name}」：${Object.keys(patch).join('、')}`, byStaffId),
-        }
-      }),
-
-    deleteSeatGroup: (id, byStaffId) =>
-      set((s) => {
-        const g = s.seatGroups.find((x) => x.id === id)
-        return {
-          seatGroups: s.seatGroups.filter((x) => x.id !== id),
-          seats: s.seats.map((x) => (x.seatGroupId === id ? { ...x, seatGroupId: null } : x)),
-          audit: withAudit(s.audit, 'seat_group.update', `删除坐席组「${g?.name}」`, byStaffId),
-        }
-      }),
   }
 }

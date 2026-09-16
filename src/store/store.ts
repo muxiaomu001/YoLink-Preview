@@ -24,7 +24,9 @@ import type {
 } from '@/domain/types'
 import { groupWelcomeMessages } from '@/domain/groupWelcome'
 import { buildSeed } from '@/domain/seed'
-import { newId, newInviteCode } from '@/domain/ids'
+import { newId } from '@/domain/ids'
+import { allocateSeats } from '@/domain/allocation'
+import { inviteCodeError, newInviteCode, normalizeInviteCode } from '@/domain/inviteCode'
 import { iso } from '@/domain/time'
 import { DEMO_IP } from './actions/helpers'
 import { settingsActions, type SettingsActions } from './actions/settings'
@@ -42,7 +44,7 @@ import { dExtraActions, type DExtraActions } from './actions/D-extra'
 import { quickReplyActions, type QuickReplyActions } from './actions/quickReplies'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
-export const STORAGE_KEY = 'yolink-demo-v6'
+export const STORAGE_KEY = 'yolink-demo-v7'
 
 const now = () => iso(Date.now())
 
@@ -87,7 +89,8 @@ export interface CoreActions {
   updateSeatWelcome: (seatId: string, welcome: string) => void
   /** 群发：返回实际发送数与因频控/拉黑/注销跳过数；频控超限返回 null（按钮应禁用） */
   sendBroadcast: (input: { name: string; seatId: string; operatorId: string; targetKind: BroadcastTargetKind; targetDesc: string; contentKind?: 'text' | 'image' | 'file'; media?: MessageMedia; text: string; customerIds: string[]; chatGroupId?: string; scheduledAt?: string | null }) => { sent: number; skipped: number } | null
-  createInviteLink: (input: { name: string; inviteGroupId: string; creatorStaffId: string; expiresAt: string | null; maxUses: number | null; chatGroupIds?: string[] }) => InviteLink
+  /** code 留空则随机生成；自定义码重复或不合法时返回 error */
+  createInviteLink: (input: { name: string; inviteGroupId: string; creatorStaffId: string; expiresAt: string | null; maxUses: number | null; chatGroupIds?: string[]; code?: string }) => { ok: true; link: InviteLink } | { ok: false; error: string }
   revokeInviteLink: (id: string, byStaffId: string) => void
   // 管理后台
   createSeat: (input: Omit<Seat, 'id' | 'createdAt' | 'avatarText' | 'avatarColor'> & { avatarColor?: string }, byStaffId: string) => Seat
@@ -96,8 +99,11 @@ export interface CoreActions {
   createStaff: (input: { name: string; username: string; email?: string; roleId: string; withSeat: boolean; roleDesc?: string; assignSeatIds?: string[]; mustChangePassword?: boolean }, byStaffId: string) => Staff
   setStaffStatus: (id: string, status: Staff['status'], byStaffId: string) => void
   updateRoleCaps: (roleId: string, caps: Capability[]) => void
-  createInviteGroup: (input: { name: string; seatIds: string[]; primarySeatId: string; chatGroupIds: string[] }, byStaffId: string) => InviteGroup
-  updateInviteGroup: (id: string, patch: Partial<InviteGroup>, byStaffId: string) => void
+  /** code 留空则随机生成 */
+  createInviteGroup: (input: { name: string; fixedSeatIds: string[]; rotatingSeatIds: string[]; chatGroupIds: string[]; code?: string }, byStaffId: string) => { ok: true; group: InviteGroup } | { ok: false; error: string }
+  updateInviteGroup: (id: string, patch: Partial<InviteGroup>, byStaffId: string) => { ok: true } | { ok: false; error: string }
+  /** 邀请组与邀请链接共用的已占用码，改码时排除自己 */
+  takenInviteCodes: (exceptId?: string) => string[]
   resetInviteCode: (id: string, byStaffId: string) => void
   backfillSeat: (inviteGroupId: string, seatId: string, byStaffId: string) => number
   setDefaultInviteGroup: (id: string) => void
@@ -164,10 +170,9 @@ export const useStore = create<DemoStore>()(
           blockedSeatIds: [],
         }
         const seatById = Object.fromEntries(s.seats.map((x) => [x.id, x]))
-        // 放几个加几个：停用或暂停接新的坐席跳过；主归属被跳过时落到下一个
-        const usable = group.seatIds.filter((id) => seatById[id] && seatById[id].status === 'accepting')
-        const skipped = group.seatIds.filter((id) => !usable.includes(id))
-        const primarySeatId = usable.includes(group.primarySeatId) ? group.primarySeatId : usable[0]
+        // 固定坐席全加，接待员按队列轮一个；停用与暂停接新的跳过
+        const { seatIds: usable, primarySeatId, rotationIndex, skippedSeatIds: skipped } = allocateSeats(group, seatById)
+        if (!usable.length) return { ok: false, error: '该邀请组当前没有可接客的坐席，请联系管理员' }
         const customerSeats: CustomerSeat[] = []
         const conversations: Conversation[] = []
         const messages: Message[] = []
@@ -197,7 +202,7 @@ export const useStore = create<DemoStore>()(
         for(const gid of joinGroupIds){const g=s.chatGroups.find((x)=>x.id===gid),conv=s.conversations.find((x)=>x.chatGroupId===gid);if(g&&conv)messages.push(...groupWelcomeMessages(g,conv.id,[customer],at))}
         const inviteLinks = link ? s.inviteLinks.map((l) => (l.id === link!.id ? { ...l, uses: l.uses + 1 } : l)) : s.inviteLinks
         const auditEntries = [
-          { id: newId('au'), at, actorStaffId: null, type: 'customer.register' as AuditType, detail: `客户「${customer.nickname}」通过${link ? `邀请链接「${link.name}」（${group.name}）` : `邀请组「${group.name}」`}注册，自动添加：${usable.map((id) => seatById[id].displayName).join('、')}${skipped.length ? `；跳过：${skipped.map((id) => seatById[id]?.displayName).join('、')}` : ''}${joinGroupIds.length ? `；自动入群：${joinGroupIds.map((gid) => s.chatGroups.find((g) => g.id === gid)?.name).join('、')}` : ''}` },
+          { id: newId('au'), at, actorStaffId: null, type: 'customer.register' as AuditType, detail: `客户「${customer.nickname}」通过${link ? `邀请链接「${link.name}」（${group.name}）` : `邀请组「${group.name}」`}注册，轮询分配接待员：${primarySeatId ? seatById[primarySeatId]?.displayName : '无'}；自动添加：${usable.map((id) => seatById[id]?.displayName).join('、')}${skipped.length ? `；跳过（停用或暂停接新）：${skipped.map((id) => seatById[id]?.displayName).join('、')}` : ''}${joinGroupIds.length ? `；自动入群：${joinGroupIds.map((gid) => s.chatGroups.find((g) => g.id === gid)?.name).join('、')}` : ''}` },
         ]
         set({
           customers: [customer, ...s.customers],
@@ -206,6 +211,8 @@ export const useStore = create<DemoStore>()(
           messages: [...s.messages, ...messages],
           chatGroups,
           inviteLinks,
+          // 轮询游标推进一位，下一个客户接着往下分
+          inviteGroups: s.inviteGroups.map((g) => (g.id === group!.id ? { ...g, rotationIndex } : g)),
           audit: [...auditEntries, ...s.audit],
           session: { ...s.session, phoneCustomerId: customer.id },
         })
@@ -363,12 +370,19 @@ export const useStore = create<DemoStore>()(
       createInviteLink: (input) => {
         const s = get()
         const group = s.inviteGroups.find((g) => g.id === input.inviteGroupId)
-        const link: InviteLink = { id: newId('il'), name: input.name, inviteGroupId: input.inviteGroupId, code: newInviteCode(), creatorStaffId: input.creatorStaffId, expiresAt: input.expiresAt, maxUses: input.maxUses, uses: 0, clicks: 0, status: 'active', chatGroupIds: input.chatGroupIds ?? [], createdAt: now() }
+        const taken = get().takenInviteCodes()
+        if (input.code) {
+          const err = inviteCodeError(input.code, taken)
+          if (err) return { ok: false, error: err }
+        }
+        let code = input.code ? normalizeInviteCode(input.code) : newInviteCode()
+        while (!input.code && taken.includes(code)) code = newInviteCode()
+        const link: InviteLink = { id: newId('il'), name: input.name, inviteGroupId: input.inviteGroupId, code, creatorStaffId: input.creatorStaffId, expiresAt: input.expiresAt, maxUses: input.maxUses, uses: 0, clicks: 0, status: 'active', chatGroupIds: input.chatGroupIds ?? [], createdAt: now() }
         set({
           inviteLinks: [link, ...s.inviteLinks],
-          audit: [{ id: newId('au'), at: now(), actorStaffId: input.creatorStaffId, type: 'invite_link.create', detail: `在「${group?.name}」下创建邀请链接「${input.name}」，码 ${link.code}` }, ...s.audit],
+          audit: [{ id: newId('au'), at: now(), actorStaffId: input.creatorStaffId, type: 'invite_link.create', detail: `在「${group?.name}」下创建邀请链接「${input.name}」，码 ${link.code}${input.code ? '（自定义）' : ''}` }, ...s.audit],
         })
-        return link
+        return { ok: true, link }
       },
 
       revokeInviteLink: (id, byStaffId) => {
@@ -424,7 +438,7 @@ export const useStore = create<DemoStore>()(
         const notes: string[] = []
         if (input.withSeat) {
           const colors = ['#1f3b73', '#2f56ad', '#0f766e', '#b45309', '#7e22ce', '#be123c', '#0369a1']
-          const seat: Seat = { id: newId('seat'), displayName: input.name, avatarText: input.name.slice(0, 1), avatarColor: colors[s.seats.length % colors.length], roleDesc: input.roleDesc ?? '投资顾问', type: 'assign', operatorStaffId: staff.id, status: 'accepting', welcome: '', customerDeletable: false, seatGroupId: null, maxCustomers: null, createdAt: now() }
+          const seat: Seat = { id: newId('seat'), displayName: input.name, avatarText: input.name.slice(0, 1), avatarColor: colors[s.seats.length % colors.length], roleDesc: input.roleDesc ?? '投资顾问', type: 'assign', operatorStaffId: staff.id, status: 'accepting', welcome: '', customerDeletable: false, createdAt: now() }
           seats = [...seats, seat]
           notes.push(`同时创建同名坐席「${seat.displayName}」并指派`)
         }
@@ -459,32 +473,57 @@ export const useStore = create<DemoStore>()(
 
       updateRoleCaps: (roleId, caps) => set((s) => ({ roles: s.roles.map((r) => (r.id === roleId ? { ...r, caps } : r)) })),
 
+      takenInviteCodes: (exceptId) => {
+        const s = get()
+        return [...s.inviteGroups.filter((g) => g.id !== exceptId).map((g) => g.code), ...s.inviteLinks.filter((l) => l.id !== exceptId).map((l) => l.code)]
+      },
+
       createInviteGroup: (input, byStaffId) => {
         const s = get()
-        const group: InviteGroup = { id: newId('ig'), name: input.name, code: newInviteCode(), seatIds: input.seatIds, primarySeatId: input.primarySeatId, chatGroupIds: input.chatGroupIds, isDefault: false, enabled: true, createdAt: now() }
-        const names = input.seatIds.map((id) => s.seats.find((x) => x.id === id)?.displayName).join('、')
+        if (!input.fixedSeatIds.length && !input.rotatingSeatIds.length) return { ok: false, error: '至少配一个坐席' }
+        const taken = get().takenInviteCodes()
+        if (input.code) {
+          const err = inviteCodeError(input.code, taken)
+          if (err) return { ok: false, error: err }
+        }
+        let code = input.code ? normalizeInviteCode(input.code) : newInviteCode()
+        while (!input.code && taken.includes(code)) code = newInviteCode()
+        const group: InviteGroup = { id: newId('ig'), name: input.name, code, fixedSeatIds: input.fixedSeatIds, rotatingSeatIds: input.rotatingSeatIds, rotationIndex: 0, chatGroupIds: input.chatGroupIds, isDefault: false, enabled: true, createdAt: now() }
+        const nameOf = (id: string) => s.seats.find((x) => x.id === id)?.displayName ?? id
         set({
           inviteGroups: [...s.inviteGroups, group],
-          audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'invite_group.create', detail: `创建邀请组「${group.name}」，码 ${group.code}，成员：${names}；主归属：${s.seats.find((x) => x.id === input.primarySeatId)?.displayName}` }, ...s.audit],
+          audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'invite_group.create', detail: `创建邀请组「${group.name}」，码 ${group.code}${input.code ? '（自定义）' : ''}；轮询接待员：${group.rotatingSeatIds.map(nameOf).join(' → ') || '无'}；固定坐席：${group.fixedSeatIds.map(nameOf).join('、') || '无'}` }, ...s.audit],
         })
-        return group
+        return { ok: true, group }
       },
 
       updateInviteGroup: (id, patch, byStaffId) => {
         const s = get()
         const g = s.inviteGroups.find((x) => x.id === id)
-        if (!g) return
+        if (!g) return { ok: false, error: '邀请组不存在' }
+        const next = { ...g, ...patch }
+        if (!next.fixedSeatIds.length && !next.rotatingSeatIds.length) return { ok: false, error: '至少配一个坐席' }
+        if (patch.code !== undefined && normalizeInviteCode(patch.code) !== g.code) {
+          const err = inviteCodeError(patch.code, get().takenInviteCodes(id))
+          if (err) return { ok: false, error: err }
+          next.code = normalizeInviteCode(patch.code)
+        }
+        // 队列改了游标就可能越界，收回到队首而不是静默取模
+        if (patch.rotatingSeatIds && next.rotationIndex >= next.rotatingSeatIds.length) next.rotationIndex = 0
         set({
-          inviteGroups: s.inviteGroups.map((x) => (x.id === id ? { ...x, ...patch } : x)),
-          audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'invite_group.update', detail: `修改邀请组「${g.name}」：${Object.keys(patch).join('、')}（老客户不追溯）` }, ...s.audit],
+          inviteGroups: s.inviteGroups.map((x) => (x.id === id ? next : x)),
+          audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'invite_group.update', detail: `修改邀请组「${g.name}」：${Object.keys(patch).join('、')}（老客户不追溯）${next.code !== g.code ? `；邀请码 ${g.code} → ${next.code}` : ''}` }, ...s.audit],
         })
+        return { ok: true }
       },
 
       resetInviteCode: (id, byStaffId) => {
         const s = get()
         const g = s.inviteGroups.find((x) => x.id === id)
         if (!g) return
-        const code = newInviteCode()
+        const taken = get().takenInviteCodes(id)
+        let code = newInviteCode()
+        while (taken.includes(code)) code = newInviteCode()
         set({
           inviteGroups: s.inviteGroups.map((x) => (x.id === id ? { ...x, code } : x)),
           audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'invite_group.reset_code', detail: `重置邀请组「${g.name}」的邀请码：${g.code} → ${code}` }, ...s.audit],
