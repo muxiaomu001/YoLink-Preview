@@ -17,6 +17,7 @@ import { MeScreen } from './screens/MeScreen'
 import { ChatScreen } from './screens/ChatScreen'
 import { ActiveAnnouncementBar, StartupExperience } from './StartupExperience'
 import { clearStartupSeen } from '@/domain/startupSeen'
+import { customerLoginState, type CustomerLoginState } from '@/domain/customerStatus'
 
 type Tab = 'chats' | 'contacts' | 'me'
 
@@ -26,11 +27,25 @@ const TABS: { key: Tab; label: string; Icon: typeof MessageCircle }[] = [
   { key: 'me', label: '我的', Icon: UserRound },
 ]
 
+function PhoneAccessScreen({ state, onBack }: { state: Extract<CustomerLoginState, 'banned' | 'forcedLogout'>; onBack: () => void }) {
+  const banned = state === 'banned'
+  return (
+    <div className="flex h-full flex-col items-center justify-center px-8 text-center">
+      <div className="text-base font-semibold text-zinc-900">{banned ? '账号已被封禁' : '登录已失效'}</div>
+      <p className="mt-2 text-xs leading-5 text-zinc-500">{banned ? '当前账号无法登录，请联系企业管理员。' : '该账号已在其他操作后退出登录，请重新登录。'}</p>
+      <button type="button" onClick={onBack} className="mt-5 rounded-lg bg-brand-700 px-4 py-2 text-xs font-medium text-white hover:bg-brand-800">
+        返回登录
+      </button>
+    </div>
+  )
+}
+
 export function PhoneApp() {
   const s = useStore()
   const [params, setParams] = useSearchParams()
   const customer = customerById(s, params.get('customer') ?? s.session.phoneCustomerId)
-  const loggedIn = !!customer && !customer.deletedAt
+  const sessionState = customerLoginState(customer, s.session.phoneSessionStartedAt)
+  const activeCustomer = sessionState === 'active' ? customer : undefined
   const [tab, setTab] = useState<Tab>('chats')
   const [openConv, setOpenConv] = useState<string | null>(() => params.get('conversation'))
   const [justAdded, setJustAdded] = useState<JustAdded | null>(null)
@@ -71,22 +86,24 @@ export function PhoneApp() {
         <div className="relative h-[min(780px,90dvh)] w-[min(380px,calc(100vw-16px))] overflow-hidden rounded-[40px] border-[10px] border-zinc-900 bg-white shadow-2xl">
           <div className="absolute top-0 left-1/2 z-10 h-6 w-28 -translate-x-1/2 rounded-b-2xl bg-zinc-900" />
           <div className="relative flex h-full flex-col pt-6">
-            {!loggedIn ? (
+            {sessionState === 'banned' || sessionState === 'forcedLogout' ? (
+              <PhoneAccessScreen state={sessionState} onBack={logout} />
+            ) : !activeCustomer ? (
               // registerCustomer 成功后自动把 session.phoneCustomerId 指向新客户
               <RegisterScreen onDone={setJustAdded} />
             ) : justAdded ? (
               <WelcomeScreen added={justAdded} onEnter={() => setJustAdded(null)} />
             ) : openConv ? (
-              <ChatScreen convId={openConv} customerId={customer.id} onBack={() => setOpenConv(null)} />
+              <ChatScreen convId={openConv} customerId={activeCustomer.id} onBack={() => setOpenConv(null)} />
             ) : (
               <>
                 {/* 软引导只在「消息」页顶上出现一条：可关、关了不再来、任何时候都不挡路 */}
-                {tab === 'chats' && <ActiveAnnouncementBar customerId={customer.id} dismissedIds={dismissedBarIds} onDismiss={(id) => setDismissedBarIds((ids) => ids.includes(id) ? ids : [...ids, id])} onAnnouncementShown={onAnnouncementShown} />}
-                {tab === 'chats' && shouldShowProfileGuide(customer) && <ProfileGuide customer={customer} onGoProfile={() => setTab('me')} />}
+                {tab === 'chats' && <ActiveAnnouncementBar customerId={activeCustomer.id} dismissedIds={dismissedBarIds} onDismiss={(id) => setDismissedBarIds((ids) => ids.includes(id) ? ids : [...ids, id])} onAnnouncementShown={onAnnouncementShown} />}
+                {tab === 'chats' && shouldShowProfileGuide(activeCustomer) && <ProfileGuide customer={activeCustomer} onGoProfile={() => setTab('me')} />}
                 <div className="min-h-0 flex-1">
-                  {tab === 'chats' && <ChatsScreen customerId={customer.id} onOpen={setOpenConv} />}
-                  {tab === 'contacts' && <ContactsScreen customerId={customer.id} onOpen={setOpenConv} />}
-                  {tab === 'me' && <MeScreen customerId={customer.id} onLoggedOut={logout} />}
+                  {tab === 'chats' && <ChatsScreen customerId={activeCustomer.id} onOpen={setOpenConv} />}
+                  {tab === 'contacts' && <ContactsScreen customerId={activeCustomer.id} onOpen={setOpenConv} />}
+                  {tab === 'me' && <MeScreen customerId={activeCustomer.id} onLoggedOut={logout} />}
                 </div>
                 <nav className="grid grid-cols-3 border-t border-zinc-200 bg-white pb-3">
                   {TABS.map(({ key, label, Icon }) => (

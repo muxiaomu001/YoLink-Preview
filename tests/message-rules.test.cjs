@@ -1,6 +1,6 @@
 const { test, beforeEach } = require('node:test')
 const assert = require('node:assert/strict')
-const { reset, flush, store, rules } = require('./source-store.cjs')
+const { reset, flush, store, rules, customerStatus, policy } = require('./source-store.cjs')
 const current = () => store.getState()
 const seat = { kind: 'seat', id: 'seat_lin', staffId: 'st_lin' }
 beforeEach(reset)
@@ -10,12 +10,12 @@ function send(convId, actor, text, extra = {}) {
   flush()
   return current().messages.find(m => m.id === result.id)
 }
-function dm() { return current().conversations.find(c => c.kind === 'dm' && c.seatId === seat.id && !current().customers.find(x => x.id === c.customerId)?.blacklistedAt && !current().customers.find(x => x.id === c.customerId)?.blockedSeatIds.includes(seat.id)) }
+function dm() { return current().conversations.find(c => c.kind === 'dm' && c.seatId === seat.id && !current().customers.find(x => x.id === c.customerId)?.bannedAt && !current().customers.find(x => x.id === c.customerId)?.blockedSeatIds.includes(seat.id)) }
 function groupContext() {
   const g = current().chatGroups.find(g => g.id === 'cg_community')
   // 风控不是本测试对象，使用已存在群成员并取消本次内存夹具的观察期。
   const ids = g.memberCustomerIds.slice(0, 2)
-  store.setState({ customers: current().customers.map(c => ids.includes(c.id) ? { ...c, watchUntil: undefined, blacklistedAt: null, mutedAllUntil: null } : c) })
+  store.setState({ customers: current().customers.map(c => ids.includes(c.id) ? { ...c, watchUntil: undefined, bannedAt: null, mutedAllUntil: null } : c) })
   return { g, conv: current().conversations.find(c => c.chatGroupId === g.id), actor: { kind: 'customer', id: ids[0] }, other: { kind: 'customer', id: ids[1] } }
 }
 function addWord(scope, action, word = '测试词') {
@@ -208,16 +208,37 @@ test('整号影子模式关闭后，历史消息及其回复仍保持隐藏', ()
   assert.equal(rules.messageVisibleFor(current(), reply, actor), true)
   assert.equal(rules.messageVisibleFor(current(), send(conv.id, actor, '模式关闭后的新消息'), other), true)
 })
-test('跳过的收件人不产生替换记录或消息', () => {
+test('封禁的收件人不产生替换记录或消息', () => {
   addWord('seat', 'replace')
   const c = dm().customerId
-  store.setState({ customers: current().customers.map(x => x.id === c ? { ...x, blacklistedAt: new Date().toISOString() } : x) })
+  store.setState({ customers: current().customers.map(x => x.id === c ? { ...x, bannedAt: new Date().toISOString() } : x) })
   const n = current().messages.length, hits = current().sensitiveHits.length
   const result = current().sendBroadcast({ ...singleInput('测试词'), customerIds: [c] })
   assert.equal(result.sent, 0)
   assert.equal(result.skipped, 1)
   assert.equal(current().messages.length, n)
   assert.equal(current().sensitiveHits.length, hits)
+})
+
+test('全局禁言覆盖私聊和群聊，到期后自动解除', () => {
+  const { g, conv, actor } = groupContext()
+  const until = new Date(Date.now() + 3600000).toISOString()
+  store.setState({ customers: current().customers.map(c => c.id === actor.id ? { ...c, mutedAllUntil: until } : c) })
+  const privateConv = current().conversations.find(c => c.kind === 'dm' && c.customerId === actor.id)
+
+  assert.match(current().queueChatMessage({ convId: privateConv.id, actor, text: '私聊消息' }).reason ?? '', /全局禁言/)
+  assert.match(current().queueChatMessage({ convId: conv.id, actor, text: '群聊消息' }).reason ?? '', /全局禁言/)
+  assert.equal(policy.customerCanSpeakIn(current(), g, actor.id, new Date(Date.now() + 7200000).toISOString()).ok, true)
+})
+
+test('封禁状态下登录被拒，强制下线后的旧登录失效', () => {
+  const c = current().customers.find(x => !x.bannedAt && !x.deletedAt)
+  const startedAt = new Date(Date.now() - 1000).toISOString()
+  store.setState({ customers: current().customers.map(x => x.id === c.id ? { ...x, bannedAt: new Date().toISOString() } : x) })
+  assert.equal(customerStatus.customerLoginState(current().customers.find(x => x.id === c.id), startedAt), 'banned')
+
+  store.setState({ customers: current().customers.map(x => x.id === c.id ? { ...x, bannedAt: null, sessionsRevokedAt: new Date().toISOString() } : x) })
+  assert.equal(customerStatus.customerLoginState(current().customers.find(x => x.id === c.id), startedAt), 'forcedLogout')
 })
 
 test('客户隐藏最后上线时间后，员工侧已读回执仍正常写入', () => {

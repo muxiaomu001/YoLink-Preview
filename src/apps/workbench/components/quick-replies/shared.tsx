@@ -9,7 +9,7 @@ import type { QuickReplySnippet } from '@/store/selectors'
 export interface QuickReplyTarget {
   /** 当前有没有选中会话 */
   active: boolean
-  /** 有值即不能发（拉黑 / 无频道发布权限），用于禁用按钮并在 title 里说明 */
+  /** 有值即不能发（客户屏蔽坐席 / 无频道发布权限），用于禁用按钮并在 title 里说明 */
   blockReason?: string
   /** 私聊客户昵称，渲染 {{customer.nickname}} 用 */
   customerName?: string

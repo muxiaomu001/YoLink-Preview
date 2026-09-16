@@ -80,9 +80,9 @@ export function EffectPreview() {
           <div className="mt-3 flex items-center justify-between text-[11px] text-zinc-500">
             <span>
               「{customer.nickname}」为关：{off.length} 项；为开：{rows.length - off.length} 项
-              {customer.blacklistedAt && (
+              {customer.bannedAt && (
                 <Pill tone="red" className="ml-1.5">
-                  已拉黑：发不出消息
+                  已封禁：无法登录
                 </Pill>
               )}
             </span>

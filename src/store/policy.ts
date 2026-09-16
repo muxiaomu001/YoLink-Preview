@@ -6,6 +6,7 @@
  */
 import type { BotAccount, ChatGroup, DemoState, GroupAdminPerm, GroupMemberKind, Message, PolicyCol } from '@/domain/types'
 import { WATCH_LIMIT_TEXT, isWatching } from '@/domain/register'
+import { globalMuteReason } from '@/domain/customerStatus'
 
 /** 客户只有手机 App，坐席只有桌面工作台：矩阵按角色分两列，不按端拆 */
 export type PolicyRole = 'customer' | 'staff'
@@ -108,12 +109,13 @@ export function activeRestriction(g: ChatGroup, customerId: string, nowIso: stri
   return g.restrictions.find((r) => r.customerId === customerId && (r.until === null || r.until > nowIso))
 }
 
-/** 客户此刻能不能在群里发言：拉黑、全局禁言、新号观察期、频道只读、全员禁言、单人禁言、策略 group.send */
+/** 客户此刻能不能在群里发言：封禁、全局禁言、新号观察期、频道只读、全员禁言、单人禁言、策略 group.send */
 export function customerCanSpeakIn(s: DemoState, g: ChatGroup, customerId: string, nowIso: string): { ok: boolean; reason?: string } {
   const c = s.customers.find((x) => x.id === customerId)
   if (!c) return { ok: false, reason: '不是成员' }
-  if (c.blacklistedAt) return { ok: false, reason: '已被拉黑' }
-  if (c.mutedAllUntil && c.mutedAllUntil > nowIso) return { ok: false, reason: '所有群禁言中' }
+  if (c.bannedAt) return { ok: false, reason: '账号已被封禁' }
+  const globalMute = globalMuteReason(c, nowIso)
+  if (globalMute) return { ok: false, reason: globalMute }
   // 新号观察期：拦群内发言，不拦私聊——批量注册的号进来就是为了往群里刷，私聊刷不出量
   if (isWatching(c, nowIso)) return { ok: false, reason: `新号观察期内${WATCH_LIMIT_TEXT}` }
   if (g.kind === 'channel') return { ok: false, reason: '频道只读' }

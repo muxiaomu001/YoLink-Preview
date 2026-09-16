@@ -4,6 +4,7 @@
 import { Link } from 'react-router-dom'
 import { useStore } from '@/store/store'
 import { customerById } from '@/store/selectors'
+import { globalMuteReason } from '@/domain/customerStatus'
 import { customerSnapshot, resolveCap } from '@/store/policy'
 import { Button, Select } from '@/ui/primitives'
 import { DemoNoteToggle } from '@/ui/DemoNote'
@@ -18,7 +19,7 @@ export function DemoPanel({ onSwitch, onReplayStartup, customerId }: { customerI
         .filter((p) => !p.staffOnly && snapshot[p.key] === false)
         .map((p) => ({ item: p, source: resolveCap(s, { role: 'customer', key: p.key, userId: customer!.id }).source }))
     : []
-  const mutedAll = customer?.mutedAllUntil && customer.mutedAllUntil > new Date().toISOString()
+  const globalMute = customer ? globalMuteReason(customer) : undefined
 
   return (
     <aside className="thin-scroll max-h-[780px] w-72 overflow-y-auto rounded-lg border border-dashed border-zinc-400 bg-white/70 p-4 text-xs">
@@ -40,7 +41,7 @@ export function DemoPanel({ onSwitch, onReplayStartup, customerId }: { customerI
           .filter((c) => !c.deletedAt)
           .map((c) => (
             <option key={c.id} value={c.id}>
-              {c.nickname} · {s.inviteGroups.find((g) => g.id === c.inviteGroupId)?.name}
+              {c.nickname} · {s.inviteGroups.find((g) => g.id === c.inviteGroupId)?.name}{c.bannedAt ? '（已封禁）' : ''}
             </option>
           ))}
       </Select>
@@ -63,10 +64,10 @@ export function DemoPanel({ onSwitch, onReplayStartup, customerId }: { customerI
             <span className="text-[11px] font-medium text-zinc-700">当前客户的能力快照</span>
             <span className="text-[10px] text-zinc-400">关 {off.length} / {s.policyItems.filter((p) => !p.staffOnly).length}</span>
           </div>
-          {(customer.blacklistedAt || mutedAll) && (
+          {(customer.bannedAt || globalMute) && (
             <p className="mb-1 rounded bg-red-50 px-2 py-1 text-[10px] text-red-700">
-              {customer.blacklistedAt ? '已被拉黑：发不出任何消息。' : ''}
-              {mutedAll ? '所有群禁言中。' : ''}
+              {customer.bannedAt ? '账号已封禁，无法登录。' : ''}
+              {globalMute ? `${customer.bannedAt ? ' ' : ''}${globalMute}。` : ''}
             </p>
           )}
           {off.length === 0 ? (

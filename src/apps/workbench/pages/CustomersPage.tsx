@@ -48,12 +48,12 @@ export function CustomersPage() {
     toast(`已切换到坐席身份「${ps.displayName}」`, 'info')
     nav(`/workbench/chat/${conv.id}`)
   }
-  const toggleBlack = async (c: Customer) => {
-    const on = !c.blacklistedAt
-    const ok = await confirm({ title: on ? `拉黑「${c.nickname}」？` : `解除「${c.nickname}」的拉黑？`, body: on ? '拉黑后客户无法发消息，群发自动跳过。' : '解除后客户可以重新发消息。', okText: on ? '拉黑' : '解除', danger: on })
+  const toggleBan = async (c: Customer) => {
+    const on = !c.bannedAt
+    const ok = await confirm({ title: on ? `封禁「${c.nickname}」？` : `解除「${c.nickname}」的封禁？`, body: on ? '封禁后账号无法登录，所有已登录设备会退出。群发不再投递给该客户。' : '解除后客户可以重新登录。', okText: on ? '封禁' : '解除', danger: on })
     if (!ok || !staff) return
-    s.setCustomerBlacklist(c.id, on, staff.id)
-    toast(on ? '已拉黑' : '已解除拉黑')
+    s.setCustomerBan(c.id, on, staff.id)
+    toast(on ? '已封禁' : '已解除封禁')
   }
 
   return (
@@ -128,7 +128,7 @@ export function CustomersPage() {
                   render: (c) => (
                     <span className="inline-flex items-center gap-1 text-zinc-900">
                       {c.nickname}
-                      {c.blacklistedAt && <Pill tone="red">已拉黑</Pill>}
+                      {c.bannedAt && <Pill tone="red">封禁</Pill>}
                     </span>
                   ),
                 },
@@ -179,8 +179,8 @@ export function CustomersPage() {
                       <Button size="sm" variant="ghost" onClick={() => openChat(c)}>
                         聊天
                       </Button>
-                      <Button size="sm" variant="ghost" className={c.blacklistedAt ? '' : 'text-red-700'} onClick={() => void toggleBlack(c)}>
-                        {c.blacklistedAt ? '解除拉黑' : '拉黑'}
+                      <Button size="sm" variant="ghost" className={c.bannedAt ? '' : 'text-red-700'} onClick={() => void toggleBan(c)}>
+                        {c.bannedAt ? '解除封禁' : '封禁'}
                       </Button>
                     </div>
                   ),

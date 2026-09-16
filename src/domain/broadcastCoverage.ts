@@ -14,11 +14,11 @@
  */
 import type { Customer, DemoState } from './types'
 
-export type SkipReason = 'deleted' | 'blacklisted' | 'noReachableSeat' | 'rateLimited'
+export type SkipReason = 'deleted' | 'banned' | 'noReachableSeat' | 'rateLimited'
 
 export const SKIP_REASON_LABEL: Record<SkipReason, string> = {
   deleted: '已注销',
-  blacklisted: '已拉黑',
+  banned: '已封禁',
   noReachableSeat: '所选坐席都够不到（没加过或已屏蔽）',
   rateLimited: '今天收到的群发已达上限',
 }
@@ -69,7 +69,7 @@ export function planCoverage(s: DemoState, seatIds: string[], at: string): Cover
     if (c.deletedAt) return skipWith(c, 'deleted')
     const mine = reach.get(c.id)
     if (!mine?.length) return
-    if (c.blacklistedAt) return skipWith(c, 'blacklisted')
+    if (c.bannedAt) return skipWith(c, 'banned')
     const primaryId = s.customerSeats.find((cs) => cs.customerId === c.id && cs.primary)?.seatId
     const candidates = mine
       .filter((id) => !c.blockedSeatIds.includes(id))

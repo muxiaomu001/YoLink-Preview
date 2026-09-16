@@ -690,8 +690,8 @@ function buildCustomers() {
       if (c.inviteCount >= 3) c.roleLabel = '推荐大使'
     }
     // 给几个客户种上管控状态：状态列与筛选空着演示不了，
-    // 而"拉黑 / 禁言 / 待首次改密"本来就是任何一个跑了半年的企业都有几个的常态
-    if (s === 'complaint_refund') c.blacklistedAt = iso(registeredMs + 86400000 * 12)
+    // 而"封禁 / 全局禁言 / 待首次改密"本来就是任何一个跑了半年的企业都有几个的常态
+    if (s === 'complaint_refund') c.bannedAt = iso(registeredMs + 86400000 * 12)
     if (s === 'quiet_long' && idx % 7 === 3) c.mutedAllUntil = iso(Date.now() + 86400000 * 2)
     if (s === 'onboarding_pending' && idx % 5 === 1) c.mustChangePassword = true
     // 影子模式只种一个：这是个重手段，满屏紫色标记会让人以为它是日常操作

@@ -1,5 +1,5 @@
 /**
- * 客户资料卡「更多」菜单：重置密码、强制下线、拉黑 / 解除、禁言（所有群）/ 解除、注销。
+ * 客户资料卡「更多」菜单：重置密码、强制下线、封禁 / 解除、全局禁言 / 解除、注销。
  * 确认框文案取自 domain/customerControl，与管理后台客户详情里的同名动作共用一份。
  * 危险项红字，二次确认保留。每项的可用性都有依据：主归属坐席的实操员工、员工角色能力 delete_user。
  */
@@ -24,7 +24,7 @@ export function CustomerActions({ c, open, onClose }: { c: Customer; open: boole
   const canReset = primary?.operatorStaffId === staff.id
   const canDelete = can('delete_user')
   const muted = isMutedNow(c)
-  const blacklisted = !!c.blacklistedAt
+  const banned = !!c.bannedAt
 
   const reset = async () => {
     onClose()
@@ -39,27 +39,27 @@ export function CustomerActions({ c, open, onClose }: { c: Customer; open: boole
     s.forceLogoutCustomer(c.id, staff.id)
     toast('已强制下线，客户所有设备被登出')
   }
-  const toggleBlack = async () => {
+  const toggleBan = async () => {
     onClose()
     const ok = await confirm({
-      title: blacklisted ? `解除「${c.nickname}」的拉黑？` : `拉黑「${c.nickname}」？`,
-      body: blacklisted ? CONTROL_COPY.blacklistOff : CONTROL_COPY.blacklistOn,
-      okText: blacklisted ? '解除' : '拉黑',
-      danger: !blacklisted,
+      title: banned ? `解除「${c.nickname}」的封禁？` : `封禁「${c.nickname}」？`,
+      body: banned ? CONTROL_COPY.banOff : CONTROL_COPY.banOn,
+      okText: banned ? '解除' : '封禁',
+      danger: !banned,
     })
     if (!ok) return
-    s.setCustomerBlacklist(c.id, !blacklisted, staff.id)
-    toast(blacklisted ? '已解除拉黑' : '已拉黑，客户无法发消息')
+    s.setCustomerBan(c.id, !banned, staff.id)
+    toast(banned ? '已解除封禁' : '已封禁，客户无法登录')
   }
   const mute = (hours: number | null) => {
     s.muteCustomerAll(c.id, hours, staff.id)
-    toast(`已禁言「${c.nickname}」（所有群）${muteLabel(hours)}`)
+    toast(`已全局禁言「${c.nickname}」${muteLabel(hours)}`)
     setMuting(false)
   }
   const unmute = () => {
     onClose()
     s.muteCustomerAll(c.id, 0, staff.id)
-    toast('已解除全群禁言')
+    toast('已解除全局禁言')
   }
   const del = async () => {
     onClose()
@@ -76,12 +76,12 @@ export function CustomerActions({ c, open, onClose }: { c: Customer; open: boole
           <MenuItem disabled={!canReset} title={canReset ? '生成一次性新密码' : `只有主归属坐席「${primary?.displayName ?? '无'}」的实操员工可以重置`} onClick={() => void reset()}>
             <KeyRound size={14} /> 重置密码
           </MenuItem>
-          <MenuItem title="撤销全部登录 session，账号不停用" onClick={() => void kick()}>
+          <MenuItem title="让该客户的所有设备退出登录" onClick={() => void kick()}>
             <LogOut size={14} /> 强制下线
           </MenuItem>
           {muted ? (
             <MenuItem onClick={unmute}>
-              <MicOff size={14} /> 解除全群禁言
+              <MicOff size={14} /> 解除全局禁言
             </MenuItem>
           ) : (
             <MenuItem
@@ -90,12 +90,12 @@ export function CustomerActions({ c, open, onClose }: { c: Customer; open: boole
                 setMuting(true)
               }}
             >
-              <MicOff size={14} /> 禁言（所有群）
+              <MicOff size={14} /> 全局禁言
             </MenuItem>
           )}
           <div className="my-1 border-t border-zinc-100" />
-          <MenuItem danger={!blacklisted} onClick={() => void toggleBlack()}>
-            <Ban size={14} /> {blacklisted ? '解除拉黑' : '拉黑'}
+          <MenuItem danger={!banned} onClick={() => void toggleBan()}>
+            <Ban size={14} /> {banned ? '解除封禁' : '封禁'}
           </MenuItem>
           <MenuItem danger disabled={!canDelete} title={canDelete ? '注销客户账号' : '需员工角色能力 delete_user'} onClick={() => void del()}>
             <UserX size={14} /> 注销账号
@@ -108,7 +108,7 @@ export function CustomerActions({ c, open, onClose }: { c: Customer; open: boole
         <p className="mt-3 text-[12px] text-amber-700">{CONTROL_COPY.password}</p>
       </Modal>
 
-      <Modal open={muting} onClose={() => setMuting(false)} title={`禁言「${c.nickname}」（所有群）`} width={400}>
+      <Modal open={muting} onClose={() => setMuting(false)} title={`全局禁言「${c.nickname}」`} width={400}>
         <div className="grid grid-cols-2 gap-2">
           {MUTE_OPTIONS.map((o) => (
             <Button key={o.label} onClick={() => mute(o.hours)}>

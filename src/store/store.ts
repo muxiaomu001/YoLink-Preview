@@ -50,7 +50,7 @@ import { providerLicensingActions, type ProviderLicensingActions } from './actio
 import { clearStartupSeen } from '@/domain/startupSeen'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
-export const STORAGE_KEY = 'yolink-demo-v12'
+export const STORAGE_KEY = 'yolink-demo-v13'
 
 const now = () => iso(Date.now())
 
@@ -112,7 +112,7 @@ export interface CoreActions {
   createTag: (name: string, color: string, source: Tag['source']) => Tag
   setNote: (customerId: string, note: string) => void
   updateSeatWelcome: (seatId: string, welcome: string) => void
-  /** 群发：返回实际发送数与因频控/拉黑/注销跳过数；频控超限返回 null（按钮应禁用） */
+  /** 群发：返回实际发送数与因频控/封禁/注销跳过数；频控超限返回 null（按钮应禁用） */
   sendBroadcast: (input: { name: string; seatId: string; operatorId: string; targetKind: BroadcastTargetKind; targetDesc: string; contentKind?: 'text' | 'image' | 'file'; media?: MessageMedia; text: string; customerIds: string[]; chatGroupId?: string; scheduledAt?: string | null }) => { sent: number; skipped: number; reason?: string } | null
   /** 多坐席全覆盖群发：每个客户只收一条，发送身份优先用他的主归属坐席。频控超限返回 null */
   sendCoverageBroadcast: (input: { name: string; seatIds: string[]; operatorId: string; text: string; scheduledAt?: string | null }) => { sent: number; skipped: number; reason?: string } | null
@@ -156,7 +156,14 @@ export const useStore = create<DemoStore>()(
           audit: [{ id: newId('au'), at: now(), actorStaffId: actorStaffId ?? s.session.adminStaffId, type, detail, ip: DEMO_IP }, ...s.audit],
         })),
 
-      setSession: (patch) => set((s) => ({ session: { ...s.session, ...patch } })),
+      setSession: (patch) =>
+        set((s) => ({
+          session: {
+            ...s.session,
+            ...patch,
+            ...(patch.phoneCustomerId !== undefined ? { phoneSessionStartedAt: patch.phoneCustomerId ? now() : null } : {}),
+          },
+        })),
 
       registerCustomer: (input) => {
         const s = get()
@@ -265,7 +272,7 @@ export const useStore = create<DemoStore>()(
           // 轮询游标推进一位，下一个客户接着往下分
           inviteGroups: s.inviteGroups.map((g) => (g.id === group!.id ? { ...g, rotationIndex } : g)),
           audit: [...auditEntries, ...s.audit],
-          session: { ...s.session, phoneCustomerId: customer.id },
+          session: { ...s.session, phoneCustomerId: customer.id, phoneSessionStartedAt: at },
         })
         return { ok: true, customerId: customer.id, addedSeatIds: usable, addedGroupIds: joinGroupIds, nicknameAuto: nick.auto, watchUntil }
       },
@@ -394,7 +401,7 @@ export const useStore = create<DemoStore>()(
           // 频控二：每客户每天最多收到的群发条数，跨坐席、跨任务合并
           input.customerIds.forEach((cid) => {
             const c = s.customers.find((x) => x.id === cid)
-            if (!c || c.deletedAt || c.blacklistedAt || c.blockedSeatIds.includes(input.seatId)) {
+            if (!c || c.deletedAt || c.bannedAt || c.blockedSeatIds.includes(input.seatId)) {
               skipped += 1
               return
             }

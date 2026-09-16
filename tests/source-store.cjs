@@ -24,6 +24,8 @@ function load(file) {
 const { useStore } = load(path.join(sourceRoot, 'src/store/store.ts'))
 const { buildSeed } = load(path.join(sourceRoot, 'src/domain/seed.ts'))
 const rules = load(path.join(sourceRoot, 'src/domain/messageRules.ts'))
+const customerStatus = load(path.join(sourceRoot, 'src/domain/customerStatus.ts'))
+const policy = load(path.join(sourceRoot, 'src/store/policy.ts'))
 function reset() {
   timers.length = 0
   memory.clear()
@@ -31,4 +33,4 @@ function reset() {
   return useStore.getState()
 }
 function flush() { while (timers.length) timers.shift()() }
-module.exports = { reset, flush, store: useStore, rules }
+module.exports = { reset, flush, store: useStore, rules, customerStatus, policy }

@@ -4,17 +4,16 @@
 import { useMemo, useRef, useState } from 'react'
 import { ArrowDown, MoreHorizontal } from 'lucide-react'
 import type { Message } from '@/domain/types'
-import { actorKey, draftKey, messageVisibleFor } from '@/domain/messageRules'
+import { actorKey, draftKey, messageVisibleFor, sendFailure } from '@/domain/messageRules'
 import { useMessageTimeline } from '@/ui/useMessageTimeline'
 import { ChatTyping } from '@/ui/ChatTyping'
 import { ChatMediaLibrary } from '@/ui/ChatMediaLibrary'
 import { DeleteMessagesModal } from '@/ui/DeleteMessagesModal'
 import { confirm } from '@/ui/confirm'
 import { useMessageRead } from '@/ui/useMessageRead'
-import { iso } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { customerById, messagesOf, seatById } from '@/store/selectors'
-import { customerCan, customerCanSpeakIn } from '@/store/policy'
+import { customerCan } from '@/store/policy'
 import { SeatAvatar } from '@/ui/display'
 import { Button, Textarea } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
@@ -44,8 +43,6 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
   // 本次会话看过的公告（按公告时间记，公告更新会再弹）
   const [seenAnnouncementAt, setSeenAnnouncementAt] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
-  // "现在"：进入会话时取一次，自己每发一条刷新一次；用于禁言到期与删除时限判断
-  const [nowMs, setNowMs] = useState(() => Date.now())
   const group = conv?.kind !== 'dm' ? s.chatGroups.find((g) => g.id === conv?.chatGroupId) : undefined
   const announcement = group?.announcement
   const showAnnouncement = !!announcement && seenAnnouncementAt !== announcement.at
@@ -59,13 +56,13 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
   if (group && showInfo) return <GroupInfoScreen g={group} customerId={customerId} onBack={() => setShowInfo(false)} onLeft={onBack} />
 
   // 输入区能不能发
-  const speak = group ? customerCanSpeakIn(s, group, customerId, iso(nowMs)) : customer.blacklistedAt ? { ok: false, reason: '你已被限制发送消息' } : { ok: true }
+  const blockedReason = sendFailure(s, convId, actor)
   const canMedia = group ? customerCan(s, customerId, 'group.send_media', gid) : customerCan(s, customerId, 'dm.send_media')
   const canMentionAll = !!group && group.kind !== 'channel' && customerCan(s, customerId, 'group.mention_all', gid)
   const send = (text: string) => {
     const r=s.queueChatMessage({convId,actor,text,replyToId:replyTo?.id})
     if(!r.ok){toast(r.reason??'发送失败','warn');return false}
-    s.saveChatDraft(convId,actor,{text:''});setNowMs(Date.now());timeline.jumpLatest();return true
+    s.saveChatDraft(convId,actor,{text:''});timeline.jumpLatest();return true
   }
   const clear=async()=>{const ok=await confirm({title:'清空聊天？',body:'仅清空你的可见历史，其他参与者不受影响；联系人和群成员关系保留。',okText:'清空',danger:true});if(ok){s.clearChatFor(convId,actor);setToolsOpen(false)}}
 
@@ -103,7 +100,7 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
       {group?.kind!=='channel'&&<InputBar
         draftId={key} text={draft.text} setText={setText}
         placeholder={seat ? `发消息给 ${seat.displayName}` : '发消息'}
-        blockedReason={speak.ok ? undefined : speak.reason}
+        blockedReason={blockedReason}
         canMedia={canMedia}
         canMentionAll={canMentionAll}
         replyTo={replyTo}

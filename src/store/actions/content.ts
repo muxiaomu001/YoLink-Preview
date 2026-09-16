@@ -44,11 +44,12 @@ export function contentActions(set: Set, get: Get): ContentActions {
         const r = s.reports.find((x) => x.id === id)
         if (!r) return {}
         const target = s.customers.find((c) => c.id === r.targetCustomerId)
-        const label = resolution === 'blocked' ? '拉黑被举报人' : resolution === 'deleted' ? '删除消息' : '忽略'
+        const label = resolution === 'banned' ? '封禁被举报人' : resolution === 'deleted' ? '删除消息' : '忽略'
         const messages = resolution === 'deleted' && r.messageId ? s.messages.map((m) => (m.id === r.messageId ? { ...m, deletedAt: now() } : m)) : s.messages
         return {
           reports: s.reports.map((x) => (x.id === id ? { ...x, status: 'handled', resolution, handledBy: byStaffId, handledAt: now() } : x)),
           messages,
+          customers: resolution === 'banned' ? s.customers.map((c) => (c.id === r.targetCustomerId ? { ...c, bannedAt: now(), sessionsRevokedAt: now() } : c)) : s.customers,
           audit: withAudit(s.audit, 'report.handle', `处理举报（${target?.nickname}）：${label}`, byStaffId),
         }
       }),

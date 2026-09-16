@@ -1,5 +1,5 @@
 /**
- * 后台客户详情里的「账号管控」：重置密码、强制下线、拉黑 / 解除、全群禁言 / 解除、影子模式。
+ * 后台客户详情里的「账号管控」：重置密码、强制下线、封禁 / 解除、全局禁言 / 解除、影子模式。
  *
  * 这些动作原来只有工作台有，管理员要处理一个闹事的客户得先去工作台、还得是那个客户
  * 主归属坐席的实操员工才点得动。后台是管理员的地盘，不该绕这一圈。
@@ -37,7 +37,7 @@ export function CustomerControlSection({ c }: { c: Customer }) {
   const [shadowReason, setShadowReason] = useState('')
   const deleted = !!c.deletedAt
   const muted = isMutedNow(c)
-  const blacklisted = !!c.blacklistedAt
+  const banned = !!c.bannedAt
   const shadowed = !!c.shadowModeAt
 
   const reset = async () => {
@@ -51,16 +51,16 @@ export function CustomerControlSection({ c }: { c: Customer }) {
     s.forceLogoutCustomer(c.id, admin)
     toast('已强制下线，客户所有设备被登出')
   }
-  const toggleBlack = async () => {
+  const toggleBan = async () => {
     const ok = await confirm({
-      title: blacklisted ? `解除「${c.nickname}」的拉黑？` : `拉黑「${c.nickname}」？`,
-      body: blacklisted ? CONTROL_COPY.blacklistOff : CONTROL_COPY.blacklistOn,
-      okText: blacklisted ? '解除' : '拉黑',
-      danger: !blacklisted,
+      title: banned ? `解除「${c.nickname}」的封禁？` : `封禁「${c.nickname}」？`,
+      body: banned ? CONTROL_COPY.banOff : CONTROL_COPY.banOn,
+      okText: banned ? '解除' : '封禁',
+      danger: !banned,
     })
     if (!ok) return
-    s.setCustomerBlacklist(c.id, !blacklisted, admin)
-    toast(blacklisted ? '已解除拉黑' : '已拉黑，客户无法发消息')
+    s.setCustomerBan(c.id, !banned, admin)
+    toast(banned ? '已解除封禁' : '已封禁，客户无法登录')
   }
   const toggleShadow = async () => {
     if (!shadowed) {
@@ -80,7 +80,7 @@ export function CustomerControlSection({ c }: { c: Customer }) {
   }
   const mute = (hours: number | null) => {
     s.muteCustomerAll(c.id, hours, admin)
-    toast(`已禁言「${c.nickname}」（所有群）${muteLabel(hours)}`)
+    toast(`已全局禁言「${c.nickname}」${muteLabel(hours)}`)
     setMuting(false)
   }
 
@@ -92,12 +92,12 @@ export function CustomerControlSection({ c }: { c: Customer }) {
           <KeyRound size={13} /> 重置
         </Button>
       </Row>
-      <Row title="强制下线" desc={c.sessionsRevokedAt ? `上次下线于 ${fmtDateTime(c.sessionsRevokedAt)}；账号未停用，客户可重新登录` : '撤销全部登录 session，所有设备被登出。账号不停用'}>
+      <Row title="强制下线" desc={c.sessionsRevokedAt ? `上次下线于 ${fmtDateTime(c.sessionsRevokedAt)}；客户可重新登录` : '让所有已登录设备退出，客户可重新登录'}>
         <Button size="sm" disabled={deleted} onClick={() => void kick()}>
           <LogOut size={13} /> 下线
         </Button>
       </Row>
-      <Row title="全群禁言" desc={muted ? `禁言中${c.mutedAllUntil!.startsWith('9999-') ? '（永久）' : `，至 ${fmtDateTime(c.mutedAllUntil!)}`}；私聊不受影响` : '所有群与频道发不了言，私聊不受影响'}>
+      <Row title="全局禁言" desc={muted ? `禁言中${c.mutedAllUntil!.startsWith('9999-') ? '（永久）' : `，至 ${fmtDateTime(c.mutedAllUntil!)}`}；所有官方联系人、群和频道都不能发消息` : '所有官方联系人、群和频道都不能发消息'}>
         {muted ? (
           <Button size="sm" disabled={deleted} onClick={() => mute(0)}>
             <MicOff size={13} /> 解除禁言
@@ -108,9 +108,9 @@ export function CustomerControlSection({ c }: { c: Customer }) {
           </Button>
         )}
       </Row>
-      <Row title="拉黑" desc={blacklisted ? `拉黑于 ${fmtDateTime(c.blacklistedAt!)}；所有官方号与群都发不出消息，群发自动跳过` : '所有官方号与群都发不出消息，群发自动跳过他'}>
-        <Button size="sm" variant={blacklisted ? 'secondary' : 'danger'} disabled={deleted} onClick={() => void toggleBlack()}>
-          <Ban size={13} /> {blacklisted ? '解除拉黑' : '拉黑'}
+      <Row title="封禁" desc={banned ? `封禁于 ${fmtDateTime(c.bannedAt!)}；账号无法登录` : '账号无法登录，所有已登录设备会退出'}>
+        <Button size="sm" variant={banned ? 'secondary' : 'danger'} disabled={deleted} onClick={() => void toggleBan()}>
+          <Ban size={13} /> {banned ? '解除封禁' : '封禁'}
         </Button>
       </Row>
 
@@ -148,7 +148,7 @@ export function CustomerControlSection({ c }: { c: Customer }) {
         </div>
       </Modal>
 
-      <Modal open={muting} onClose={() => setMuting(false)} title={`禁言「${c.nickname}」（所有群）`} width={400}>
+      <Modal open={muting} onClose={() => setMuting(false)} title={`全局禁言「${c.nickname}」`} width={400}>
         <div className="grid grid-cols-2 gap-2">
           {MUTE_OPTIONS.map((o) => (
             <Button key={o.label} onClick={() => mute(o.hours)}>

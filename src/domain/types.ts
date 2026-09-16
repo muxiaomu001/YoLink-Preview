@@ -230,9 +230,9 @@ export interface Customer {
   blockedSeatIds: string[]
   /** 已注销：保留数据，不再出现在工作台 */
   deletedAt?: ISODate
-  /** 被企业拉黑：客户发不出消息 */
-  blacklistedAt?: ISODate | null
-  /** 所有群禁言到期时间；null 表示未禁言 */
+  /** 企业封禁：账号无法登录 */
+  bannedAt?: ISODate | null
+  /** 全局禁言到期时间；null 表示未禁言 */
   mutedAllUntil?: ISODate | null
   /** 员工重置过密码，首次登录强制修改 */
   mustChangePassword?: boolean
@@ -628,7 +628,7 @@ export type AuditType =
   | 'group.create'
   | 'message.recall'
   | 'message.edit'
-  | 'customer.block'
+  | 'customer.ban'
   | 'customer.mute'
   | 'customer.reset_password'
   | 'customer.force_logout'
@@ -668,7 +668,7 @@ export interface Report {
   messageId?: string
   reason: string
   status: 'pending' | 'handled'
-  resolution?: 'blocked' | 'deleted' | 'ignored'
+  resolution?: 'banned' | 'deleted' | 'ignored'
   handledBy?: string
   handledAt?: ISODate
 }
@@ -1275,6 +1275,8 @@ export interface Session {
   workbenchStaffId: string | null
   workbenchSeatId: string | null
   phoneCustomerId: string | null
+  /** 当前手机端登录建立时间；强制下线后用来判定这次登录已失效 */
+  phoneSessionStartedAt?: ISODate | null
 }
 
 export interface DemoState {

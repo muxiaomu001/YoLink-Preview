@@ -1,6 +1,7 @@
 import type { ChatActor, DemoState, Message } from './types'
 import { fmtDuration } from './time'
 import { customerCan, customerCanSpeakIn, groupPerm, seatCan, seatGroupPerm } from '@/store/policy'
+import { globalMuteReason } from './customerStatus'
 
 /**
  * 0 为不限时间；演示初值用于体验，正式默认值待产品确认。
@@ -151,7 +152,9 @@ export function sendFailure(s: DemoState, convId: string, actor: ChatActor, medi
   if (actor.kind === 'seat') return seatMessageSendAllowed(s, convId, actor.id, actor.staffId ?? '', media) ? undefined : '当前身份或策略不允许发送'
   const conv = s.conversations.find((c) => c.id === convId)!
   const customer = s.customers.find((c) => c.id === actor.id)!
-  if (customer.blacklistedAt) return '你已被限制发送消息'
+  if (customer.bannedAt) return '账号已被封禁'
+  const globalMute = globalMuteReason(customer)
+  if (globalMute) return globalMute
   if (conv.kind === 'dm') {
     if (customer.blockedSeatIds.includes(conv.seatId!)) return '请先解除对该官方联系人的拉黑'
     if (media && !customerCan(s, actor.id, 'dm.send_media')) return '当前不允许发送附件'

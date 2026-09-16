@@ -13,7 +13,7 @@ import { fmtDateTimeSec, messageText } from './audit-helpers'
 type Tab = 'pending' | 'all'
 type Resolution = NonNullable<Report['resolution']>
 
-const RESOLUTION_LABEL: Record<Resolution, string> = { blocked: '已拉黑被举报人', deleted: '已删除消息', ignored: '已忽略' }
+const RESOLUTION_LABEL: Record<Resolution, string> = { banned: '已封禁被举报人', deleted: '已删除消息', ignored: '已忽略' }
 
 export function ReportsPage() {
   const s = useStore()
@@ -28,7 +28,7 @@ export function ReportsPage() {
     const target = customerById(s, r.targetCustomerId)
     const name = target?.nickname ?? '该客户'
     const copy: Record<Resolution, { title: string; body: string; ok: string; danger: boolean }> = {
-      blocked: { title: `拉黑「${name}」？`, body: '拉黑后该客户不能再在群里发言，也不能私聊其他客户。举报标记为已处理，记审计日志。', ok: '拉黑', danger: true },
+      banned: { title: `封禁「${name}」？`, body: '封禁后该客户无法登录，所有已登录设备会退出。举报会标记为已处理。', ok: '封禁', danger: true },
       deleted: { title: '删除被举报的消息？', body: '删除后客户侧不可见，审计仍可查。举报标记为已处理，记审计日志。', ok: '删除消息', danger: true },
       ignored: { title: '忽略这条举报？', body: '不做处理，举报标记为已处理并记审计日志。', ok: '忽略', danger: false },
     }
@@ -105,8 +105,8 @@ export function ReportsPage() {
                 <Eye size={12} /> 查看上下文
               </Button>
             )}
-            <Button size="sm" variant="danger" onClick={() => void handle(r, 'blocked')}>
-              <Ban size={12} /> 拉黑被举报人
+            <Button size="sm" variant="danger" onClick={() => void handle(r, 'banned')}>
+              <Ban size={12} /> 封禁被举报人
             </Button>
             {r.targetKind === 'message' && (
               <Button size="sm" variant="danger" onClick={() => void handle(r, 'deleted')}>
@@ -126,7 +126,7 @@ export function ReportsPage() {
     <div>
       <PageHeader title="举报处理" level="P1" desc="客户在 App 里提交的举报会进入这里排队，按先后顺序处理。" />
       <Note>
-        被举报对象是消息时可先看上下文再决定。处理动作三选一：拉黑被举报人、删除消息（仅消息类）、忽略。<b>活跃角色被举报的记录进日报的事实提醒</b>，不在这里处理。
+        被举报对象是消息时可先看上下文再决定。处理动作三选一：封禁被举报人、删除消息（仅消息类）、忽略。<b>活跃角色被举报的记录进日报的事实提醒</b>，不在这里处理。
       </Note>
 
       <Tabs

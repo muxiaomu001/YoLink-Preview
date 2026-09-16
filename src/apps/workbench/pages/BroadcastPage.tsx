@@ -79,11 +79,11 @@ export function BroadcastPage() {
     return []
   }, [friends, mine, targetKind, tagIds, product, role])
 
-  /** 发送前预估会被跳过的人：注销 / 拉黑 / 屏蔽本坐席 / 今日已达每客户频控 */
+  /** 发送前预估会被跳过的人：注销 / 封禁 / 屏蔽本坐席 / 今日已达每客户频控 */
   const willSkip = useMemo(() => {
     if (!seat) return 0
     return targets.filter((c) => {
-      if (c.blacklistedAt || c.blockedSeatIds.includes(seat.id)) return true
+      if (c.bannedAt || c.blockedSeatIds.includes(seat.id)) return true
       const received = s.messages.filter((m) => m.isBroadcast && m.at.slice(0, 10) === today && s.conversations.find((x) => x.id === m.convId)?.customerId === c.id).length
       return received >= perCustomer
     }).length
@@ -151,7 +151,7 @@ export function BroadcastPage() {
     if (r.reason) return toast(r.reason, 'warn')
     if (mode === 'scheduled') toast('已创建定时任务，到点按当时人群发送', 'info')
     else if (targetKind === 'group') toast(r.sent ? `已以「${seat.displayName}」身份往群「${group?.name}」发了一条群消息` : '群会话不存在，未发送', r.sent ? 'ok' : 'warn')
-    else toast(`已以「${seat.displayName}」身份发给 ${r.sent} 位客户${r.skipped ? `，跳过 ${r.skipped} 位（注销 / 拉黑 / 屏蔽 / 频控）` : ''}`)
+    else toast(`已以「${seat.displayName}」身份发给 ${r.sent} 位客户${r.skipped ? `，跳过 ${r.skipped} 位（注销 / 封禁 / 屏蔽 / 频控）` : ''}`)
     setName('')
     setText('')
     setMedia(undefined)
