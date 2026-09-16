@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Building2, ExternalLink, FileKey2, KeyRound, Plus, Search, ShieldCheck } from 'lucide-react'
+import { Building2, ExternalLink, FileKey2, KeyRound, LockKeyhole, LogOut, Plus, Search, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { ProviderInstance } from '@/domain/types'
+import { PROVIDER_STATUS_LABEL, providerInstanceStatus } from '@/domain/providerLicense'
 import { fmtDate, fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { Button, Input, Select } from '@/ui/primitives'
@@ -12,15 +13,10 @@ import { DemoNote, DemoNoteToggle } from '@/ui/DemoNote'
 import { BindInstanceModal, RenewInstanceModal, StopInstanceModal } from './ProviderApp.parts'
 
 type Filter = 'all' | 'active' | 'expired' | 'stopped'
-
-function statusOf(instance: ProviderInstance): Exclude<Filter, 'all'> {
-  if (instance.stoppedAt) return 'stopped'
-  if (instance.expiresAt < new Date().toISOString()) return 'expired'
-  return 'active'
-}
+const ACCESS_KEY = 'yolink-provider-demo-access'
 
 function StatusPill({ instance }: { instance: ProviderInstance }) {
-  const status = statusOf(instance)
+  const status = providerInstanceStatus(instance)
   if (status === 'stopped') return <Pill tone="red">人工停用</Pill>
   if (status === 'expired') return <Pill tone="amber">已到期 · 仍在用</Pill>
   return <Pill tone="green">授权中</Pill>
@@ -30,6 +26,7 @@ const ACTION_LABEL = { bind: '绑定', renew: '续期', stop: '停用', resume: 
 
 export function ProviderApp() {
   const s = useStore()
+  const [hasAccess] = useState(() => sessionStorage.getItem(ACCESS_KEY) === 'yes')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const [binding, setBinding] = useState(false)
@@ -38,13 +35,29 @@ export function ProviderApp() {
   const normalized = query.trim().toLowerCase()
   const rows = useMemo(
     () => s.providerInstances.filter((instance) => {
-      const matchFilter = filter === 'all' || statusOf(instance) === filter
+      const matchFilter = filter === 'all' || providerInstanceStatus(instance) === filter
       const matchQuery = !normalized || [instance.enterpriseName, instance.enterpriseCode, instance.deviceCode, instance.instanceId].some((value) => value.toLowerCase().includes(normalized))
       return matchFilter && matchQuery
     }),
     [filter, normalized, s.providerInstances],
   )
-  const counts = s.providerInstances.reduce((result, instance) => ({ ...result, [statusOf(instance)]: result[statusOf(instance)] + 1 }), { active: 0, expired: 0, stopped: 0 })
+  const counts = s.providerInstances.reduce((result, instance) => {
+    result[providerInstanceStatus(instance)] += 1
+    return result
+  }, { active: 0, expired: 0, stopped: 0 })
+
+  if (!hasAccess) {
+    return (
+      <div className="flex min-h-full items-center justify-center bg-zinc-100 p-6">
+        <section className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
+          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-950 text-white"><LockKeyhole size={21} /></span>
+          <h1 className="mt-5 text-lg font-semibold text-zinc-900">仅限供应方账号</h1>
+          <p className="mt-2 text-xs leading-5 text-zinc-500">企业管理员和员工不能进入授权中心。请从演示首页选择供应方身份进入。</p>
+          <Link to="/" className="mt-5 inline-flex h-8 items-center justify-center rounded-md bg-brand-700 px-4 text-xs font-medium text-white hover:bg-brand-800">返回演示首页</Link>
+        </section>
+      </div>
+    )
+  }
 
   const resume = async (instance: ProviderInstance) => {
     const ok = await confirm({ title: `恢复「${instance.enterpriseName}」`, body: '恢复人工停用状态；如果授权已经到期，仍会保持“已到期”提示。', okText: '恢复' })
@@ -66,7 +79,7 @@ export function ProviderApp() {
         </nav>
         <div className="mt-auto space-y-2 border-t border-white/10 p-4 text-xs">
           <Link to="/admin/license" target="_blank" className="flex items-center gap-1.5 text-zinc-300 hover:text-white"><ExternalLink size={12} /> 查看企业许可页</Link>
-          <Link to="/" className="text-zinc-500 hover:text-zinc-300">返回演示首页</Link>
+          <Link to="/" onClick={() => sessionStorage.removeItem(ACCESS_KEY)} className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-300"><LogOut size={12} /> 退出授权中心</Link>
         </div>
       </aside>
 
@@ -104,7 +117,7 @@ export function ProviderApp() {
                 { key: 'enterprise', title: '企业', render: (instance) => <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-50 text-brand-700"><Building2 size={15} /></span><div><div className="font-medium text-zinc-900">{instance.enterpriseName}</div><div className="font-mono text-[10px] text-zinc-400">{instance.enterpriseCode}</div></div></div> },
                 { key: 'device', title: '绑定实例', render: (instance) => <KV items={[{ k: '设备码', v: <span className="font-mono text-[11px]">{instance.deviceCode}</span> }, { k: '实例标识', v: <span className="font-mono text-[10px] text-zinc-500">{instance.instanceId.slice(0, 13)}…</span> }]} /> },
                 { key: 'version', title: '版本', render: (instance) => <span className="font-mono text-xs">{instance.version}</span> },
-                { key: 'expiry', title: '本期到期日', render: (instance) => <div><div className="tabular-nums">{fmtDate(instance.expiresAt)}</div>{statusOf(instance) === 'expired' && <div className="text-[10px] text-amber-700">到期未自动停用</div>}</div> },
+                { key: 'expiry', title: '本期到期日', render: (instance) => <div><div className="tabular-nums">{fmtDate(instance.expiresAt)}</div>{providerInstanceStatus(instance) === 'expired' && <div className="text-[10px] text-amber-700">{PROVIDER_STATUS_LABEL.expired}</div>}</div> },
                 { key: 'status', title: '状态', render: (instance) => <div><StatusPill instance={instance} />{instance.stopReason && <div className="mt-1 max-w-36 truncate text-[10px] text-zinc-400" title={instance.stopReason}>{instance.stopReason}</div>}</div> },
                 { key: 'ops', title: '操作', align: 'right', render: (instance) => <div className="flex justify-end gap-1"><Button size="sm" variant="ghost" onClick={() => setRenewing(instance)}>续期</Button>{instance.stoppedAt ? <Button size="sm" variant="secondary" onClick={() => void resume(instance)}>恢复</Button> : <Button size="sm" variant="danger" onClick={() => setStopping(instance)}>停用</Button>}</div> },
               ]}

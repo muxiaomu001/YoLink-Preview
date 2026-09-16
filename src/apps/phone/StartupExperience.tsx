@@ -12,9 +12,13 @@ function seenKey(customerId: string, announcementId: string) {
   return `yolink-announcement-seen:${customerId}:${announcementId}`
 }
 
+function canShowToCustomer(item: Announcement, customerId: string) {
+  return item.showMode === 'every' || localStorage.getItem(seenKey(customerId, item.id)) !== 'yes'
+}
+
 function popupFor(items: Announcement[], customerId?: string) {
   if (!customerId) return undefined
-  return activeAnnouncements(items).find((item) => item.kind === 'popup' && (item.showMode === 'every' || localStorage.getItem(seenKey(customerId, item.id)) !== 'yes'))
+  return activeAnnouncements(items).find((item) => item.kind === 'popup' && canShowToCustomer(item, customerId))
 }
 
 export function StartupExperience({ customerId }: { customerId?: string }) {
@@ -90,24 +94,35 @@ export function StartupExperience({ customerId }: { customerId?: string }) {
   )
 }
 
-export function ActiveAnnouncementBar() {
+export function ActiveAnnouncementBar({ customerId }: { customerId: string }) {
   const announcements = useStore((state) => state.announcements)
-  const item = useMemo(() => activeAnnouncements(announcements).find((announcement) => announcement.kind === 'bar'), [announcements])
+  const item = useMemo(() => activeAnnouncements(announcements).find((announcement) => announcement.kind === 'bar' && canShowToCustomer(announcement, customerId)), [announcements, customerId])
   const [hiddenId, setHiddenId] = useState<string | null>(null)
   if (!item || hiddenId === item.id) return null
+
+  const close = () => {
+    if (item.showMode === 'once') localStorage.setItem(seenKey(customerId, item.id), 'yes')
+    setHiddenId(item.id)
+  }
 
   return (
     <div className="flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-950">
       <ShieldCheck size={14} className="mt-0.5 shrink-0 text-amber-700" />
-      <button
-        type="button"
-        className="min-w-0 flex-1 text-left"
-        onClick={() => item.buttonAction === 'link' && item.url && window.open(item.url, '_blank', 'noopener,noreferrer')}
-      >
+      <div className="min-w-0 flex-1">
         <span className="font-medium">{item.title}</span>
         <span className="ml-1 text-amber-800">{item.body}</span>
-      </button>
-      <button type="button" onClick={() => setHiddenId(item.id)} className="mt-0.5 text-amber-700 hover:text-amber-950" aria-label="关闭顶部公告">
+        <button
+          type="button"
+          className="ml-1 font-medium text-amber-950 underline underline-offset-2"
+          onClick={() => {
+            if (item.buttonAction === 'link' && item.url) window.open(item.url, '_blank', 'noopener,noreferrer')
+            close()
+          }}
+        >
+          {item.buttonText}
+        </button>
+      </div>
+      <button type="button" onClick={close} className="mt-0.5 text-amber-700 hover:text-amber-950" aria-label="关闭顶部公告">
         <X size={13} />
       </button>
     </div>

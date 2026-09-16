@@ -1,6 +1,5 @@
 import type { ProviderInstance, ProviderLicenseAction } from '@/domain/types'
 import { newId } from '@/domain/ids'
-import { iso } from '@/domain/time'
 import { type Get, type Set, now } from './helpers'
 
 export interface ProviderLicensingActions {
@@ -8,20 +7,17 @@ export interface ProviderLicensingActions {
     enterpriseName: string
     enterpriseCode: string
     deviceCode: string
-    months: number
+    expiresOn: string
   }) => { ok: true; instance: ProviderInstance } | { ok: false; error: string }
-  renewProviderInstance: (id: string, months: number) => void
+  renewProviderInstance: (id: string, expiresOn: string) => void
   stopProviderInstance: (id: string, reason: string) => void
   resumeProviderInstance: (id: string) => void
 }
 
 const OPERATOR = '供应方管理员'
 
-function addMonths(from: string, months: number) {
-  const base = Math.max(Date.now(), new Date(from).getTime())
-  const date = new Date(base)
-  date.setMonth(date.getMonth() + months)
-  return iso(date.getTime())
+function expiryIso(date: string) {
+  return new Date(`${date}T23:59:59`).toISOString()
 }
 
 function action(instanceId: string, kind: ProviderLicenseAction['action'], detail: string): ProviderLicenseAction {
@@ -33,7 +29,7 @@ export function providerLicensingActions(set: Set, get: Get): ProviderLicensingA
     bindProviderInstance: (input) => {
       const s = get()
       const deviceCode = input.deviceCode.trim().toUpperCase()
-      if (s.providerInstances.some((x) => x.deviceCode.toUpperCase() === deviceCode)) return { ok: false, error: '这个设备码已经绑定' }
+      if (s.providerInstances.some((x) => x.deviceCode.toUpperCase() === deviceCode)) return { ok: false, error: '这个设备码已经绑定，请核对后在已有实例中操作' }
       const at = now()
       const instance: ProviderInstance = {
         id: newId('pi'),
@@ -43,28 +39,28 @@ export function providerLicensingActions(set: Set, get: Get): ProviderLicensingA
         instanceId: crypto.randomUUID(),
         version: 'v1.0.3',
         boundAt: at,
-        expiresAt: addMonths(at, input.months),
+        expiresAt: expiryIso(input.expiresOn),
         stoppedAt: null,
         stopReason: null,
       }
       set({
         providerInstances: [instance, ...s.providerInstances],
-        providerLicenseActions: [action(instance.instanceId, 'bind', `绑定设备码 ${deviceCode}，授权 ${input.months} 个月`), ...s.providerLicenseActions],
+        providerLicenseActions: [action(instance.instanceId, 'bind', `绑定设备码 ${deviceCode}，到期日 ${input.expiresOn}`), ...s.providerLicenseActions],
       })
       return { ok: true, instance }
     },
 
-    renewProviderInstance: (id, months) => {
+    renewProviderInstance: (id, expiresOn) => {
       const s = get()
       const instance = s.providerInstances.find((x) => x.id === id)
       if (!instance) return
-      const expiresAt = addMonths(instance.expiresAt, months)
+      const expiresAt = expiryIso(expiresOn)
       const license = instance.instanceId === s.license.instanceId
         ? { ...s.license, expiresAt, modules: s.license.modules.map((module) => ({ ...module, expiresAt })) }
         : s.license
       set({
         providerInstances: s.providerInstances.map((x) => (x.id === id ? { ...x, expiresAt } : x)),
-        providerLicenseActions: [action(instance.instanceId, 'renew', `续期 ${months} 个月，到期日更新为 ${expiresAt.slice(0, 10)}${instance.stoppedAt ? '；停用状态保持不变' : ''}`), ...s.providerLicenseActions],
+        providerLicenseActions: [action(instance.instanceId, 'renew', `到期日更新为 ${expiresOn}${instance.stoppedAt ? '；停用状态保持不变' : ''}`), ...s.providerLicenseActions],
         license,
       })
     },

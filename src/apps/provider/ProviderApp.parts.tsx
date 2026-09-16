@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import type { ProviderInstance } from '@/domain/types'
 import { useStore } from '@/store/store'
-import { Button, Field, Input, Select, Textarea } from '@/ui/primitives'
+import { Button, Field, Input, Textarea } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
 import { Note } from '@/ui/display'
 
-const MONTH_OPTIONS = [1, 3, 6, 12]
+const today = () => new Date().toISOString().slice(0, 10)
 
 export function BindInstanceModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const bind = useStore((state) => state.bindProviderInstance)
-  const [form, setForm] = useState({ enterpriseName: '', enterpriseCode: '', deviceCode: '', months: 1 })
+  const [form, setForm] = useState({ enterpriseName: '', enterpriseCode: '', deviceCode: '', expiresOn: '' })
   const [error, setError] = useState('')
-  const valid = form.enterpriseName.trim().length >= 2 && /^[A-Za-z0-9-]{2,16}$/.test(form.enterpriseCode.trim()) && form.deviceCode.trim().length >= 8
+  const valid = form.enterpriseName.trim().length >= 2 && /^[A-Za-z0-9-]{2,16}$/.test(form.enterpriseCode.trim()) && form.deviceCode.trim().length >= 8 && form.expiresOn >= today()
 
   const submit = () => {
     const result = bind(form)
@@ -48,10 +48,8 @@ export function BindInstanceModal({ open, onClose }: { open: boolean; onClose: (
         <Field label="实例设备码" required hint="由客户部署实例生成">
           <Input value={form.deviceCode} onChange={(event) => { setError(''); setForm((value) => ({ ...value, deviceCode: event.target.value.toUpperCase() })) }} placeholder="例如：HX-PROD-7C2A-91F4" className="font-mono" />
         </Field>
-        <Field label="首次授权时长">
-          <Select value={form.months} onChange={(event) => setForm((value) => ({ ...value, months: Number(event.target.value) }))}>
-            {MONTH_OPTIONS.map((months) => <option key={months} value={months}>{months} 个月</option>)}
-          </Select>
+        <Field label="首次到期日" required hint="由本次授权确认">
+          <Input type="date" min={today()} value={form.expiresOn} onChange={(event) => setForm((value) => ({ ...value, expiresOn: event.target.value }))} />
         </Field>
         {error && <div className="text-xs text-red-600">{error}</div>}
       </div>
@@ -61,7 +59,7 @@ export function BindInstanceModal({ open, onClose }: { open: boolean; onClose: (
 
 export function RenewInstanceModal({ instance, onClose }: { instance: ProviderInstance | null; onClose: () => void }) {
   const renew = useStore((state) => state.renewProviderInstance)
-  const [months, setMonths] = useState(1)
+  const [expiresOn, setExpiresOn] = useState('')
   if (!instance) return null
   return (
     <Modal
@@ -71,15 +69,13 @@ export function RenewInstanceModal({ instance, onClose }: { instance: ProviderIn
       footer={
         <>
           <Button onClick={onClose}>取消</Button>
-          <Button variant="primary" onClick={() => { renew(instance.id, months); toast(`已为「${instance.enterpriseName}」续期 ${months} 个月`); onClose() }}>确认续期</Button>
+          <Button variant="primary" disabled={expiresOn < today()} onClick={() => { renew(instance.id, expiresOn); toast(`已更新「${instance.enterpriseName}」的到期日`); onClose() }}>确认续期</Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Field label="续期时长">
-          <Select value={months} onChange={(event) => setMonths(Number(event.target.value))}>
-            {MONTH_OPTIONS.map((value) => <option key={value} value={value}>{value} 个月</option>)}
-          </Select>
+        <Field label="新到期日" required hint={`当前到期日 ${instance.expiresAt.slice(0, 10)}`}>
+          <Input type="date" min={today()} value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} />
         </Field>
         {instance.stoppedAt && <Note tone="amber">这个实例目前已人工停用。续期只更新到期日，不会自动恢复。</Note>}
       </div>

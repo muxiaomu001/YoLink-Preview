@@ -61,7 +61,7 @@ export function Landing() {
 
         <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
           {CARDS.map((c) => (
-            <Link key={c.to} to={c.to} className="group rounded-xl border border-zinc-200 bg-white p-5 transition-shadow hover:shadow-md">
+            <Link key={c.to} to={c.to} onClick={() => { if (c.to === '/provider') sessionStorage.setItem('yolink-provider-demo-access', 'yes') }} className="group rounded-xl border border-zinc-200 bg-white p-5 transition-shadow hover:shadow-md">
               <c.icon className="mb-3 text-brand-700" size={22} />
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-zinc-900">{c.title}</h2>

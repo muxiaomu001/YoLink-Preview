@@ -25,7 +25,7 @@ export function DemoPanel({ onSwitch, onReplayStartup, customerId }: { customerI
       <div className="mb-2 font-semibold text-zinc-700">演示控制</div>
       <p className="mb-3 leading-relaxed text-zinc-500">这块不是产品的一部分。手机屏演示注册、聊天、联系人和我的。网站栏目、发现、经营等入口尚未覆盖；手机导航待单独确认。客户看到官方身份，不显示实操员工。</p>
       <DemoNoteToggle className="mb-3 w-full justify-center" />
-      <Button size="sm" className="mb-3 w-full" onClick={onReplayStartup}>重新播放启动页</Button>
+      <Button size="sm" className="mb-3 w-full" onClick={onReplayStartup}>重播开屏</Button>
       <label className="mb-1 block text-[11px] text-zinc-500">以哪位客户的视角查看</label>
       <Select
         value={customer?.id ?? ''}

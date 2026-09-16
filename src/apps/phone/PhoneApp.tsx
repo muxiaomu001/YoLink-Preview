@@ -63,7 +63,7 @@ export function PhoneApp() {
             ) : (
               <>
                 {/* 软引导只在「消息」页顶上出现一条：可关、关了不再来、任何时候都不挡路 */}
-                {tab === 'chats' && <ActiveAnnouncementBar />}
+                {tab === 'chats' && <ActiveAnnouncementBar customerId={customer.id} />}
                 {tab === 'chats' && shouldShowProfileGuide(customer) && <ProfileGuide customer={customer} onGoProfile={() => setTab('me')} />}
                 <div className="min-h-0 flex-1">
                   {tab === 'chats' && <ChatsScreen customerId={customer.id} onOpen={setOpenConv} />}
