@@ -41,11 +41,10 @@ export function chatExperienceActions(set: Set, get: Get): ChatExperienceActions
         if (reason) return { ok: false, reason: `未删除任何消息：${reason}` }
       }
       const at = now(), key = actorKey(actor)
-      // 自己删自己的消息记为「撤回」，管理员删他人的记为「删除」：两端气泡占位文案不同
-      const isRecall = (m: Message) => m.senderKind === actor.kind && m.senderId === actor.id
-      set({ messages: s.messages.map((m) => unique.includes(m.id) ? everyone ? (isRecall(m) ? { ...m, recalledAt: at } : { ...m, deletedAt: at }) : { ...m, hiddenFor: [...new Set([...(m.hiddenFor ?? []), key])] } : m),
+      // 为所有人删除：两端普通聊天直接消失、不留占位；deletedByManager 只给审计区分作者删除与管理删除
+      set({ messages: s.messages.map((m) => unique.includes(m.id) ? everyone ? { ...m, deletedAt: at, deletedByManager: canManageDelete(s, m, actor) || undefined } : { ...m, hiddenFor: [...new Set([...(m.hiddenFor ?? []), key])] } : m),
         chatGroups: everyone?s.chatGroups.map((g)=>({...g,pinnedMessageIds:g.pinnedMessageIds.filter((id)=>!unique.includes(id))})):s.chatGroups,
-        groupLogs: everyone ? [...Array.from(new Set(messages.map((m)=>s.conversations.find((c)=>c.id===m!.convId)?.chatGroupId).filter((id):id is string=>!!id))).map((groupId)=>({id:newId('glog'),groupId,at,actorKind:actor.kind,actorId:actor.id,action:'delete_message',detail:`为所有人移除 ${unique.length} 条消息（撤回或管理删除），原文保留审计`})),...s.groupLogs] : s.groupLogs,
+        groupLogs: everyone ? [...Array.from(new Set(messages.map((m)=>s.conversations.find((c)=>c.id===m!.convId)?.chatGroupId).filter((id):id is string=>!!id))).map((groupId)=>({id:newId('glog'),groupId,at,actorKind:actor.kind,actorId:actor.id,action:'delete_message',detail:`为所有人移除 ${unique.length} 条消息，原文保留审计`})),...s.groupLogs] : s.groupLogs,
         audit: withAudit(s.audit, 'message.delete', `${key} ${everyone ? '为所有人' : '仅为本方身份'}删除 ${unique.length} 条消息：${unique.join('、')}${everyone && messages.some((m) => canManageDelete(s, m!, actor)) ? '（管理权限）' : ''}`, actor.staffId ?? null) })
       return { ok: true }
     },

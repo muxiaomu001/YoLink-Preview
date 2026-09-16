@@ -90,7 +90,7 @@ export const POLICY_ITEMS: PolicyItem[] = [
   { key: 'dm.create_with_friend', label: '与好友发起私聊', group: '私聊', desc: '客服预设下客户的好友只有官方坐席', level: 'P0' },
   { key: 'dm.create_with_stranger', label: '与非好友发起私聊', group: '私聊', desc: '不加好友直接私聊', level: 'P0' },
   { key: 'dm.send_media', label: '私聊发送媒体', group: '私聊', desc: '图片、视频、语音', level: 'P0' },
-  { key: 'dm.recall', label: '撤回自己发出的消息', group: '私聊', desc: '撤回即为所有人删除，会留下「已撤回」痕迹；时限见数值型策略', level: 'P0' },
+  { key: 'dm.recall', label: '为所有人删除自己发出的消息', group: '私聊', desc: '两端普通聊天里直接消失、不留占位，原文保留审计；时限见数值型策略', level: 'P0' },
   { key: 'dm.edit', label: '编辑自己的消息', group: '私聊', desc: '时限见数值型策略', level: 'P0' },
   { key: 'dm.forward', label: '转发私聊消息', group: '私聊', desc: '转发到其他会话', level: 'P0' },
   // 群与频道
@@ -198,7 +198,7 @@ export const POLICY_NUMBERS: PolicyNumbers = {
 
 export const POLICY_CHANGES: PolicyChange[] = [
   { id: 'pc_0001', at: ago(90), byStaffId: 'st_admin', kind: 'preset', detail: '应用预设「客服预设」' },
-  { id: 'pc_0002', at: ago(60), byStaffId: 'st_admin', kind: 'number', detail: '消息撤回时限 60 → 120 秒' },
+  { id: 'pc_0002', at: ago(60), byStaffId: 'st_admin', kind: 'number', detail: '「为所有人删除」时限 60 → 120 秒' },
   { id: 'pc_0003', at: ago(21), byStaffId: 'st_admin', kind: 'cap', detail: 'group.send_media 客户 · 手机：关 → 开' },
   { id: 'pc_0004', at: ago(3), byStaffId: 'st_admin', kind: 'preset', detail: '应用预设「客服预设」' },
 ]

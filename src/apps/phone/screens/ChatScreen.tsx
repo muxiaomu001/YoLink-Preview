@@ -4,7 +4,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { ArrowDown, MoreHorizontal } from 'lucide-react'
 import type { Message } from '@/domain/types'
-import { actorKey, draftKey, messageVisibleInChat } from '@/domain/messageRules'
+import { actorKey, draftKey, messageVisibleFor } from '@/domain/messageRules'
 import { useMessageTimeline } from '@/ui/useMessageTimeline'
 import { ChatTyping } from '@/ui/ChatTyping'
 import { ChatMediaLibrary } from '@/ui/ChatMediaLibrary'
@@ -28,7 +28,7 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
   const conv = s.conversations.find((c) => c.id === convId)
   const customer = customerById(s, customerId)
   const actor=useMemo(()=>({kind:'customer' as const,id:customerId}),[customerId])
-  const msgs = useMemo(() => messagesOf(s, convId).filter((m)=>messageVisibleInChat(s,m,actor)), [s, convId,actor])
+  const msgs = useMemo(() => messagesOf(s, convId).filter((m)=>messageVisibleFor(s,m,actor)), [s, convId,actor])
   const key=draftKey(actor,convId),draft=s.chatDrafts?.[key]??{text:''}
   const setText=(text:string)=>s.saveChatDraft(convId,actor,{...(useStore.getState().chatDrafts?.[key]??{text:''}),text})
   const setReplyTo=(m?:Message)=>s.saveChatDraft(convId,actor,{...(useStore.getState().chatDrafts?.[key]??{text:''}),replyToId:m?.id})
@@ -42,7 +42,7 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
   // 本次会话看过的公告（按公告时间记，公告更新会再弹）
   const [seenAnnouncementAt, setSeenAnnouncementAt] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
-  // "现在"：进入会话时取一次，自己每发一条刷新一次；用于禁言到期与撤回时限判断
+  // "现在"：进入会话时取一次，自己每发一条刷新一次；用于禁言到期与删除时限判断
   const [nowMs, setNowMs] = useState(() => Date.now())
   const group = conv?.kind !== 'dm' ? s.chatGroups.find((g) => g.id === conv?.chatGroupId) : undefined
   const announcement = group?.announcement
@@ -92,7 +92,7 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
         <div>
         {msgs.map((m) => {
           const mine = m.senderKind === 'customer' && m.senderId === customerId
-          return <Bubble customerId={customerId} key={m.id} m={m} mine={mine} inGroup={!!group} canRecall={false} canReply={group?.kind!=='channel'} onReply={() => setReplyTo(m)} onRecall={()=>setDeleting([m.id])} onDelete={()=>setDeleting([m.id])} onEdit={mine && !m.recalledAt && !m.deletedAt && customerCan(s, customerId, 'dm.edit', gid) ? () => setEditing(m) : undefined} />
+          return <Bubble customerId={customerId} key={m.id} m={m} mine={mine} inGroup={!!group} canReply={group?.kind!=='channel'} onReply={() => setReplyTo(m)} onDelete={()=>setDeleting([m.id])} onEdit={mine && customerCan(s, customerId, 'dm.edit', gid) ? () => setEditing(m) : undefined} />
         })}
         {!msgs.length&&<p className="py-12 text-center text-sm text-zinc-400">暂无可见消息</p>}
         </div>

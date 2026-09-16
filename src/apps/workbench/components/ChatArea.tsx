@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
 import { clsx } from 'clsx'
 import { ArrowDown, CornerUpLeft, X } from 'lucide-react'
-import { actorKey, draftKey, messageVisibleInChat } from '@/domain/messageRules'
+import { actorKey, draftKey, messageVisibleFor } from '@/domain/messageRules'
 import { useStore } from '@/store/store'
 import { useMessageTimeline } from '@/ui/useMessageTimeline'
 import type { ChatMediaKind } from '@/ui/MediaComposer'
@@ -38,7 +38,7 @@ export interface ChatAreaHandle {
 export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo }: { ref?: Ref<ChatAreaHandle>; row: ConvRow; seat: Seat; rightOpen: boolean; onToggleRight: () => void; onGroupInfo: () => void }) {
   const { s, staff } = useWorkbench()
   const actor = useMemo(() => ({ kind: 'seat' as const, id: seat.id, staffId: staff?.id }), [seat.id, staff?.id])
-  const msgs = useMemo(() => messagesOf(s,row.conv.id).filter((m)=>messageVisibleInChat(s,m,actor)), [s,row.conv.id,actor])
+  const msgs = useMemo(() => messagesOf(s,row.conv.id).filter((m)=>messageVisibleFor(s,m,actor)), [s,row.conv.id,actor])
   const key=draftKey(actor,row.conv.id)
   const draft=s.chatDrafts?.[key]??{text:''}
   // 输入框文字放在本地 state：全局 store 挂了 persist，逐键写入会把每次按键变成一次全量 localStorage 落盘。
@@ -99,7 +99,7 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
 
   const hits = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return q ? msgs.filter((m) => !m.recalledAt && !m.deletedAt && m.senderKind !== 'system' && m.text.toLowerCase().includes(q)).map((m) => m.id) : []
+    return q ? msgs.filter((m) => m.senderKind !== 'system' && m.text.toLowerCase().includes(q)).map((m) => m.id) : []
   }, [msgs, query])
   const onQuery = (v: string) => {
     setQuery(v)
@@ -112,7 +112,7 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
 
   // AI 推荐：策略允许才有入口；自动弹出要求私聊、客户在等、员工偏好开着
   const canAi = seatCan(s, seat.id, 'ai.suggest') && s.license.modules.some((m) => m.key === 'ai' && m.enabled)
-  const lastCustomerMsg = [...msgs].reverse().find((m) => m.senderKind === 'customer' && !m.recalledAt && !m.deletedAt)
+  const lastCustomerMsg = [...msgs].reverse().find((m) => m.senderKind === 'customer')
   const aiAuto = canAi && isDm && !!customer && !!row.waitingSince && !!lastCustomerMsg && !!staff?.prefs?.aiSuggest && dismissedFor !== lastCustomerMsg.id
   const autoDrafts = aiAuto && customer && lastCustomerMsg ? draftsFor({ lastCustomerText: lastCustomerMsg.text, customer, seat, knowledge: s.knowledge }) : []
   const aiContext = JSON.stringify([msgs.at(-1)?.id, s.knowledge])
@@ -197,8 +197,8 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
         {msgs.map((m, i) => (
           <div key={m.id}>
           {m.id===firstUnreadId&&<div className="my-3 text-center text-xs text-brand-600">以下是未读消息</div>}
-          {/* 多选模式下整行可点，但「已撤回」占位不参与勾选 */}
-          {(() => { const pickable = selecting && !m.recalledAt && !m.deletedAt; return (
+          {/* 多选模式下整行可点 */}
+          {(() => { const pickable = selecting; return (
           <div
             className={selecting?clsx('flex items-start gap-2.5 rounded-md py-0.5 pl-1',pickable&&'cursor-pointer hover:bg-zinc-50'):undefined}
             role={pickable?'checkbox':undefined}

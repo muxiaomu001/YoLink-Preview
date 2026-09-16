@@ -70,7 +70,7 @@ export function MessageContextModal({ messageId, onClose }: { messageId: string;
                 {m.senderKind === 'system' && <Pill>系统</Pill>}
                 {isTarget && <Pill tone="amber">目标消息</Pill>}
               </div>
-              {(m.deletedAt||m.recalledAt)&&<Pill tone="red">已从普通聊天删除，审计保留</Pill>}
+              {m.deletedAt&&<Pill tone="red">{m.deletedByManager?'管理删除':'作者删除'}，审计保留</Pill>}
               {m.editedAt && <Pill tone="blue">已编辑</Pill>}
               {!!m.editHistory?.length && <details className="my-2 rounded border border-zinc-200 bg-white p-2 text-xs">
                 <summary className="cursor-pointer text-brand-700">查看 {m.editHistory.length} 次修改记录</summary>

@@ -1,5 +1,5 @@
 /**
- * 工作台动作：消息操作（撤回、引用、转发、坐席删群消息）、会话操作（已读、置顶、静音）、
+ * 工作台动作：消息操作（引用、转发、坐席删群消息）、会话操作（已读、置顶、静音）、
  * 客户操作（重置密码、拉黑、全群禁言）、个人设置、客户手机端的社交动作。话术库见 quickReplies.ts。
  */
 import type { Message, MessageMedia, StaffPrefs } from '@/domain/types'
@@ -13,8 +13,6 @@ import { type Get, type Set, now, randomPassword, withAudit } from './helpers'
 export interface WorkbenchActions {
   /** 坐席发消息（带引用 / @ / 群发标记之外的扩展参数） */
   seatSendRich: (input: { convId: string; seatId: string; operatorId: string; text: string; replyToId?: string; mentionAll?: boolean; selectedMentions?: { mentionSeatIds: string[]; mentionCustomerIds: string[] }; kind?: 'text' | 'image' | 'file'; media?: MessageMedia; aiDraftUsed?: boolean }) => void
-  /** 撤回自己的消息：时限内可用，返回是否成功 */
-  recallMessage: (messageId: string, byStaffId: string) => boolean
   editMessage: (messageId: string, text: string, byStaffId: string, expectedText: string) => string | null
   /** 坐席（群主或有 can_delete_messages 的管理员）删除群里别人的消息 */
   seatDeleteMessage: (messageId: string, seatId: string, byStaffId: string) => void
@@ -41,17 +39,11 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
     seatSendRich: (input) => {
       get().queueChatMessage({ ...input, actor: {kind:'seat',id:input.seatId,staffId:input.operatorId} })
     },
-    recallMessage: (id, staffId) => {
-      const m=get().messages.find((x)=>x.id===id)
-      if(!m?.seatId||m.senderKind!=='seat')return false
-      return get().deleteChatMessages([id],{kind:'seat',id:m.seatId,staffId},true).ok
-    },
-
     editMessage: (messageId, text, byStaffId, expectedText) => {
       const s = get()
       const m = s.messages.find((x) => x.id === messageId)
       if (!m || m.senderKind !== 'seat' || !m.seatId || !seatConversationAllowed(s, m.convId, m.seatId, byStaffId) || !seatCan(s, m.seatId, 'dm.edit')) return '当前身份不能编辑这条消息'
-      if (m.recalledAt || m.deletedAt) return '消息已撤回或删除，不能编辑'
+      if (m.deletedAt) return '消息已删除，不能编辑'
       if (m.text !== expectedText) return '消息已被其他窗口修改，请重新打开编辑'
       if (messageLimitSeconds(s, 'seat', 'edit') > 0 && Date.now() - new Date(m.at).getTime() > messageLimitSeconds(s, 'seat', 'edit') * 1000) return '已超过后台设置的编辑时限'
       const body = text.trim()
@@ -163,7 +155,7 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
       const conv = s.conversations.find((c) => c.id === m?.convId)
       const member = conv?.kind === 'dm' ? conv.customerId === customerId : s.chatGroups.some((g) => g.id === conv?.chatGroupId && g.memberCustomerIds.includes(customerId))
       if (!m || m.senderKind !== 'customer' || m.senderId !== customerId || !member || !customerCan(s, customerId, 'dm.edit', conv?.chatGroupId)) return '当前身份不能编辑这条消息'
-      if (m.recalledAt || m.deletedAt) return '消息已撤回或删除，不能编辑'
+      if (m.deletedAt) return '消息已删除，不能编辑'
       if (m.text !== expectedText) return '消息已被其他窗口修改，请重新打开编辑'
       const limit = messageLimitSeconds(s, 'customer', 'edit')
       if (limit > 0 && Date.now() - new Date(m.at).getTime() > limit * 1000) return '已超过后台设置的编辑时限'

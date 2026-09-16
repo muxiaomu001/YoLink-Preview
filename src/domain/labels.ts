@@ -78,7 +78,7 @@ export const AUDIT_LABEL: Record<AuditType, string> = {
   'group.invite_link': '群邀请链接',
   'group.create': '建群',
   'message.edit': '编辑消息',
-  'message.recall': '撤回消息',
+  'message.recall': '为所有人删除消息',
   'customer.block': '拉黑客户',
   'customer.mute': '禁言客户',
   'customer.reset_password': '重置客户密码',

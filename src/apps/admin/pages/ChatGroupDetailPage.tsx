@@ -70,7 +70,7 @@ function RecentMessagesCard({ group }: { group: ChatGroup }) {
               </span>
               <span className="tabular-nums text-zinc-400">{fmtDateTime(m.at)}</span>
             </div>
-            <div className={m.deletedAt || m.recalledAt ? 'mt-0.5 text-zinc-400 italic' : m.senderKind === 'system' ? 'mt-0.5 text-zinc-400' : 'mt-0.5 text-zinc-700'}>{visibleText(m, 'staff')}</div>
+            <div className={m.deletedAt ? 'mt-0.5 text-zinc-400 italic' : m.senderKind === 'system' ? 'mt-0.5 text-zinc-400' : 'mt-0.5 text-zinc-700'}>{visibleText(m, 'staff')}</div>
           </li>
         ))}
       </ul>

@@ -142,9 +142,11 @@ export function senderName(s: DemoState, m: Message): string {
   return '系统'
 }
 
-/** 撤回或删除后各端看到的占位文本 */
+/**
+ * 正文文本。已删除的消息不会出现在任何一端的普通聊天里，
+ * 这里的占位只服务后台审计视图：管理员能看到原文和删除方式。
+ */
 export function visibleText(m: Message, viewer: 'customer' | 'staff'): string {
-  if (m.recalledAt) return viewer === 'staff' ? `[已撤回] ${m.text}` : '消息已撤回'
-  if (m.deletedAt) return viewer === 'staff' ? `[已删除] ${m.text}` : '消息已被管理员删除'
+  if (m.deletedAt) return viewer === 'staff' ? `[${m.deletedByManager ? '管理删除' : '已删除'}] ${m.text}` : ''
   return m.text
 }

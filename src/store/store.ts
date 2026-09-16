@@ -556,7 +556,15 @@ export const useStore = create<DemoStore>()(
           chatRulesVersion: 1,
           policyMatrix: saved.chatRulesVersion ? (saved.policyMatrix ?? current.policyMatrix) : { ...(saved.policyMatrix ?? current.policyMatrix), 'dm.recall': { staff: (saved.policyMatrix ?? current.policyMatrix)['dm.recall']?.staff ?? true, customer: false } },
           policyNumbers: { ...current.policyNumbers, ...saved.policyNumbers },
-          policyItems: (saved.policyItems ?? current.policyItems).map((item) => item.key === 'dm.edit' ? { ...item, level: 'P0' as const } : item.key === 'dm.recall' ? { ...item, label: '撤回自己发出的消息', desc: '撤回即为所有人删除，会留下「已撤回」痕迹；按客户 / 坐席独立开关，时限见数值型策略' } : item),
+          policyItems: (saved.policyItems ?? current.policyItems).map((item) => item.key === 'dm.edit' ? { ...item, level: 'P0' as const } : item.key === 'dm.recall' ? { ...item, label: '为所有人删除自己发出的消息', desc: '两端普通聊天里直接消失、不留占位，原文保留审计；按客户 / 坐席独立开关，时限见数值型策略' } : item),
+          // 旧数据里「撤回」是独立状态，现在统一成删除：已撤回的一律按已删除处理，免得刷新后重新冒出来
+          messages: (saved.messages ?? current.messages).map((m) => {
+            const legacy = m as typeof m & { recalledAt?: string }
+            if (!legacy.recalledAt) return m
+            const { recalledAt: _r, ...rest } = legacy
+            void _r
+            return { ...rest, deletedAt: legacy.deletedAt ?? legacy.recalledAt }
+          }),
         }
       },
       storage: createJSONStorage(() => localStorage),

@@ -19,9 +19,9 @@ interface NumberField {
 
 /** 顺序与 PRD 05 数值型策略表一致 */
 const FIELDS: NumberField[] = [
-  { key: 'seatRecallSeconds', label: '坐席撤回时限', unit: '秒', defaultValue: 120 },
+  { key: 'seatRecallSeconds', label: '坐席「为所有人删除」时限', unit: '秒', defaultValue: 120 },
   { key: 'seatEditSeconds', label: '坐席编辑时限', unit: '秒', defaultValue: 900 },
-  { key: 'customerRecallSeconds', label: '客户撤回时限', unit: '秒', defaultValue: 120 },
+  { key: 'customerRecallSeconds', label: '客户「为所有人删除」时限', unit: '秒', defaultValue: 120 },
   { key: 'customerEditSeconds', label: '客户编辑时限', unit: '秒', defaultValue: 900 },
   { key: 'groupMaxMembers', label: '单群上限', unit: '人', defaultValue: 10000 },
   { key: 'slowModeSeconds', label: '发言限流默认间隔', unit: '秒', defaultValue: 0, hint: '0 为关闭；策略键 group.slow_mode_seconds。群设置里的六档下拉 P2' },

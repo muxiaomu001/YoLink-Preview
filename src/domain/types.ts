@@ -482,10 +482,10 @@ export interface Message {
   mentionAll?: boolean
   aiDraftUsed?: boolean
   isWelcome?: boolean
-  /** 管理员删除：内容对客户不可见，审计仍可查 */
+  /** 为所有人删除：普通聊天中直接消失、不留占位；原文与操作人保留在审计 */
   deletedAt?: ISODate
-  /** 发送者自己撤回：所有端不再显示内容，审计仍可查 */
-  recalledAt?: ISODate
+  /** 该次删除是否由管理权限发起（而非作者本人），只用于审计区分 */
+  deletedByManager?: boolean
   editedAt?: ISODate
   /** 编辑前的正文留在本地审计数据中 */
   editHistory?: { text: string; at: ISODate; operatorId: string }[]

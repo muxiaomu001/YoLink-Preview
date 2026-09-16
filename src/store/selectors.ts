@@ -56,7 +56,6 @@ export function unreadForSeat(s: DemoState, conv: Conversation, seatId?: string)
   for (let i = list.length - 1; i >= 0; i -= 1) {
     const m = list[i]
     if (readAt && m.at <= readAt) break
-    if (m.recalledAt || m.deletedAt) continue
     if (m.senderKind === 'customer' || m.senderKind === 'bot') n += 1
     else if (!readAt && m.senderKind === 'seat' && (!seatId || m.seatId === seatId)) break
     else if (m.senderKind === 'seat' && m.seatId !== seatId) n += 1
@@ -95,7 +94,7 @@ export function conversationsForSeat(s: DemoState, seatId: string): ConvRow[] {
         return {
           conv,
           title: customer?.nickname ?? '未知客户',
-          subtitle: last?.recalledAt ? '[已撤回]' : last?.deletedAt ? '[已删除]' : last?.text ?? '',
+          subtitle: last?.text ?? '',
           customer,
           last,
           unread: unreadForSeat(s, conv, seatId),
@@ -108,11 +107,11 @@ export function conversationsForSeat(s: DemoState, seatId: string): ConvRow[] {
       }
       const g = s.chatGroups.find((x) => x.id === conv.chatGroupId)
       const list = visibleMessages
-      const mentioned = list.some((m) => !m.recalledAt && !m.deletedAt && (m.mentionSeatIds?.includes(seatId) || m.mentionAll) && m.senderId !== seatId && m.at > (conv.readAtBySeat?.[seatId] ?? ''))
+      const mentioned = list.some((m) => (m.mentionSeatIds?.includes(seatId) || m.mentionAll) && m.senderId !== seatId && m.at > (conv.readAtBySeat?.[seatId] ?? ''))
       return {
         conv,
         title: g?.name ?? '群',
-        subtitle: last ? `${senderName(s, last)}：${last.recalledAt ? '[已撤回]' : last.deletedAt ? '[已删除]' : last.text}` : '',
+        subtitle: last ? `${senderName(s, last)}：${last.text}` : '',
         last,
         unread: unreadForSeat(s, conv, seatId),
         waitingSince: null,

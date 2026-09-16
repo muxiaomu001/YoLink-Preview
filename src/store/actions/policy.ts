@@ -18,11 +18,11 @@ export interface PolicyActions {
 }
 
 const NUMBER_LABEL: Record<keyof PolicyNumbers, string> = {
-  seatRecallSeconds: '坐席撤回时限',
+  seatRecallSeconds: '坐席「为所有人删除」时限',
   seatEditSeconds: '坐席编辑时限',
-  customerRecallSeconds: '客户撤回时限',
+  customerRecallSeconds: '客户「为所有人删除」时限',
   customerEditSeconds: '客户编辑时限',
-  recallSeconds: '旧版统一撤回时限',
+  recallSeconds: '旧版统一删除时限',
   editSeconds: '消息编辑时限',
   groupMaxMembers: '单群上限',
   slowModeSeconds: '发言限流默认间隔',

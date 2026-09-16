@@ -133,7 +133,7 @@ export function MessageAuditPage() {
     {
       key: 'text',
       title: '消息内容',
-      render: (m) => (m.deletedAt || m.recalledAt ? <span className="italic text-zinc-400">{m.recalledAt ? '[已撤回] ' : '[已删除] '}{m.text}</span> : <span className="line-clamp-2 max-w-md text-zinc-800">{messageText(m)}</span>),
+      render: (m) => (m.deletedAt ? <span className="italic text-zinc-400">{m.deletedByManager ? '[管理删除] ' : '[已删除] '}{m.text}</span> : <span className="line-clamp-2 max-w-md text-zinc-800">{messageText(m)}</span>),
     },
     {
       key: 'ops',

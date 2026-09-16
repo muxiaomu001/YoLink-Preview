@@ -56,9 +56,9 @@ export function ChatsScreen({ customerId, onOpen }: { customerId: string; onOpen
       <div className="thin-scroll flex-1 overflow-y-auto">
         {rows.filter((r)=>!r.conv.hiddenAtByViewer?.[`customer:${customerId}`] || (r.last?.at??'')>r.conv.hiddenAtByViewer[`customer:${customerId}`]).map((r) => {
           const last = r.last
-          const mentioned = messagesOf(s, r.conv.id).some((m) => messageVisibleFor(s,m,{kind:'customer',id:customerId}) && !m.recalledAt && !m.deletedAt && m.senderId !== customerId && (m.mentionAll || m.mentionCustomerIds?.includes(customerId)) && m.at > (r.conv.readAtByCustomer?.[customerId] ?? ''))
+          const mentioned = messagesOf(s, r.conv.id).some((m) => messageVisibleFor(s,m,{kind:'customer',id:customerId}) && m.senderId !== customerId && (m.mentionAll || m.mentionCustomerIds?.includes(customerId)) && m.at > (r.conv.readAtByCustomer?.[customerId] ?? ''))
           const prefix = !last || last.senderKind === 'system' ? '' : last.senderKind === 'customer' && last.senderId === customerId ? '我：' : r.conv.kind === 'dm' ? '' : `${senderName(s, last)}：`
-          const unread = messagesOf(s, r.conv.id).filter((m) => messageVisibleFor(s,m,{kind:'customer',id:customerId}) && !m.recalledAt && !m.deletedAt && m.senderKind !== 'system' && m.senderId !== customerId && m.at > (r.conv.readAtByCustomer?.[customerId] ?? '')).length
+          const unread = messagesOf(s, r.conv.id).filter((m) => messageVisibleFor(s,m,{kind:'customer',id:customerId}) && m.senderKind !== 'system' && m.senderId !== customerId && m.at > (r.conv.readAtByCustomer?.[customerId] ?? '')).length
           return (
             <button key={r.conv.id} type="button" onClick={() => onOpen(r.conv.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left active:bg-zinc-50">
               {r.seat ? <SeatAvatar seat={r.seat} size={44} /> : r.group ? <GroupAvatar g={r.group} size={44} /> : null}

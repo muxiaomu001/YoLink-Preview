@@ -1,12 +1,12 @@
 /**
  * 单条消息：系统消息灰色居中；文本 URL 自动成链接；图片消息显示缩略图（点开大图）、文件消息显示文件卡，说明文字在下方；
- * 引用条可跳转；撤回 / 删除用占位；机器人、群发、转发、AI 草稿、欢迎语小标；文字菜单按权限显示（引用、撤回、删除、转发、复制、置顶）。
+ * 引用条可跳转；已删除的消息不进列表、不留占位；机器人、群发、转发、AI 草稿、欢迎语小标；文字菜单按权限显示（引用、删除、转发、复制、置顶）。
  */
 import { useCallback, useState } from 'react'
 import { clsx } from 'clsx'
-import { Bot, CheckSquare, Copy, Forward, MoreHorizontal, Pencil, Pin, Reply, Trash2, Undo2 } from 'lucide-react'
+import { Bot, CheckSquare, Copy, Forward, MoreHorizontal, Pencil, Pin, Reply, Trash2 } from 'lucide-react'
 import type { ChatGroup, Message, Seat } from '@/domain/types'
-import { channelOf, deleteAllBlock, messageVisibleFor } from '@/domain/messageRules'
+import { channelOf, messageVisibleFor } from '@/domain/messageRules'
 import { fmtDateTime, fmtTime } from '@/domain/time'
 import { botById, seatCan, seatGroupPerm, senderName } from '@/store/policy'
 import { customerById, seatById, staffById } from '@/store/selectors'
@@ -60,7 +60,6 @@ export function MessageItem({
   const channel = channelOf(s,m)
   const isGroup = !!group
   const mine = m.senderKind === 'seat' && m.seatId === seat.id
-  const gone = !!m.recalledAt || !!m.deletedAt
   const otherSeat = m.senderKind === 'seat' && !mine ? seatById(s, m.seatId) : undefined
   const customer = m.senderKind === 'customer' ? customerById(s, m.senderId) : undefined
   const bot = m.senderKind === 'bot' ? botById(s, m.senderId) : undefined
@@ -72,17 +71,10 @@ export function MessageItem({
   const bubbleCls = channel ? 'bg-white text-zinc-800 shadow-sm' : mine ? 'bg-brand-700 text-white' : otherSeat ? 'bg-brand-50 text-brand-900' : bot ? 'bg-purple-50 text-purple-950' : 'bg-white text-zinc-800 shadow-sm'
 
   // 操作权限
-  const showForward = !gone && seatCan(s, seat.id, isGroup ? 'group.forward' : 'dm.forward', group?.id)
-  const showPin = isGroup && !gone && !pinned && seatGroupPerm(s, group, seat.id, staff?.id ?? null, 'can_pin_messages')
+  const showForward = seatCan(s, seat.id, isGroup ? 'group.forward' : 'dm.forward', group?.id)
+  const showPin = isGroup && !pinned && seatGroupPerm(s, group, seat.id, staff?.id ?? null, 'can_pin_messages')
 
   const copy = async () => toast((await copyText(m.text)) ? '已复制' : '复制失败：浏览器不允许访问剪贴板', 'info')
-
-  // 撤回 = 为所有人删除自己的消息，受后台「撤回时限」约束；超时后保留为禁用项，让后台开关的效果可见
-  const recallBlock = mine && !gone ? deleteAllBlock(s, m, actor) : '不是自己发出的消息'
-  const recall = () => {
-    if (!staff) return
-    toast(s.recallMessage(m.id, staff.id) ? '已撤回' : '撤回失败，消息可能已不可用', 'info')
-  }
 
   const actions: MessageMenuAction[] = [
     { label: quoteSelection ? '引用所选文字' : '回复', icon: Reply, section: 0, onSelect: () => onReply(m,quoteSelection||undefined) },
@@ -91,7 +83,7 @@ export function MessageItem({
     ...(showPin ? [{ label: '置顶消息', icon: Pin, section: 1, onSelect: () => onPin(m) }] : []),
     ...(showForward ? [{ label: '转发', icon: Forward, section: 1, opensPicker: true, onSelect: () => onForward(m) }] : []),
     ...(onSelect ? [{ label: '选择多条', icon: CheckSquare, section: 1, onSelect: () => onSelect(m) }] : []),
-    ...(mine && !gone ? [{ label: '撤回', icon: Undo2, section: 2, disabled: !!recallBlock, hint: recallBlock, onSelect: recall }] : []),
+    // 只有一个删除入口，范围（仅本方 / 为所有人）在弹窗里选，超时或无权限时那一项自动置灰
     { label: '删除', icon: Trash2, section: 2, danger: true, onSelect: () => setDeleting(true) },
   ]
 
@@ -107,7 +99,7 @@ export function MessageItem({
   return (
     <div id={`msg-${m.id}`} data-message-id={m.id} className={clsx('rounded-md transition-shadow', current && 'ring-2 ring-amber-300', selected && 'bg-brand-100/60 ring-1 ring-brand-300')}>
       {showDate && <div className="my-3 text-center text-[11px] text-zinc-400">{fmtDateTime(m.at).slice(0, 10)}</div>}
-      <div onContextMenu={(e) => { e.preventDefault(); if (gone) return; const selection=window.getSelection();const text=selection?.toString().trim()??'';setQuoteSelection(selection?.anchorNode&&e.currentTarget.contains(selection.anchorNode)&&text&&m.text.includes(text)?text.slice(0,1024):'');positionMenu(e.clientX, e.clientY); setMenuOpen(true) }} className={clsx('group relative mb-3.5 flex gap-2.5', mine && !channel && 'flex-row-reverse')}>
+      <div onContextMenu={(e) => { e.preventDefault(); const selection=window.getSelection();const text=selection?.toString().trim()??'';setQuoteSelection(selection?.anchorNode&&e.currentTarget.contains(selection.anchorNode)&&text&&m.text.includes(text)?text.slice(0,1024):'');positionMenu(e.clientX, e.clientY); setMenuOpen(true) }} className={clsx('group relative mb-3.5 flex gap-2.5', mine && !channel && 'flex-row-reverse')}>
         {channel ? <Avatar text={channel.name} color="#b45309" size={30} official={channel.official} /> : mine ? <SeatAvatar seat={seat} size={30} /> : otherSeat ? <SeatAvatar seat={otherSeat} size={30} /> : bot ? <Avatar text={bot.nickname} size={30} color={bot.avatarColor} /> : <Avatar text={customer?.nickname ?? '?'} size={30} />}
         <div className={clsx('max-w-[70%]', mine && !channel && 'items-end text-right')}>
           {(channel || !mine && (isGroup || bot)) && (
@@ -125,10 +117,10 @@ export function MessageItem({
               className={clsx('mb-0.5 block max-w-full truncate rounded border-l-2 border-brand-400 bg-zinc-100 px-2 py-0.5 text-left text-[11px] text-zinc-500 hover:bg-zinc-200', mine && 'ml-auto')}
               title="点击跳到原消息"
             >
-              {senderName(s, replyTo)}：{replyTo.recalledAt || replyTo.deletedAt ? '原消息已不可用' : (m.quoteText&&replyTo.text.includes(m.quoteText)?m.quoteText:replyTo.text).slice(0,120)}
+              {senderName(s, replyTo)}：{(m.quoteText&&replyTo.text.includes(m.quoteText)?m.quoteText:replyTo.text).slice(0,120)}
             </button>
           )}
-          {!gone && hasMedia ? (
+          {hasMedia ? (
             // 图片 / 文件消息：附件不包在气泡里，说明文字单独一个小气泡
             <div className={clsx('inline-flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
               {m.forwardedFrom && <div className="text-[11px] text-zinc-400">转发自 {m.forwardedFrom.name??'原会话'}</div>}
@@ -136,18 +128,18 @@ export function MessageItem({
               {m.text && <div className={clsx('rounded-lg px-3 py-1.5 text-left text-[13px] leading-relaxed whitespace-pre-wrap', bubbleCls)}>{<MessageText m={m} highlight={highlight} />}</div>}
             </div>
           ) : (
-            <div className={clsx('inline-block rounded-lg px-3 py-2 text-left text-[13px] leading-relaxed whitespace-pre-wrap', gone ? 'bg-zinc-100 text-zinc-400 italic' : bubbleCls)}>
+            <div className={clsx('inline-block rounded-lg px-3 py-2 text-left text-[13px] leading-relaxed whitespace-pre-wrap', bubbleCls)}>
               {m.forwardedFrom && <div className={clsx('mb-0.5 text-[11px]', mine ? 'text-brand-100' : 'text-zinc-400')}>转发自 {m.forwardedFrom.name??'原会话'}</div>}
-              {gone ? '消息已撤回' : <MessageText m={m} highlight={highlight} />}
+              <MessageText m={m} highlight={highlight} />
             </div>
           )}
           <div className={clsx('mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400', mine && !channel && 'justify-end')}>
             <span className="tabular-nums">{fmtTime(m.at)}</span>
-            {m.editedAt && !gone && <span title={`修改于 ${fmtDateTime(m.editedAt)}`}>已编辑</span>}
+            {m.editedAt && <span title={`修改于 ${fmtDateTime(m.editedAt)}`}>已编辑</span>}
             {m.channelSignature && <span>{m.channelSignature}</span>}
-            {mine && !gone && <MessageDelivery message={m} actor={actor} />}
-            {!gone && (!m.delivery || m.delivery === 'sent') && (mine || group) && <MessageReceipt m={m} staffSeatId={seat.id} />}
-            {pinned && !gone && <span className="inline-flex items-center gap-0.5 text-amber-600"><Pin size={10} />已置顶</span>}
+            {mine && <MessageDelivery message={m} actor={actor} />}
+            {(!m.delivery || m.delivery === 'sent') && (mine || group) && <MessageReceipt m={m} staffSeatId={seat.id} />}
+            {pinned && <span className="inline-flex items-center gap-0.5 text-amber-600"><Pin size={10} />已置顶</span>}
             {m.isWelcome && <span className="rounded bg-zinc-100 px-1">欢迎语</span>}
             {m.isBroadcast && <span className="rounded bg-amber-50 px-1 text-amber-700">群发</span>}
             {m.aiDraftUsed && <span className="rounded bg-violet-50 px-1 text-violet-600">AI 草稿</span>}
@@ -156,8 +148,8 @@ export function MessageItem({
             {bot && m.operatorId && can('view_seat_operator') && <span title="客户看不到这个">手动：{staffById(s, m.operatorId)?.name}</span>}
           </div>
         </div>
-        {!gone && <button type="button" id={`menu-trigger-${m.id}`} aria-label="更多消息操作" aria-haspopup="menu" aria-expanded={menuOpen} title="更多消息操作（也可右键消息）" className={clsx('self-start rounded p-1 text-zinc-400 transition-opacity hover:bg-zinc-200 hover:text-zinc-700 focus-visible:opacity-100 group-hover:opacity-100', menuOpen ? 'opacity-100' : 'opacity-0')} onClick={(e) => { setQuoteSelection('');const rect = e.currentTarget.getBoundingClientRect(); positionMenu(rect.left, rect.bottom + 4); setMenuOpen((v) => !v) }}><MoreHorizontal size={16} /></button>}
-        {menuOpen && !gone && <MessageActionMenu triggerId={`menu-trigger-${m.id}`} actions={actions} position={menuPosition} onClose={closeMenu} />}
+        <button type="button" id={`menu-trigger-${m.id}`} aria-label="更多消息操作" aria-haspopup="menu" aria-expanded={menuOpen} title="更多消息操作（也可右键消息）" className={clsx('self-start rounded p-1 text-zinc-400 transition-opacity hover:bg-zinc-200 hover:text-zinc-700 focus-visible:opacity-100 group-hover:opacity-100', menuOpen ? 'opacity-100' : 'opacity-0')} onClick={(e) => { setQuoteSelection('');const rect = e.currentTarget.getBoundingClientRect(); positionMenu(rect.left, rect.bottom + 4); setMenuOpen((v) => !v) }}><MoreHorizontal size={16} /></button>
+        {menuOpen && <MessageActionMenu triggerId={`menu-trigger-${m.id}`} actions={actions} position={menuPosition} onClose={closeMenu} />}
       </div>
       {deleting && <DeleteMessagesModal ids={[m.id]} actor={actor} onClose={() => setDeleting(false)} />}
       {editing && <EditMessage message={m} onClose={() => setEditing(false)} />}

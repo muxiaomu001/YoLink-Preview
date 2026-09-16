@@ -25,8 +25,6 @@ export function activeFilterCount(f: Filters): number {
 
 export function previewOf(m: Message | undefined): string {
   if (!m) return ''
-  if (m.recalledAt) return '[已撤回]'
-  if (m.deletedAt) return '[已删除]'
   if(m.kind==='video')return '[视频] '+m.text
   if(m.kind==='voice')return '[语音] '+m.text
   if(m.media?.album)return `[图片 ${m.media.album.length} 张] ${m.text}`
