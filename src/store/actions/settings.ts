@@ -4,7 +4,6 @@
 import type { AppPlatform, AppVersion, Backup, DailyReportSettings, DemoState, ModuleKey } from '@/domain/types'
 import { MODULE_LABEL } from '@/domain/labels'
 import { newId } from '@/domain/ids'
-import { iso } from '@/domain/time'
 import { type Get, type Set, now, withAudit } from './helpers'
 
 export interface SettingsActions {
@@ -13,8 +12,6 @@ export interface SettingsActions {
   testStorageConnection: () => boolean
   toggleModule: (key: ModuleKey, on: boolean, byStaffId: string) => void
   updateAppVersion: (platform: AppPlatform, patch: Partial<AppVersion>, byStaffId: string) => void
-  /** 上传新许可文件：演示里把到期日延一年 */
-  uploadLicense: (byStaffId: string) => void
   triggerBackup: (byStaffId: string) => Backup
   restoreBackup: (id: string, byStaffId: string) => void
   runHealthCheck: () => void
@@ -72,15 +69,6 @@ export function settingsActions(set: Set, get: Get): SettingsActions {
         appVersions: s.appVersions.map((v) => (v.platform === platform ? { ...v, ...patch } : v)),
         audit: withAudit(s.audit, 'app_version.update', `更新 ${platform} 版本信息：${Object.keys(patch).join('、')}`, byStaffId),
       })),
-
-    uploadLicense: (byStaffId) =>
-      set((s) => {
-        const next = iso(new Date(s.license.expiresAt).getTime() + 365 * 86400000)
-        return {
-          license: { ...s.license, expiresAt: next, modules: s.license.modules.map((m) => ({ ...m, enabled: true, expiresAt: next })) },
-          audit: withAudit(s.audit, 'license.upload', `上传新许可文件，到期日延至 ${next.slice(0, 10)}，全部模块授权即时生效`, byStaffId),
-        }
-      }),
 
     triggerBackup: (byStaffId) => {
       const s = get()

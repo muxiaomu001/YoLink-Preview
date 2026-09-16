@@ -55,6 +55,7 @@ import { WbSettingsPage } from '@/apps/workbench/pages/WbSettingsPage'
 import { BotsPage } from '@/apps/workbench/pages/BotsPage'
 import { WithdrawalsPage } from '@/apps/workbench/pages/WithdrawalsPage'
 import { PhoneApp } from '@/apps/phone/PhoneApp'
+import { ProviderApp } from '@/apps/provider/ProviderApp'
 
 const router = createBrowserRouter([
   { path: '/', element: <Landing /> },
@@ -133,6 +134,7 @@ const router = createBrowserRouter([
     ],
   },
   { path: '/phone', element: <PhoneApp /> },
+  { path: '/provider', element: <ProviderApp /> },
   { path: '*', element: <Navigate to="/" replace /> },
 ], { basename: import.meta.env.BASE_URL.replace(/\/$/, '') })
 

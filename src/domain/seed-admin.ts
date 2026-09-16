@@ -31,6 +31,8 @@ import type {
   PolicyNumbers,
   PolicyOverride,
   PolicyPreset,
+  ProviderInstance,
+  ProviderLicenseAction,
   ProfileSyncSettings,
   ReferralAnomaly,
   ReferralRules,
@@ -245,7 +247,7 @@ export const BANNERS: Banner[] = [
 
 export const ANNOUNCEMENTS: Announcement[] = [
   { id: 'an_1', title: '系统维护通知', body: '9 月 20 日 02:00 至 04:00（香港时间）进行系统维护，期间账户查询可能短暂不可用，交易不受影响。', buttonText: '我知道了', buttonAction: 'close', kind: 'popup', startAt: ago(2), endAt: iso(agoMs(-5)), showMode: 'once', impressions: 612 },
-  { id: 'an_2', title: '合规提示：谨防冒充顾问收款', body: '恒信财富所有资金往来均通过您本人名下的托管账户，顾问不会要求您向个人账户转账。', buttonText: '查看详情', buttonAction: 'link', url: 'https://hxwm.example/compliance', kind: 'bar', startAt: ago(20), endAt: ago(3), showMode: 'every', impressions: 4380 },
+  { id: 'an_2', title: '合规提示：谨防冒充顾问收款', body: '恒信财富所有资金往来均通过您本人名下的托管账户，顾问不会要求您向个人账户转账。', buttonText: '查看详情', buttonAction: 'link', url: 'https://hxwm.example/compliance', kind: 'bar', startAt: ago(20), endAt: iso(agoMs(-30)), showMode: 'every', impressions: 4380 },
 ]
 
 // ---------- AI ----------
@@ -415,6 +417,51 @@ export const LICENSE: License = {
     { key: 'referral', name: '推荐奖励', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-110)) },
   ],
 }
+
+export const PROVIDER_INSTANCES: ProviderInstance[] = [
+  {
+    id: 'pi_hxwm',
+    enterpriseName: '恒信财富',
+    enterpriseCode: 'HXWM',
+    deviceCode: 'HX-PROD-7C2A-91F4',
+    instanceId: LICENSE.instanceId,
+    version: LICENSE.version,
+    boundAt: ago(168),
+    expiresAt: LICENSE.expiresAt,
+    stoppedAt: null,
+    stopReason: null,
+  },
+  {
+    id: 'pi_yhjy',
+    enterpriseName: '远航教育',
+    enterpriseCode: 'YHJY',
+    deviceCode: 'YH-PROD-38B1-2D6E',
+    instanceId: '14d81e39-5f32-4ac8-9b63-bd6f151b08af',
+    version: 'v1.0.2',
+    boundAt: ago(403),
+    expiresAt: ago(12),
+    stoppedAt: null,
+    stopReason: null,
+  },
+  {
+    id: 'pi_dhmy',
+    enterpriseName: '东海贸易',
+    enterpriseCode: 'DHMY',
+    deviceCode: 'DH-PROD-5E90-11AC',
+    instanceId: '742f6c3e-9a20-4662-8f19-8fb1adf49a2d',
+    version: 'v1.0.1',
+    boundAt: ago(95),
+    expiresAt: iso(agoMs(-40)),
+    stoppedAt: ago(2),
+    stopReason: '客户确认暂停本期服务',
+  },
+]
+
+export const PROVIDER_LICENSE_ACTIONS: ProviderLicenseAction[] = [
+  { id: 'pla_1', instanceId: PROVIDER_INSTANCES[2].instanceId, at: ago(2), operatorName: '供应方管理员', action: 'stop', detail: '人工停用：客户确认暂停本期服务' },
+  { id: 'pla_2', instanceId: PROVIDER_INSTANCES[0].instanceId, at: ago(16), operatorName: '供应方管理员', action: 'renew', detail: '续期 12 个月，到期日更新' },
+  { id: 'pla_3', instanceId: PROVIDER_INSTANCES[1].instanceId, at: ago(403), operatorName: '供应方管理员', action: 'bind', detail: '绑定企业部署实例设备码' },
+]
 
 export const BACKUPS: Backup[] = [
   { id: 'bk_1', at: ago(0, 3), sizeMb: 412, status: 'done' },
@@ -598,6 +645,8 @@ export function buildAdminSeed(ctx: AdminSeedContext) {
     webhookLogs: buildWebhookLogs(),
     appVersions: APP_VERSIONS,
     license: LICENSE,
+    providerInstances: PROVIDER_INSTANCES,
+    providerLicenseActions: PROVIDER_LICENSE_ACTIONS,
     backups: BACKUPS,
     health: HEALTH,
     dailyStats: buildDailyStats(customers),

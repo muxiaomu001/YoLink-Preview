@@ -67,7 +67,6 @@ export const AUDIT_LABEL: Record<AuditType, string> = {
   'api_key.delete': '删除 API Key',
   'webhook.update': 'Webhook',
   'app_version.update': 'App 版本',
-  'license.upload': '上传许可',
   'backup.run': '备份',
   'backup.restore': '恢复',
   'group.setting': '群设置',

@@ -45,11 +45,19 @@ import { botActions, type BotActions } from './actions/bots'
 import { aExtraActions, type AExtraActions } from './actions/A-extra'
 import { dExtraActions, type DExtraActions } from './actions/D-extra'
 import { quickReplyActions, type QuickReplyActions } from './actions/quickReplies'
+import { providerLicensingActions, type ProviderLicensingActions } from './actions/providerLicensing'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
 export const STORAGE_KEY = 'yolink-demo-v11'
 
 const now = () => iso(Date.now())
+
+function clearStartupSeenState() {
+  if (typeof window === 'undefined') return
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith('yolink-announcement-seen:')) localStorage.removeItem(key)
+  }
+}
 
 function renderWelcome(tpl: string, nickname: string, seatName: string): string {
   return tpl.replace('{{customer.nickname}}', nickname).replace('{{seat.name}}', seatName)
@@ -130,7 +138,7 @@ export interface CoreActions {
   updateTitle: (id: string, patch: Partial<Title>, byStaffId: string) => void
 }
 
-export type DemoActions = ChatExperienceActions & CoreActions & SettingsActions & PeopleActions & PolicyActions & ContentActions & ModuleActions & IntegrationActions & GroupActions & WorkbenchActions & BotActions & AExtraActions & DExtraActions & QuickReplyActions
+export type DemoActions = ChatExperienceActions & CoreActions & SettingsActions & PeopleActions & PolicyActions & ContentActions & ModuleActions & IntegrationActions & GroupActions & WorkbenchActions & BotActions & AExtraActions & DExtraActions & QuickReplyActions & ProviderLicensingActions
 
 export type DemoStore = DemoState & DemoActions
 
@@ -139,7 +147,10 @@ export const useStore = create<DemoStore>()(
     (set, get) => ({
       ...buildSeed(),
 
-      resetDemo: () => set({ ...buildSeed() }),
+      resetDemo: () => {
+        clearStartupSeenState()
+        set({ ...buildSeed() })
+      },
 
       logAudit: (type, detail, actorStaffId) =>
         set((s) => ({
@@ -698,6 +709,7 @@ export const useStore = create<DemoStore>()(
       ...aExtraActions(set, get),
       ...dExtraActions(set, get),
       ...quickReplyActions(set, get),
+      ...providerLicensingActions(set, get),
     }),
     {
       name: STORAGE_KEY,
@@ -707,6 +719,13 @@ export const useStore = create<DemoStore>()(
         return {
           ...current,
           ...saved,
+          enterprise: {
+            ...current.enterprise,
+            ...saved.enterprise,
+            startupBrand: { ...current.enterprise.startupBrand, ...saved.enterprise?.startupBrand },
+          },
+          providerInstances: saved.providerInstances ?? current.providerInstances,
+          providerLicenseActions: saved.providerLicenseActions ?? current.providerLicenseActions,
           roles: (saved.roles??current.roles).map((role)=>role.id==='role_admin'?{...role,caps:[...role.caps.filter((c)=>c!=='manage_messages'),'manage_messages' as const]}:role),
           chatRulesVersion: 1,
           policyMatrix: saved.chatRulesVersion ? (saved.policyMatrix ?? current.policyMatrix) : { ...(saved.policyMatrix ?? current.policyMatrix), 'dm.recall': { staff: (saved.policyMatrix ?? current.policyMatrix)['dm.recall']?.staff ?? true, customer: false } },

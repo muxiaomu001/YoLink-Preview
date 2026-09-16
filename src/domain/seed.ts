@@ -67,6 +67,13 @@ export const ENTERPRISE: Enterprise = {
   logoText: '恒',
   defaultLanguage: 'zh',
   brandColor: '#1f3b73',
+  startupBrand: {
+    enabled: true,
+    backgroundColor: '#10203f',
+    tagline: '让每一次客户沟通都有延续',
+    durationSeconds: 2,
+    allowSkip: true,
+  },
   agreementUrl: 'https://hxwm.example/legal/terms',
   privacyUrl: 'https://hxwm.example/legal/privacy',
   faqUrl: 'https://hxwm.example/help/faq',

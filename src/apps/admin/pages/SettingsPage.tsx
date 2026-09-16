@@ -153,8 +153,9 @@ function AppearancePane() {
   }
   const ok = allowed.length > 0 && allowed.includes(def)
   return (
-    <Card title="外观">
-      <div className="space-y-4">
+    <div className="space-y-4">
+      <Card title="主题">
+        <div className="space-y-4">
         <div>
           <div className="mb-1.5 text-xs font-medium text-zinc-600">允许的主题（内置四款，至少一款）</div>
           <div className="flex flex-wrap gap-4">
@@ -194,6 +195,71 @@ function AppearancePane() {
         >
           保存
         </Button>
+        </div>
+      </Card>
+      <StartupBrandCard />
+    </div>
+  )
+}
+
+function StartupBrandCard() {
+  const s = useStore()
+  const admin = s.session.adminStaffId!
+  const enterprise = s.enterprise
+  const [form, setForm] = useState(enterprise.startupBrand)
+  const colorOk = HEX_RE.test(form.backgroundColor)
+  const taglineOk = form.tagline.trim().length >= 2 && form.tagline.trim().length <= 32
+
+  return (
+    <Card title="品牌启动页">
+      <div className="grid grid-cols-[1fr_220px] gap-6">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between rounded-md border border-zinc-200 px-3 py-2">
+            <div>
+              <div className="text-xs font-medium text-zinc-700">显示品牌启动页</div>
+              <div className="mt-0.5 text-[11px] text-zinc-500">客户每次冷启动 App 时先看到企业品牌画面。</div>
+            </div>
+            <Switch checked={form.enabled} onChange={(enabled) => setForm((value) => ({ ...value, enabled }))} />
+          </div>
+          <Field label="启动页文案" hint="2 到 32 字">
+            <Input value={form.tagline} maxLength={32} disabled={!form.enabled} onChange={(event) => setForm((value) => ({ ...value, tagline: event.target.value }))} />
+          </Field>
+          <Field label="背景色" hint="使用独立颜色，不跟随客户主题">
+            <ColorPicker value={form.backgroundColor} onChange={(backgroundColor) => setForm((value) => ({ ...value, backgroundColor }))} />
+          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="展示时长">
+              <Select value={form.durationSeconds} disabled={!form.enabled} onChange={(event) => setForm((value) => ({ ...value, durationSeconds: Number(event.target.value) as 1 | 2 | 3 }))}>
+                <option value={1}>1 秒</option>
+                <option value={2}>2 秒</option>
+                <option value={3}>3 秒</option>
+              </Select>
+            </Field>
+            <div className="flex items-end pb-1">
+              <Checkbox checked={form.allowSkip} disabled={!form.enabled} onChange={(allowSkip) => setForm((value) => ({ ...value, allowSkip }))} label="允许客户跳过" />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="primary"
+              disabled={!colorOk || !taglineOk}
+              onClick={() => {
+                s.updateEnterprise({ startupBrand: { ...form, tagline: form.tagline.trim() } }, admin)
+                toast('品牌启动页已保存，客户下次启动生效')
+              }}
+            >
+              保存
+            </Button>
+            {(!colorOk || !taglineOk) && <span className="text-[11px] text-red-600">请填写有效背景色和启动页文案</span>}
+          </div>
+        </div>
+        <div className="overflow-hidden rounded-[24px] border-[6px] border-zinc-900 shadow-lg">
+          <div className="flex h-80 flex-col items-center justify-center px-5 text-center text-white" style={{ background: colorOk ? form.backgroundColor : enterprise.brandColor }}>
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 text-3xl font-semibold ring-1 ring-white/25">{enterprise.logoText}</div>
+            <div className="mt-5 text-xl font-semibold tracking-wide">{enterprise.name}</div>
+            <div className="mt-2 text-xs text-white/70">{form.tagline || '启动页文案'}</div>
+          </div>
+        </div>
       </div>
     </Card>
   )

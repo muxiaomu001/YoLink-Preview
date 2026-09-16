@@ -1,14 +1,11 @@
 /**
  * 版本与许可（PRD 05 1049-1057 行）：信息卡 + 模块授权表 + 上传新许可文件。
  */
-import { Upload } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { fmtDate } from '@/domain/time'
 import { useStore } from '@/store/store'
-import { Button } from '@/ui/primitives'
 import { Card, KV, Note, PageHeader, Pill, Table } from '@/ui/display'
 import { DemoNote } from '@/ui/DemoNote'
-import { toast } from '@/ui/overlay'
-import { confirm } from '@/ui/confirm'
 
 const WARN_DAYS = 30
 const daysUntil = (iso: string) => Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000)
@@ -22,39 +19,24 @@ function ExpiryCell({ at }: { at: string }) {
 
 export function LicensePage() {
   const s = useStore()
-  const admin = s.session.adminStaffId!
   const lic = s.license
+  const providerInstance = s.providerInstances.find((instance) => instance.instanceId === lic.instanceId)
   const left = daysUntil(lic.expiresAt)
   const expiringSoon = left <= WARN_DAYS
-
-  const upload = async () => {
-    const ok = await confirm({
-      title: '上传新许可文件',
-      body: '选择由 YoLink 签发的 .lic 文件，上传后立即生效，无需重启。',
-      okText: '上传并生效',
-    })
-    if (!ok) return
-    s.uploadLicense(admin)
-    toast('许可已更新，到期日延长一年')
-  }
 
   return (
     <div>
       <PageHeader
         title="版本与许可"
-        desc="展示当前版本、授权范围与到期状态，到期前会在这里提醒。"
-        extra={
-          <Button variant="primary" onClick={() => void upload()}>
-            <Upload size={14} /> 上传新许可文件
-          </Button>
-        }
+        desc="展示当前版本、授权范围与到期状态。续期、人工停用和恢复由 YoLink 供应方处理。"
       />
       {expiringSoon && (
         <div className="mb-4">
-          <Note tone="amber">许可将在 {left} 天后到期（{fmtDate(lic.expiresAt)}），请及时续期。</Note>
-          <DemoNote className="mt-2">到期后的聊天、查询、模块停用与宽限期规则待产品确认，演示里不做限制。</DemoNote>
+          <Note tone="amber">{left < 0 ? `许可已于 ${fmtDate(lic.expiresAt)} 到期。到期不会自动停用，请联系 YoLink 供应方续期。` : `许可将在 ${left} 天后到期（${fmtDate(lic.expiresAt)}），请联系 YoLink 供应方续期。`}</Note>
         </div>
       )}
+      {providerInstance?.stoppedAt && <Note tone="amber" className="mb-4">此实例已由 YoLink 供应方人工停用。原因：{providerInstance.stopReason}</Note>}
+      <DemoNote className="mb-4">供应方续期和停用操作在独立的<Link to="/provider" target="_blank" className="mx-1 text-brand-700 hover:underline">授权中心</Link>演示；企业管理员在这里不能给自己续期或恢复。</DemoNote>
       <div className="grid grid-cols-[360px_1fr] gap-4">
         <Card title="实例信息">
           <KV
@@ -64,6 +46,8 @@ export function LicensePage() {
               { k: '许可类型', v: lic.type === 'private' ? <Pill tone="blue">私有化部署</Pill> : <Pill tone="purple">SaaS 托管</Pill> },
               { k: '许可到期时间', v: <ExpiryCell at={lic.expiresAt} /> },
               { k: '企业码', v: <span className="font-mono">{s.enterprise.code}</span> },
+              { k: '实例设备码', v: <span className="font-mono text-[11px]">{providerInstance?.deviceCode ?? '-'}</span> },
+              { k: '供应方状态', v: providerInstance?.stoppedAt ? <Pill tone="red">人工停用</Pill> : left < 0 ? <Pill tone="amber">已到期 · 未停用</Pill> : <Pill tone="green">授权中</Pill> },
             ]}
           />
         </Card>

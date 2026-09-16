@@ -77,6 +77,14 @@ export interface StorageConfig {
   lastTestOk: boolean | null
 }
 
+export interface StartupBrand {
+  enabled: boolean
+  backgroundColor: string
+  tagline: string
+  durationSeconds: 1 | 2 | 3
+  allowSkip: boolean
+}
+
 export interface Enterprise {
   id: string
   name: string
@@ -86,6 +94,8 @@ export interface Enterprise {
   logoText: string
   defaultLanguage: Language
   brandColor: string
+  /** 客户端每次冷启动先展示的企业品牌画面 */
+  startupBrand: StartupBrand
   agreementUrl: string
   privacyUrl: string
   faqUrl: string
@@ -600,7 +610,6 @@ export type AuditType =
   | 'api_key.delete'
   | 'webhook.update'
   | 'app_version.update'
-  | 'license.upload'
   | 'backup.run'
   | 'backup.restore'
   | 'group.setting'
@@ -1205,6 +1214,28 @@ export interface License {
   modules: LicenseModule[]
 }
 
+export interface ProviderInstance {
+  id: string
+  enterpriseName: string
+  enterpriseCode: string
+  deviceCode: string
+  instanceId: string
+  version: string
+  boundAt: ISODate
+  expiresAt: ISODate
+  stoppedAt: ISODate | null
+  stopReason: string | null
+}
+
+export interface ProviderLicenseAction {
+  id: string
+  instanceId: string
+  at: ISODate
+  operatorName: string
+  action: 'bind' | 'renew' | 'stop' | 'resume'
+  detail: string
+}
+
 export interface Backup {
   id: string
   at: ISODate
@@ -1301,6 +1332,8 @@ export interface DemoState {
   webhookLogs: WebhookLog[]
   appVersions: AppVersion[]
   license: License
+  providerInstances: ProviderInstance[]
+  providerLicenseActions: ProviderLicenseAction[]
   backups: Backup[]
   health: HealthStatus
   dailyStats: DailyStat[]

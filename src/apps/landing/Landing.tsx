@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, MonitorSmartphone, RotateCcw, Settings2, Smartphone } from 'lucide-react'
+import { ArrowRight, KeyRound, MonitorSmartphone, RotateCcw, Settings2, Smartphone } from 'lucide-react'
 import { useStore } from '@/store/store'
 import { Button } from '@/ui/primitives'
 import { confirm } from '@/ui/confirm'
@@ -10,6 +10,7 @@ const CARDS = [
   { to: '/phone', icon: Smartphone, title: '客户手机屏', who: '客户这边看到什么', desc: '扫码注册、加上官方联系人、聊天和查资料。客户全程只看到「顾问」，看不到背后是谁在操作。' },
   { to: '/workbench', icon: MonitorSmartphone, title: '客服工作台', who: '员工每天在这里干活', desc: '待我回复、AI 推荐回复、话术一键发、客户资料和群发。右下角可以切换成别的员工试。' },
   { to: '/admin', icon: Settings2, title: '管理后台', who: '老板和管理员管什么', desc: '邀请组、员工与坐席、知识库、权限开关、人员交接、经营看板。这里改一个开关，前面两屏立刻生效。' },
+  { to: '/provider', icon: KeyRound, title: '供应方授权中心', who: 'YoLink 供应方管理什么', desc: '绑定企业部署实例，查看到期状态，并执行续期、人工停用和恢复。到期不会自动停用。' },
 ]
 
 const FLOWS = [
@@ -58,7 +59,7 @@ export function Landing() {
           <DemoNoteToggle className="self-start sm:self-auto" />
         </div>
 
-        <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
           {CARDS.map((c) => (
             <Link key={c.to} to={c.to} className="group rounded-xl border border-zinc-200 bg-white p-5 transition-shadow hover:shadow-md">
               <c.icon className="mb-3 text-brand-700" size={22} />

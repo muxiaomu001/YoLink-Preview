@@ -15,6 +15,7 @@ import { ChatsScreen } from './screens/ChatsScreen'
 import { ContactsScreen } from './screens/ContactsScreen'
 import { MeScreen } from './screens/MeScreen'
 import { ChatScreen } from './screens/ChatScreen'
+import { ActiveAnnouncementBar, StartupExperience } from './StartupExperience'
 
 type Tab = 'chats' | 'contacts' | 'me'
 
@@ -32,11 +33,13 @@ export function PhoneApp() {
   const [tab, setTab] = useState<Tab>('chats')
   const [openConv, setOpenConv] = useState<string | null>(() => params.get('conversation'))
   const [justAdded, setJustAdded] = useState<JustAdded | null>(null)
+  const [startupRun, setStartupRun] = useState(0)
 
   const reset = () => {
     setParams({}, { replace: true })
     setOpenConv(null)
     setTab('chats')
+    setStartupRun((value) => value + 1)
   }
   const logout = () => {
     s.setSession({ phoneCustomerId: null })
@@ -60,6 +63,7 @@ export function PhoneApp() {
             ) : (
               <>
                 {/* 软引导只在「消息」页顶上出现一条：可关、关了不再来、任何时候都不挡路 */}
+                {tab === 'chats' && <ActiveAnnouncementBar />}
                 {tab === 'chats' && shouldShowProfileGuide(customer) && <ProfileGuide customer={customer} onGoProfile={() => setTab('me')} />}
                 <div className="min-h-0 flex-1">
                   {tab === 'chats' && <ChatsScreen customerId={customer.id} onOpen={setOpenConv} />}
@@ -77,9 +81,10 @@ export function PhoneApp() {
               </>
             )}
           </div>
+          <StartupExperience key={startupRun} customerId={customer?.id} />
         </div>
 
-        <DemoPanel customerId={customer?.id} onSwitch={reset} />
+        <DemoPanel customerId={customer?.id} onSwitch={reset} onReplayStartup={() => setStartupRun((value) => value + 1)} />
       </div>
     </div>
   )
