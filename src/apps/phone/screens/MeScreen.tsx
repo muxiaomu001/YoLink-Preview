@@ -11,8 +11,9 @@ import { Avatar, TitleChip } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { demoToast } from '@/ui/DemoNote'
-import { DemoHint, LevelTag, Row, SectionLabel, TabTitle } from '../parts'
+import { DemoHint, LevelTag, Row, ScreenHeader, SectionLabel, Sheet, TabTitle } from '../parts'
 import { AppearanceScreen, InfoScreen, NotificationScreen, ProfileScreen } from './MeSubScreens'
+import type { LastSeenVisibility } from '@/domain/types'
 
 type Sub = 'profile' | 'appearance' | 'notification' | 'privacy' | 'storage' | 'security' | 'language' | 'help' | 'about' | 'wallet' | 'referral' | null
 
@@ -27,7 +28,7 @@ export function MeScreen({ customerId, onLoggedOut }: { customerId: string; onLo
   if (sub === 'profile') return <ProfileScreen customerId={customerId} onBack={back} />
   if (sub === 'appearance') return <AppearanceScreen customerId={customerId} onBack={back} />
   if (sub === 'notification') return <NotificationScreen onBack={back} />
-  if (sub === 'privacy') return <InfoScreen title="隐私" onBack={back} rows={[{ label: '手机号可见', value: '我的好友', level: 'P1' }, { label: '最后上线时间', value: '所有人', level: 'P1' }, { label: '头像可见', value: '所有人', level: 'P1' }, { label: '谁可以拉我入群', value: '我的好友', level: 'P1' }]} />
+  if (sub === 'privacy') return <PrivacyScreen customerId={customerId} onBack={back} />
   if (sub === 'storage') return <InfoScreen title="数据与存储" onBack={back} rows={[{ label: '存储用量', value: '128 MB', level: 'P1' }, { label: '清理缓存', level: 'P1' }, { label: '自动下载媒体', value: 'Wi-Fi', level: 'P1' }]} />
   if (sub === 'security') return <InfoScreen title="账号安全" onBack={back} rows={[{ label: '修改密码', level: 'P1' }, { label: '设备管理', value: `最多 ${s.policyNumbers.maxDevices} 台在线`, level: 'P1' }, { label: '两步验证', value: '未开启', level: 'P1' }]} note={c.mustChangePassword ? '客服为你重置过密码，请尽快修改。' : `同一账号最多 ${s.policyNumbers.maxDevices} 台设备同时在线。`} />
   if (sub === 'language') return <InfoScreen title="语言" onBack={back} rows={[{ label: '中文', value: '✓' }, { label: 'English' }]} />
@@ -54,7 +55,7 @@ export function MeScreen({ customerId, onLoggedOut }: { customerId: string; onLo
       <div className="bg-white">
         <TabTitle title="我的" />
         <button type="button" onClick={() => setSub('profile')} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-zinc-50">
-          <Avatar text={c.nickname} size={56} />
+          <Avatar text={c.nickname} color={c.avatarUpdatedAt ? '#2563eb' : undefined} size={56} />
           <div className="min-w-0 flex-1">
             <div className="text-[15px] font-medium text-zinc-900">{c.nickname}</div>
             <div className="text-[11px] text-zinc-400">账号 {c.accountId}</div>
@@ -105,6 +106,52 @@ export function MeScreen({ customerId, onLoggedOut }: { customerId: string; onLo
           <DemoHint>看不到的入口（钱包、签到、邀请好友、注销账号）是模块或策略关了，右侧演示控制面板列出了原因。</DemoHint>
         </div>
       </div>
+    </div>
+  )
+}
+
+const LAST_SEEN_LABEL: Record<LastSeenVisibility, string> = {
+  everyone: '所有人',
+  friends: '我的好友',
+  nobody: '无人',
+}
+
+function PrivacyScreen({ customerId, onBack }: { customerId: string; onBack: () => void }) {
+  const s = useStore()
+  const c = customerById(s, customerId)!
+  const [choosingLastSeen, setChoosingLastSeen] = useState(false)
+  const lastSeenVisibility = c.lastSeenVisibility ?? 'everyone'
+
+  return (
+    <div className="relative flex h-full flex-col bg-zinc-50">
+      <ScreenHeader title="隐私" onBack={onBack} />
+      <div className="mt-2 bg-white">
+        <Row label="手机号可见" value="我的好友" level="P1" />
+        <Row label="最后上线时间" value={LAST_SEEN_LABEL[lastSeenVisibility]} level="P1" onClick={() => setChoosingLastSeen(true)} />
+        <Row label="头像可见" value="所有人" level="P1" />
+        <Row label="谁可以拉我入群" value="我的好友" level="P1" />
+        <Row label="已读回执" value="企业侧使用，不提供关闭" />
+      </div>
+      {choosingLastSeen && (
+        <Sheet title="谁可以看到我的最后上线时间" onClose={() => setChoosingLastSeen(false)}>
+          <div className="space-y-1">
+            {(Object.keys(LAST_SEEN_LABEL) as LastSeenVisibility[]).map((visibility) => (
+              <button
+                key={visibility}
+                type="button"
+                onClick={() => {
+                  s.setCustomerLastSeenVisibility(customerId, visibility)
+                  setChoosingLastSeen(false)
+                }}
+                className="flex w-full items-center justify-between border-b border-zinc-100 py-2.5 text-left last:border-0"
+              >
+                <span>{LAST_SEEN_LABEL[visibility]}</span>
+                {lastSeenVisibility === visibility && <span className="text-brand-700">✓</span>}
+              </button>
+            ))}
+          </div>
+        </Sheet>
+      )}
     </div>
   )
 }

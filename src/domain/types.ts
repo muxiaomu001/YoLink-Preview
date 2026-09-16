@@ -242,6 +242,10 @@ export interface Customer {
   deviceId?: string
   /** 昵称是注册时系统给的默认名，不是客户自己起的；软引导据此提示改名 */
   nicknameAuto?: boolean
+  /** 客户还没自己更换过头像；软引导据此提醒完善资料 */
+  avatarUpdatedAt?: ISODate
+  /** 客户对外展示最后上线时间的范围；不影响企业侧已读回执 */
+  lastSeenVisibility?: LastSeenVisibility
   /** 新号观察期到期时间；按注册时的企业设置算死，后来改设置不追溯已有客户 */
   watchUntil?: ISODate
   /** 客户关掉了注册后的完善资料引导，关了就不再出现 */
@@ -253,6 +257,8 @@ export interface Customer {
   /** 通用字段值（P1） */
   customFields?: Record<string, string>
 }
+
+export type LastSeenVisibility = 'everyone' | 'friends' | 'nobody'
 
 export interface CustomerSeat {
   customerId: string

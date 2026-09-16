@@ -25,10 +25,17 @@ export function ProfileScreen({ customerId, onBack }: { customerId: string; onBa
     <div className="flex h-full flex-col bg-zinc-50">
       <ScreenHeader onBack={onBack} title="个人资料" />
       <div className="flex flex-col items-center bg-white py-4">
-        <Avatar text={c.nickname} size={64} />
+        <Avatar text={c.nickname} color={c.avatarUpdatedAt ? '#2563eb' : undefined} size={64} />
         {c.nicknameAuto && <p className="mt-2 px-6 text-center text-[10px] text-zinc-400">当前昵称是注册时系统发的，改成你自己的名字客服更好认。</p>}
         {canEdit && (
-          <button type="button" onClick={() => demoToast('更换头像')} className="mt-1 text-[11px] text-brand-700">
+          <button
+            type="button"
+            onClick={() => {
+              s.updateCustomerAvatar(customerId)
+              toast('头像已更新')
+            }}
+            className="mt-1 text-[11px] text-brand-700"
+          >
             更换头像
           </button>
         )}
@@ -55,7 +62,7 @@ export function ProfileScreen({ customerId, onBack }: { customerId: string; onBa
           }
           hint="企业发的，不可编辑、不可隐藏"
         />
-        <Row label="手机号" level="P2" value={c.phone ?? '未绑定'} />
+        <Row label="手机号" level="P2" value={c.phone ?? '未填写'} hint="当前不支持绑定或更换" />
         <Row label="邮箱" level="P2" value={c.email ?? '未绑定'} />
       </div>
       <div className="px-4 py-3">

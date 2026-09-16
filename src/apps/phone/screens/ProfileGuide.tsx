@@ -1,8 +1,8 @@
 /**
  * 注册后的软引导条。
  *
- * 注册提速把昵称、头像、手机号都从注册表单里拿掉了，但这些资料本身还是有用的——
- * 客服认不出「客户8231」是谁，手机号没绑就找不回账号。所以把「填资料」从注册时的
+ * 注册提速把昵称和头像从注册表单里拿掉了，但这些资料本身还是有用的——
+ * 客服认不出「客户8231」是谁。所以把「填资料」从注册时的
  * 硬门槛改成进来之后的软提醒：可关、关了不再来、任何时候都不挡路。
  *
  * 只在「消息」页顶部出现一条，不做弹窗、不做全屏引导页——那些都是变相的硬门槛。
@@ -20,7 +20,7 @@ interface Todo {
 export function profileTodos(c: Customer): Todo[] {
   const list: Todo[] = []
   if (c.nicknameAuto) list.push({ key: 'nickname', label: '起个名字' })
-  if (!c.phone) list.push({ key: 'phone', label: '绑手机号' })
+  if (!c.avatarUpdatedAt) list.push({ key: 'avatar', label: '换个头像' })
   return list
 }
 
