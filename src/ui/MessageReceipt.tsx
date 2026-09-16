@@ -20,7 +20,8 @@ export function MessageReceipt({ m, staffSeatId }: { m: Message; staffSeatId?: s
   const readAt = m.senderKind === 'seat' ? conv.readAtByCustomer?.[conv.customerId!] : conv.readAtBySeat?.[conv.seatId!]
   const read = !!readAt && readAt >= m.at
   const Icon = read ? CheckCheck : Check
-  return <span className={`inline-flex items-center gap-0.5 ${read ? 'text-brand-600' : 'text-zinc-400'}`} title={read ? '对方已查看这条消息' : '已发送，对方尚未查看'}><Icon size={13} />{read ? '已读' : '未读'}</span>
+  // 单勾已送达、双勾品牌色已读，跟主流聊天软件一致，不带文字；名词口径见 docs/界面文案与名词规范.md
+  return <span className={`inline-flex items-center ${read ? 'text-brand-600' : 'text-zinc-400'}`} title={read ? '已读' : '已送达，对方还没看'} aria-label={read ? '已读' : '已送达'}><Icon size={13} /></span>
 }
 
 function GroupReceipt({ m, conv, group }: { m: Message; conv: Conversation; group: ChatGroup }) {

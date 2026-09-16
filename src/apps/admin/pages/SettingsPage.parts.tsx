@@ -10,6 +10,7 @@ import { useStore } from '@/store/store'
 import { Button, Field, Input, Select, Switch } from '@/ui/primitives'
 import { Card, Note, Pill } from '@/ui/display'
 import { toast } from '@/ui/overlay'
+import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 
 /** 只写不读的密钥输入：configured 为真时不回显，只能「更换」 */
 export function SecretField({ label, hint, configured, onConfigured }: { label: string; hint?: string; configured: boolean; onConfigured: (v: boolean) => void }) {
@@ -50,9 +51,11 @@ export function SecretField({ label, hint, configured, onConfigured }: { label: 
 export function SmsPane() {
   return (
     <div className="space-y-4">
-      <Note tone="amber">P2：短信与邮件服务商随验证码一起推后（用户 2026-09-15 决定）。本页为占位表单，全部只读，第一版不接任何服务商。</Note>
+      <DemoNote>
+        短信与邮件服务商跟验证码一起排在后续版本<DemoLevelTag level="P2" />。本页是占位表单，全部只读，第一版不接任何服务商。
+      </DemoNote>
       <div className="grid grid-cols-2 gap-4">
-        <Card title="短信服务商（P2）">
+        <Card title="短信服务商" level="P2">
           <div className="space-y-3">
             <Field label="短信服务商">
               <Select disabled defaultValue="">
@@ -70,7 +73,7 @@ export function SmsPane() {
             </Field>
           </div>
         </Card>
-        <Card title="邮件服务商（P2）">
+        <Card title="邮件服务商" level="P2">
           <div className="space-y-3">
             <Field label="邮件服务商">
               <Select disabled defaultValue="">
@@ -114,9 +117,9 @@ export function PushPane() {
   const needIds = form.apnsMode === 'p8'
   const error = needIds && (!form.apnsKeyId.trim() || !form.apnsTeamId.trim()) ? '使用 .p8 时 Key ID 与 Team ID 必填' : ''
   return (
-    <Card title="推送配置（P0）">
+    <Card title="推送配置" level="P0">
       <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-        <Field label="APNs 证书" hint="正式产品上传 .p8 文件或 .p12 证书">
+        <Field label="APNs 证书" hint="上传 .p8 密钥或 .p12 证书" demoHint="演示里不做文件上传，只选类型">
           <Select value={form.apnsMode} onChange={(e) => patch({ apnsMode: e.target.value as PushConfig['apnsMode'] })}>
             <option value="p8">.p8 密钥（推荐）</option>
             <option value="p12">.p12 证书</option>
@@ -212,7 +215,8 @@ export function StoragePane() {
 
   return (
     <Card
-      title="对象存储（P0）"
+      title="对象存储"
+      level="P0"
       extra={
         saved.lastTestAt ? (
           <span className="flex items-center gap-1.5 text-[11px] text-zinc-500">
@@ -276,7 +280,7 @@ export function BroadcastPane() {
   const error = a == null || b == null ? `两项都要是 ${LIMIT_MIN} 到 ${LIMIT_MAX} 的整数` : ''
   const dirty = a !== e.broadcastPerStaffPerDay || b !== e.broadcastPerCustomerPerDay
   return (
-    <Card title="群发频控（P0）">
+    <Card title="群发频控" level="P0">
       <Note>两个维度独立生效：员工维度超限时工作台「发送」按钮禁用；客户维度超限的客户本次跳过，计入「跳过」。改动立即对下一次群发生效。</Note>
       <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3">
         <Field label="每个实操员工每天群发任务数" required hint="跨其持有的坐席合并计算，默认 3">

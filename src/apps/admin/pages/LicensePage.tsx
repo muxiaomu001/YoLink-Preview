@@ -6,6 +6,7 @@ import { fmtDate } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { Button } from '@/ui/primitives'
 import { Card, KV, Note, PageHeader, Pill, Table } from '@/ui/display'
+import { DemoNote } from '@/ui/DemoNote'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 
@@ -29,19 +30,19 @@ export function LicensePage() {
   const upload = async () => {
     const ok = await confirm({
       title: '上传新许可文件',
-      body: '选择由 YoLink 签发的 .lic 文件，上传后立即生效，无需重启。演示里直接把到期日延长一年并启用全部模块。',
+      body: '选择由 YoLink 签发的 .lic 文件，上传后立即生效，无需重启。',
       okText: '上传并生效',
     })
     if (!ok) return
     s.uploadLicense(admin)
-    toast('已模拟续期：示例到期日延长一年；不代表正式续费规则')
+    toast('许可已更新，到期日延长一年')
   }
 
   return (
     <div>
       <PageHeader
         title="版本与许可"
-        desc="展示版本、授权与到期状态。订阅到期如何限制使用尚未决定；此页续期仅模拟，不上传或校验真实许可。"
+        desc="展示当前版本、授权范围与到期状态，到期前会在这里提醒。"
         extra={
           <Button variant="primary" onClick={() => void upload()}>
             <Upload size={14} /> 上传新许可文件
@@ -50,7 +51,8 @@ export function LicensePage() {
       />
       {expiringSoon && (
         <div className="mb-4">
-          <Note tone="amber">许可将在 {left} 天后到期（{fmtDate(lic.expiresAt)}）。到期后的聊天、查询、模块停用与宽限期规则待产品确认。</Note>
+          <Note tone="amber">许可将在 {left} 天后到期（{fmtDate(lic.expiresAt)}），请及时续期。</Note>
+          <DemoNote className="mt-2">到期后的聊天、查询、模块停用与宽限期规则待产品确认，演示里不做限制。</DemoNote>
         </div>
       )}
       <div className="grid grid-cols-[360px_1fr] gap-4">

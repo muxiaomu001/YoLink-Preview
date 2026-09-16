@@ -5,14 +5,17 @@ import type { ModuleKey } from '@/domain/types'
 import { MODULE_LABEL } from '@/domain/labels'
 import { useStore } from '@/store/store'
 import { Switch } from '@/ui/primitives'
-import { Card, Note, PageHeader, Pill, Table } from '@/ui/display'
+import { Card, Note, PageHeader, Pill, Table, type Column } from '@/ui/display'
 import { toast } from '@/ui/overlay'
+import { DemoLevelTag, useDemoNotes } from '@/ui/DemoNote'
 
 const MODULE_KEYS = Object.keys(MODULE_LABEL) as ModuleKey[]
+type Row = { key: ModuleKey; on: boolean; licensed: boolean } & (typeof MODULE_LABEL)[ModuleKey]
 
 export function ModulesPage() {
   const s = useStore()
   const admin = s.session.adminStaffId!
+  const demoNotes = useDemoNotes()
   const rows = MODULE_KEYS.map((key) => ({ key, ...MODULE_LABEL[key], on: s.enterprise.modules[key], licensed: s.license.modules.find((m) => m.key === key)?.enabled ?? true }))
   const onCount = rows.filter((r) => r.on).length
 
@@ -29,7 +32,8 @@ export function ModulesPage() {
           columns={[
             { key: 'name', title: '模块名称', render: (r) => <span className="font-medium text-zinc-900">{r.name}</span> },
             { key: 'desc', title: '说明', render: (r) => <span className="text-zinc-600">{r.desc}</span> },
-            { key: 'level', title: '层级', width: '80px', render: (r) => <Pill tone={r.level === 'P0' ? 'blue' : r.level === 'P1' ? 'purple' : 'zinc'}>{r.level}</Pill> },
+            // 层级是排期信息，不是产品内容：跟着演示批注开关一起消失
+            ...(demoNotes ? [{ key: 'level', title: '排期', width: '80px', render: (r: Row) => <DemoLevelTag level={r.level} className="ml-0" /> } as Column<Row>] : []),
             {
               key: 'status',
               title: '状态',

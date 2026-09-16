@@ -86,7 +86,8 @@ export function SensitiveWordsPage() {
   return (
     <div>
       <PageHeader
-        title="敏感词（P1）"
+        title="敏感词"
+        level="P1"
         desc="客户与坐席发出的消息先过词库。拦截：消息不落库，发送方看到提示；替换：命中部分改成替换文本；放行并记录：正常送达，但留一条命中记录。"
         extra={
           tab === 'words' && (

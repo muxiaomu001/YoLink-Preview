@@ -69,7 +69,8 @@ export function ApiKeysPage() {
   return (
     <div>
       <PageHeader
-        title="开放 API 凭据（P1）"
+        title="开放 API 凭据"
+        level="P1"
         desc="给 CRM、数据仓库等外部系统调 YoLink 开放 API 用的 Key。每个 Key 单独限定权限范围，泄露了删这一个就行。"
         extra={
           <Button variant="primary" onClick={() => setCreating(true)}>

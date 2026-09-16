@@ -1,11 +1,13 @@
 /**
- * 演示数据（PRD 05 943 行，仅演示实例可见）：重新生成、清空客户数据。
+ * 演示数据：重新生成、清空客户数据。
+ * 整页属于演示批注层，正式产品没有这一页；导航里的入口也跟着批注开关走（见 nav.ts 的 demoOnly）。
  */
 import { Eraser, RefreshCw } from 'lucide-react'
 import { fmtAgo, fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { Button } from '@/ui/primitives'
-import { Card, Note, PageHeader, Stat } from '@/ui/display'
+import { Card, PageHeader, Stat } from '@/ui/display'
+import { DemoNote } from '@/ui/DemoNote'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 
@@ -40,8 +42,8 @@ export function DemoDataPage() {
 
   return (
     <div>
-      <PageHeader title="演示数据" desc="仅演示实例可见。正式产品没有这一页。" />
-      <Note tone="amber">这一页只在演示实例出现：用来在给客户看之前把数据恢复干净，或者从零演示「注册即分配」。</Note>
+      <PageHeader title="演示数据" />
+      <DemoNote>正式产品没有这一页。它是给演示用的：给客户看之前把数据恢复干净，或者从零演示「注册即分配」。关掉演示批注后，左侧导航里的这一项也会消失。</DemoNote>
       <div className="mt-4 grid grid-cols-4 gap-3">
         <Stat label="当前客户数" value={customers} sub={`私聊会话 ${dmConvs} 条`} />
         <Stat label="消息数" value={messages} sub="含群与频道" />

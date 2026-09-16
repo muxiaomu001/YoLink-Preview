@@ -11,6 +11,8 @@ import { botById, customerCan, groupRoleOf, resolveCap } from '@/store/policy'
 import { Avatar, SeatAvatar, TitleChip } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
+import { copyText } from '@/ui/clipboard'
+import { demoToast } from '@/ui/DemoNote'
 import { DemoHint, GroupAvatar, ScreenHeader, SectionLabel } from '../parts'
 import { PHONE_SOURCE_LABEL, groupKindLabel } from '../shared'
 
@@ -35,7 +37,11 @@ export function GroupInfoScreen({ g, customerId, onBack, onLeft }: { g: ChatGrou
     toast(g.kind==='channel'?`已取消订阅「${g.name}」`:`已退出${kindLabel}「${g.name}」`)
     onLeft()
   }
-  const invite = () => toast(mainLink ? `邀请链接 ${mainLink.code} 已复制（演示）` : '该群暂无有效邀请链接', mainLink ? 'ok' : 'warn')
+  // 真复制，复制不了时按剪贴板口径提示
+  const invite = async () => {
+    if (!mainLink) return toast(`该${kindLabel}暂无有效邀请链接`, 'warn')
+    toast((await copyText(mainLink.code)) ? `邀请链接 ${mainLink.code} 已复制` : '复制失败：浏览器不允许访问剪贴板', mainLink ? 'ok' : 'warn')
+  }
 
   return (
     <div className="flex h-full flex-col bg-zinc-50">
@@ -72,7 +78,14 @@ export function GroupInfoScreen({ g, customerId, onBack, onLeft }: { g: ChatGrou
         {membersVisible ? (
           <MemberList g={g} canViewProfile={canViewProfile} />
         ) : (
-          <div className="bg-white px-4 py-3 text-[11px] text-zinc-400">{g.settings.membersVisible ? '当前策略不允许查看群成员列表（group.view_members 关）' : '群设置未开放成员可见'}</div>
+          // 群设置关的属于产品自己的规则，客户该知道；企业策略关的不解释给客户，只在演示批注里交代
+          g.settings.membersVisible ? (
+            <div className="px-4 py-3">
+              <DemoHint>企业策略未开放查看群成员列表（group.view_members），所以这块整个不显示。</DemoHint>
+            </div>
+          ) : (
+            <div className="bg-white px-4 py-3 text-[11px] text-zinc-400">本{kindLabel}未开放成员列表</div>
+          )
         )}
 
         <SectionLabel>操作</SectionLabel>
@@ -87,7 +100,7 @@ export function GroupInfoScreen({ g, customerId, onBack, onLeft }: { g: ChatGrou
               )}
             </button>
           ) : (
-            <div className="border-b border-zinc-100 px-4 py-2.5 text-[11px] text-zinc-400">邀请好友：当前策略不允许（group.invite 关）</div>
+            <DemoHint>企业策略未开放邀请好友（group.invite），正式产品里这一行直接不出现。</DemoHint>
           )}
           {leave.allowed ? (
             <button type="button" onClick={() => void doLeave()} className="flex w-full items-center gap-2 px-4 py-2.5 text-[13px] text-red-600 active:bg-zinc-50">
@@ -116,7 +129,7 @@ const ROW_CLS = 'flex w-full items-center gap-2 border-b border-zinc-100 px-4 py
 function Wrap({ name, canTap, children }: { name: string; canTap: boolean; children: ReactNode }) {
   if (!canTap) return <div className={ROW_CLS}>{children}</div>
   return (
-    <button type="button" onClick={() => toast(`查看「${name}」的资料（演示）`, 'info')} className={`${ROW_CLS} active:bg-zinc-50`}>
+    <button type="button" onClick={() => demoToast(`查看「${name}」的资料`)} className={`${ROW_CLS} active:bg-zinc-50`}>
       {children}
     </button>
   )

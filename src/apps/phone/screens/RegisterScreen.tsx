@@ -7,7 +7,7 @@ import { useStore } from '@/store/store'
 import { seatById } from '@/store/selectors'
 import { SeatAvatar } from '@/ui/display'
 import { Button, Input } from '@/ui/primitives'
-import { GroupAvatar } from '../parts'
+import { DemoHint, GroupAvatar } from '../parts'
 import { groupKindLabel } from '../shared'
 
 export interface JustAdded {
@@ -101,8 +101,9 @@ export function RegisterScreen({ onDone }: { onDone: (added: JustAdded) => void 
           <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+852" className="h-10" />
         </div>
         <div>
-          <div className="mb-1 text-[11px] text-zinc-500">示例密码（演示不校验）</div>
+          <div className="mb-1 text-[11px] text-zinc-500">密码</div>
           <Input type="password" defaultValue="demo1234" className="h-10" />
+          <DemoHint>演示里密码不校验，注册只看昵称和邀请码。</DemoHint>
         </div>
         <div>
           <div className="mb-1 text-[11px] text-zinc-500">邀请码{s.enterprise.inviteCodeRequired ? '' : '（选填）'}</div>

@@ -7,10 +7,11 @@ import type { Language, RegisterMethod, ThemeKey } from '@/domain/types'
 import { THEME_LABEL } from '@/domain/labels'
 import { useStore } from '@/store/store'
 import { Button, Checkbox, Field, Input, Select, Switch } from '@/ui/primitives'
-import { Card, Note, PageHeader, Pill, Tabs } from '@/ui/display'
+import { Card, PageHeader, Pill, Tabs } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 import { BroadcastPane, PushPane, QuickReplyPane, SmsPane, StoragePane } from './SettingsPage.parts'
 import { WebTabsPane } from './SettingsPage.webtabs'
+import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 
 type TabKey = 'basic' | 'appearance' | 'register' | 'sms' | 'push' | 'storage' | 'webtabs' | 'broadcast'
 
@@ -33,7 +34,7 @@ export function SettingsPage() {
   const [tab, setTab] = useState<TabKey>('basic')
   return (
     <div>
-      <PageHeader title="企业设置" desc="客户端启动时按企业码拉取这里的信息。每个分页一张表单，改完点保存才生效，所有改动进审计日志。" />
+      <PageHeader title="企业设置" desc="客户端启动时按企业码拉取这里的配置。每个分页独立保存，保存后对新启动的客户端生效。" />
       <Tabs value={tab} onChange={setTab} items={TABS} className="mb-4" />
       {tab === 'basic' && <BasicPane />}
       {tab === 'appearance' && <AppearancePane />}
@@ -91,7 +92,7 @@ function BasicPane() {
   }
 
   return (
-    <Card title="基本信息（P0）">
+    <Card title="基本信息" level="P0">
       <div className="grid grid-cols-2 gap-x-6 gap-y-3">
         <Field label="企业名称" required hint="1 到 64 字符">
           <Input value={form.name} maxLength={64} onChange={(ev) => patch('name', ev.target.value)} />
@@ -102,7 +103,7 @@ function BasicPane() {
             <option value="en">English</option>
           </Select>
         </Field>
-        <Field label="企业 Logo" hint="正式产品上传图片：推荐 512×512 PNG，最大 2MB；演示用一个字 + 品牌色代替">
+        <Field label="企业 Logo" hint="推荐 512×512 PNG，最大 2MB" demoHint="演示里用一个字加品牌色代替上传的图片">
           <div className="flex items-center gap-3">
             <span className="flex h-12 w-12 items-center justify-center rounded-xl text-xl font-semibold text-white" style={{ background: HEX_RE.test(form.brandColor) ? form.brandColor : '#71717a' }}>
               {form.logoText.trim().slice(0, 1) || '?'}
@@ -150,7 +151,7 @@ function AppearancePane() {
   }
   const ok = allowed.length > 0 && allowed.includes(def)
   return (
-    <Card title="外观（P0，依赖 10 文档）">
+    <Card title="外观">
       <div className="space-y-4">
         <div>
           <div className="mb-1.5 text-xs font-medium text-zinc-600">允许的主题（内置四款，至少一款）</div>
@@ -205,7 +206,7 @@ function RegisterPane() {
   const toggle = (m: RegisterMethod, on: boolean) => setMethods((list) => (on ? [...list, m] : list.filter((x) => x !== m)))
   const ok = methods.length > 0
   return (
-    <Card title="注册方式（P0）">
+    <Card title="注册方式" level="P0">
       <div className="space-y-4">
         <div>
           <div className="mb-1.5 text-xs font-medium text-zinc-600">允许的注册方式（至少一个；两者都是「账号 + 密码」，无验证码）</div>
@@ -228,7 +229,9 @@ function RegisterPane() {
         >
           保存
         </Button>
-        <Note>用户 2026-09-15 决定：验证码、邮箱注册、强制绑手机号与短信/邮件服务商一起推到 P2，第一版只做账号 + 密码。</Note>
+        <DemoNote>
+          第一版只做账号 + 密码；验证码、邮箱注册、强制绑手机号跟短信与邮件服务商一起排在后续版本<DemoLevelTag level="P2" />。
+        </DemoNote>
       </div>
     </Card>
   )

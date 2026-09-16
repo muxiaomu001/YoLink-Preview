@@ -12,6 +12,7 @@ import { Button, Switch } from '@/ui/primitives'
 import { Pill } from '@/ui/display'
 import { Modal } from '@/ui/overlay'
 import { groupAnchorId } from './PoliciesPage.shared'
+import { DemoLevelTag } from '@/ui/DemoNote'
 
 interface MatrixTableProps {
   items: PolicyItem[]
@@ -66,7 +67,7 @@ function GroupRows({ group, items, matrix, modules, cols, onToggle }: { group: s
             <td className="px-4 py-2">
               <div className={clsx('flex items-center gap-1.5 text-[13px]', moduleOff ? 'text-zinc-400' : 'text-zinc-800')}>
                 {p.label}
-                {p.level !== 'P0' && <Pill>{p.level}</Pill>}
+                {p.level !== 'P0' && <DemoLevelTag level={p.level} />}
                 {p.staffOnly && <Pill tone="blue">仅坐席</Pill>}
               </div>
               <div className="font-mono text-[11px] text-zinc-400">{p.key}</div>

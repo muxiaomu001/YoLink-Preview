@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { BadgeCheck } from 'lucide-react'
 import type { Seat, Tag, Title } from '@/domain/types'
 import { TitleIcon } from './titleIcons'
+import { DemoLevelTag, type DemoLevel } from './DemoNote'
 
 /** 客户头像：用昵称首字与稳定色 */
 const CUSTOMER_COLORS = ['#64748b', '#0f766e', '#7c3aed', '#be123c', '#0369a1', '#b45309', '#4d7c0f', '#6d28d9']
@@ -82,12 +83,12 @@ export function Pill({ children, tone = 'zinc', className }: { children: ReactNo
   return <span className={clsx('inline-flex items-center rounded px-1.5 text-[11px] leading-5 font-medium whitespace-nowrap', tones[tone], className)}>{children}</span>
 }
 
-export function Card({ title, extra, children, className, padded = true }: { title?: ReactNode; extra?: ReactNode; children: ReactNode; className?: string; padded?: boolean }) {
+export function Card({ title, level, extra, children, className, padded = true }: { title?: ReactNode; level?: DemoLevel; extra?: ReactNode; children: ReactNode; className?: string; padded?: boolean }) {
   return (
     <section className={clsx('rounded-lg border border-zinc-200 bg-white', className)}>
       {(title || extra) && (
         <header className="flex items-center justify-between border-b border-zinc-100 px-4 py-2.5">
-          <h3 className="text-[13px] font-semibold text-zinc-800">{title}</h3>
+          <h3 className="text-[13px] font-semibold text-zinc-800">{title}<DemoLevelTag level={level} /></h3>
           {extra}
         </header>
       )}
@@ -96,11 +97,11 @@ export function Card({ title, extra, children, className, padded = true }: { tit
   )
 }
 
-export function PageHeader({ title, desc, extra }: { title: string; desc?: ReactNode; extra?: ReactNode }) {
+export function PageHeader({ title, level, desc, extra }: { title: string; level?: DemoLevel; desc?: ReactNode; extra?: ReactNode }) {
   return (
     <div className="mb-4 flex items-start justify-between gap-4">
       <div>
-        <h1 className="text-base font-semibold text-zinc-900">{title}</h1>
+        <h1 className="text-base font-semibold text-zinc-900">{title}<DemoLevelTag level={level} /></h1>
         {desc && <p className="mt-1 max-w-3xl text-xs leading-relaxed text-zinc-500">{desc}</p>}
       </div>
       {extra && <div className="flex shrink-0 items-center gap-2">{extra}</div>}
@@ -184,11 +185,11 @@ export function Tabs<T extends string>({ value, onChange, items, className }: { 
   )
 }
 
-export function KV({ items }: { items: { k: string; v: ReactNode }[] }) {
+export function KV({ items }: { items: { k: ReactNode; v: ReactNode }[] }) {
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
-      {items.map((it) => (
-        <div key={it.k} className="contents">
+      {items.map((it, i) => (
+        <div key={i} className="contents">
           <dt className="text-zinc-500 whitespace-nowrap">{it.k}</dt>
           <dd className="text-zinc-800 min-w-0 break-words">{it.v}</dd>
         </div>
@@ -197,7 +198,7 @@ export function KV({ items }: { items: { k: string; v: ReactNode }[] }) {
   )
 }
 
-/** 说明条：在页面上把 PRD 里的规则讲给看 demo 的人 */
+/** 产品自己的提示条：给用户讲清楚这块的规则或注意事项。演示旁白用 DemoNote，不要用这个 */
 export function Note({ children, tone = 'blue' }: { children: ReactNode; tone?: 'blue' | 'amber' }) {
   return <div className={clsx('rounded-md border px-3 py-2 text-xs leading-relaxed', tone === 'blue' ? 'border-brand-100 bg-brand-50/60 text-brand-900' : 'border-amber-200 bg-amber-50 text-amber-900')}>{children}</div>
 }

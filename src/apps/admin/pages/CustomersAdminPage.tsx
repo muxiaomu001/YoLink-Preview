@@ -11,6 +11,7 @@ import { primarySeatOfCustomer } from '@/store/selectors'
 import { Button, Checkbox, Input, Select } from '@/ui/primitives'
 import { Avatar, Card, Note, PageHeader, Pill, Table, TagChip, TitleChip, type Column } from '@/ui/display'
 import { toast } from '@/ui/overlay'
+import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 import { confirm } from '@/ui/confirm'
 import { CustomerDetailModal } from './CustomersAdminPage.parts'
 
@@ -152,10 +153,11 @@ export function CustomersAdminPage() {
 
   return (
     <div>
-      <PageHeader title="客户列表" desc="全企业所有客户（管理员视角）。工作台的客户列表是员工视角，只看本人坐席主归属的客户。" />
-      <Note>
-        头衔是官方发给客户、所有人可见的；内部标签只有员工看得到。批量挂头衔每个客户最多 5 个，超了自动跳过。改主归属与注销是 P1 功能，都在「详情」里。
-      </Note>
+      <PageHeader title="客户列表" desc="全企业客户。员工在工作台只能看到自己坐席主归属的客户。" />
+      <Note>头衔是官方发给客户、所有人可见的；内部标签只有员工看得到。批量挂头衔每个客户最多 5 个，超了自动跳过。改主归属与注销在「详情」里。</Note>
+      <DemoNote className="mt-2">
+        改主归属与注销排在第二版<DemoLevelTag level="P1" />。
+      </DemoNote>
 
       <Card className="mt-4" title="筛选">
         <div className="flex flex-wrap items-end gap-2">

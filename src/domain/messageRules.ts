@@ -1,4 +1,5 @@
 import type { ChatActor, DemoState, Message } from './types'
+import { fmtDuration } from './time'
 import { customerCan, customerCanSpeakIn, groupPerm, seatCan, seatGroupPerm } from '@/store/policy'
 
 /**
@@ -66,7 +67,7 @@ export function actorCanView(s: DemoState, convId: string, actor: ChatActor) {
 /**
  * 消息对某个身份是否还存在。删除只有一套语义：
  * 为所有人删除的直接消失、不留占位，仅为本方删除的只在该身份隐藏；
- * 两种原文都保留在审计。气泡、引用、转发、搜索、未读、置顶、资料库共用这一个判断。
+ * 两种原文都保留在审计。气泡、回复、转发、搜索、未读、置顶、资料库共用这一个判断。
  */
 export function messageVisibleFor(s: DemoState, m: Message, actor: ChatActor) {
   const conv = s.conversations.find((c) => c.id === m.convId)
@@ -91,14 +92,14 @@ export function canManageDelete(s: DemoState, m: Message, actor: ChatActor) {
 }
 
 export function deleteAllBlock(s: DemoState, m: Message, actor: ChatActor) {
-  if (!messageVisibleFor(s, m, actor)) return '消息已不可用或无权访问'
-  if (m.delivery && m.delivery !== 'sent') return '这条消息尚未发出，只需从本方删除'
+  if (!messageVisibleFor(s, m, actor)) return '这条消息已经不在了'
+  if (m.delivery && m.delivery !== 'sent') return '这条消息还没发出去'
   if (canManageDelete(s, m, actor)) return undefined
-  if (m.senderKind !== actor.kind || m.senderId !== actor.id) return '没有管理删除他人消息的权限'
+  if (m.senderKind !== actor.kind || m.senderId !== actor.id) return '只能为所有人删除自己发出的消息'
   const cap = actor.kind === 'seat' ? seatCan(s, actor.id, 'dm.recall') : customerCan(s, actor.id, 'dm.recall', s.conversations.find((c) => c.id === m.convId)?.chatGroupId)
-  if (!cap) return '当前策略未开放「为所有人删除」'
+  if (!cap) return '这个会话不支持为所有人删除'
   const limit = messageLimitSeconds(s, actor.kind, 'deleteAll')
-  return limit > 0 && Date.now() - new Date(m.at).getTime() > limit * 1000 ? '已超过后台设置的删除时限，只能从本方删除' : undefined
+  return limit > 0 && Date.now() - new Date(m.at).getTime() > limit * 1000 ? `发送已超过 ${fmtDuration(limit)}，只能从这边删除` : undefined
 }
 
 export function sendFailure(s: DemoState, convId: string, actor: ChatActor, media = false) {

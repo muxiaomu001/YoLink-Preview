@@ -21,6 +21,7 @@ import { Modal, toast } from '@/ui/overlay'
 import { GroupAvatar, ScreenHeader } from '../parts'
 import { groupKindLabel } from '../shared'
 import { AnnouncementLayer, Bubble, InputBar, PinnedBar } from './ChatScreen.parts'
+import { ForwardSheet } from './ChatScreen.actions'
 import { GroupInfoScreen } from './GroupInfoScreen'
 
 export function ChatScreen({ convId, customerId, onBack }: { convId: string; customerId: string; onBack: () => void }) {
@@ -38,6 +39,7 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
   const [toolsOpen,setToolsOpen]=useState(false)
   const timeline=useMessageTimeline('phone-msg-list',actorKey(actor)+':'+convId,msgs.map((m)=>m.id).join(','))
   const [editing, setEditing] = useState<Message | null>(null)
+  const [forwarding, setForwarding] = useState<Message | null>(null)
   const [showInfo, setShowInfo] = useState(false)
   // 本次会话看过的公告（按公告时间记，公告更新会再弹）
   const [seenAnnouncementAt, setSeenAnnouncementAt] = useState<string | null>(null)
@@ -92,7 +94,7 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
         <div>
         {msgs.map((m) => {
           const mine = m.senderKind === 'customer' && m.senderId === customerId
-          return <Bubble customerId={customerId} key={m.id} m={m} mine={mine} inGroup={!!group} canReply={group?.kind!=='channel'} onReply={() => setReplyTo(m)} onDelete={()=>setDeleting([m.id])} onEdit={mine && customerCan(s, customerId, 'dm.edit', gid) ? () => setEditing(m) : undefined} />
+          return <Bubble customerId={customerId} key={m.id} m={m} mine={mine} inGroup={!!group} canReply={group?.kind!=='channel'} onReply={() => setReplyTo(m)} onDelete={()=>setDeleting([m.id])} onForward={()=>setForwarding(m)} onEdit={mine && customerCan(s, customerId, 'dm.edit', gid) ? () => setEditing(m) : undefined} />
         })}
         {!msgs.length&&<p className="py-12 text-center text-sm text-zinc-400">暂无可见消息</p>}
         </div>
@@ -113,6 +115,7 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
       {deleting&&<DeleteMessagesModal ids={deleting} actor={actor} onClose={()=>setDeleting(null)}/>}
       {libraryOpen&&<ChatMediaLibrary convId={convId} actor={actor} onClose={()=>setLibraryOpen(false)} onLocate={(id)=>timeline.jump(`pm-${id}`)}/>}
       {toolsOpen&&<Modal open title="会话操作" onClose={()=>setToolsOpen(false)} width={340}><div className="flex flex-col gap-2">{group&&<Button onClick={()=>{setToolsOpen(false);setShowInfo(true)}}>群与频道信息</Button>}<Button onClick={()=>{setToolsOpen(false);setLibraryOpen(true)}}>文件与媒体</Button><Button onClick={()=>void clear()}>清空聊天</Button><Button onClick={()=>{s.hideChatFor(convId,actor);onBack()}}>从会话列表移除</Button><p className="text-xs text-zinc-500">移除会话不会退出群或删除联系人。</p></div></Modal>}
+      {forwarding && <ForwardSheet message={forwarding} customerId={customerId} onClose={() => setForwarding(null)} />}
       {editing && <CustomerEditMessage message={editing} customerId={customerId} onClose={() => setEditing(null)} />}
       {showAnnouncement && announcement && <AnnouncementLayer title={announcement.title} content={announcement.content} onClose={() => setSeenAnnouncementAt(announcement.at)} />}
     </div>

@@ -10,6 +10,7 @@ import { useStore } from '@/store/store'
 import { dashboardNumbers, waitingSince } from '@/store/selectors'
 import { Button, Field, Input } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, Table } from '@/ui/display'
+import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 import { toast } from '@/ui/overlay'
 import { RecipientsCard } from './DailyReportPage.parts'
 
@@ -24,22 +25,25 @@ export function DailyReportPage() {
       return
     }
     s.sendDailyReportNow()
-    toast(`已生成模拟发送记录，示例接收人：${recipients.map((r) => r.name).join('、')}，记录见下方`)
+    toast(`已发送给：${recipients.map((r) => r.name).join('、')}，记录见下方`)
   }
   return (
     <div>
       <PageHeader
         title="日报与提醒"
-        desc="展示日报预览和模拟记录；当前没有真实 App、企微或飞书推送。"
+        desc="每天按时把昨天的经营与服务数据推给指定的人，这里可以预览内容、管理接收人、查看发送记录。"
         extra={
           <Button variant="primary" onClick={send}>
-            <Send size={14} /> 模拟发送一次
+            <Send size={14} /> 立即发送一次
           </Button>
         }
       />
       <Note>
-        <b>只给事实与对比，不写建议</b>（15 文档口径）：日报说「首响中位数 14 分钟，阈值 10」，不说「建议增加客服」。渠道：App 推送、企微机器人、飞书机器人是 P0；微信服务号 P1；短信与邮件 P2。
+        <b>只给事实与对比，不写建议</b>：日报会说「首响中位数 14 分钟，阈值 10 分钟」，不会说「建议增加客服」。
       </Note>
+      <DemoNote className="mt-2">
+        第一版支持 App 推送、企微机器人、飞书机器人；微信服务号<DemoLevelTag level="P1" />，短信与邮件<DemoLevelTag level="P2" />。演示里「立即发送一次」只生成记录，不真的推出去。
+      </DemoNote>
       <div className="mt-4 space-y-4">
         <RecipientsCard />
         <div className="grid grid-cols-2 gap-4">
@@ -147,7 +151,7 @@ function RecordsCard() {
         columns={[
           { key: 'date', title: '日期', width: '110px', render: (r) => <span className="tabular-nums text-zinc-700">{r.date}</span> },
           { key: 'to', title: '发送对象', render: (r) => <span className="text-zinc-700">{r.sentTo.join('、')}</span> },
-          { key: 'status', title: '状态', width: '80px', render: (r) => (r.status === 'sent' ? <Pill tone="green">模拟发送</Pill> : <Pill tone="red">失败</Pill>) },
+          { key: 'status', title: '状态', width: '80px', render: (r) => (r.status === 'sent' ? <Pill tone="green">已发送</Pill> : <Pill tone="red">失败</Pill>) },
           { key: 'summary', title: '摘要', render: (r) => <span className={r.status === 'failed' ? 'text-red-700' : 'text-zinc-600'}>{r.summary}</span> },
         ]}
       />

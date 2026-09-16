@@ -44,7 +44,7 @@ export function ExportsPage() {
 
   return (
     <div>
-      <PageHeader title="导出（P1）" desc="把客户列表与消息记录导成文件，给合规、BI 或迁移用。每一次导出都二次确认并记审计日志。" />
+      <PageHeader title="导出" level="P1" desc="把客户列表与消息记录导成文件，用于合规、BI 或数据迁移。导出前需要二次确认。" />
       <Note>
         导出需要员工角色有 <b>export_data</b> 能力。消息记录支持 CSV 与 JSON 两种格式（按 Zulip 合规导出），JSON 保留发送者、坐席与实操员工的完整字段。
       </Note>

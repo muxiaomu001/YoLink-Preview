@@ -7,6 +7,7 @@ import { Button, Checkbox, Field, Input, Textarea } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, Table } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
+import { DemoLevelTag } from '@/ui/DemoNote'
 
 const ADMIN_ROLE_ID = 'role_admin'
 const ALL_CAPS: Capability[] = CAPABILITIES.map((c) => c.key)
@@ -109,7 +110,7 @@ export function RolesPage() {
                     {(i === 0 || CAPABILITIES[i - 1].cat !== c.cat) && <div className="mb-0.5 text-[10px] font-medium text-zinc-400">{c.cat}</div>}
                     <div className="font-mono text-xs text-zinc-800">
                       {c.key}
-                      {c.level !== 'P0' && <Pill className="ml-1.5">{c.level}</Pill>}
+                      {c.level !== 'P0' && <DemoLevelTag level={c.level} />}
                     </div>
                     <div className="text-[11px] text-zinc-500">{c.desc}</div>
                   </td>
@@ -212,7 +213,7 @@ function RoleEditModal({ role, onClose }: { role?: Role; onClose: () => void }) 
                         label={
                           <span className="text-xs">
                             <span className="font-mono text-zinc-800">{c.label??c.key}</span>
-                            {c.level !== 'P0' && <Pill className="ml-1">{c.level}</Pill>}
+                            {c.level !== 'P0' && <DemoLevelTag level={c.level} />}
                             <span className="block text-[11px] text-zinc-500">{c.desc}</span>
                           </span>
                         }

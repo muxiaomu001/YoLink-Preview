@@ -1,5 +1,5 @@
 /**
- * 工作台动作：消息操作（引用、转发、坐席删群消息）、会话操作（已读、置顶、静音）、
+ * 工作台动作：消息操作（回复、转发、坐席删群消息）、会话操作（已读、置顶、静音）、
  * 客户操作（重置密码、拉黑、全群禁言）、个人设置、客户手机端的社交动作。话术库见 quickReplies.ts。
  */
 import type { Message, MessageMedia, StaffPrefs } from '@/domain/types'
@@ -11,7 +11,7 @@ import { DEFAULT_STAFF_PREFS } from '@/domain/seed-groups'
 import { type Get, type Set, now, randomPassword, withAudit } from './helpers'
 
 export interface WorkbenchActions {
-  /** 坐席发消息（带引用 / @ / 群发标记之外的扩展参数） */
+  /** 坐席发消息（带回复 / @ / 群发标记之外的扩展参数） */
   seatSendRich: (input: { convId: string; seatId: string; operatorId: string; text: string; replyToId?: string; mentionAll?: boolean; selectedMentions?: { mentionSeatIds: string[]; mentionCustomerIds: string[] }; kind?: 'text' | 'image' | 'file'; media?: MessageMedia; aiDraftUsed?: boolean }) => void
   editMessage: (messageId: string, text: string, byStaffId: string, expectedText: string) => string | null
   /** 坐席（群主或有 can_delete_messages 的管理员）删除群里别人的消息 */

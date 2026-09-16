@@ -26,7 +26,7 @@ export function ChatGroupsPage() {
     const ok = await confirm({
       title: next ? `标记「${g.name}」为官方群？` : `取消「${g.name}」的官方标记？`,
       body: next
-        ? '标记后该群的 group.leave 策略对客户关闭：客户不可退出，群名旁显示橙色「官方」标识。'
+        ? '标记后客户不能退出该群（「退出群」能力对客户关闭），群名旁显示橙色「官方」标识。'
         : '取消后客户可以自行退出该群，「官方」标识消失。',
       okText: next ? '标记为官方群' : '取消标记',
       danger: !next,
@@ -101,7 +101,7 @@ export function ChatGroupsPage() {
       />
       {creating && <CreateGroupModal onClose={() => setCreating(false)} onCreated={(id) => navigate(`/admin/groups/${id}`)} />}
       <Note>
-        标记为官方群后，该群的 <code>group.leave</code> 策略对客户关闭，客户不可退出，群名旁显示橙色「官方」。当前企业默认加入：
+        标记为官方群后，客户不能退出该群（「退出群」能力对客户关闭），群名旁显示橙色「官方」。当前企业默认加入：
         {s.enterprise.defaultChatGroupIds.map((id) => s.chatGroups.find((g) => g.id === id)?.name).filter(Boolean).join('、') || '无'}。
       </Note>
       <Card className="mt-4" padded={false}>

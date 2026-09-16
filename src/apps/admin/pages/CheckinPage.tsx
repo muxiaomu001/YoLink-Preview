@@ -31,14 +31,8 @@ export function CheckinPage() {
     <div>
       <PageHeader
         title="签到"
-        desc={
-          <>
-            <Pill tone="amber" className="mr-1.5">
-              P2，模块启用时显示
-            </Pill>
-            客户每天在 App 里签到领{unit}，7 天一个周期循环；断签从第 1 天重来。奖励直接进钱包流水（checkin_reward）。
-          </>
-        }
+        level="P2"
+        desc={`客户每天在 App 里签到领${unit}，7 天一个周期循环；断签从第 1 天重来。奖励直接记一条「签到奖励」钱包流水。`}
       />
       <div className="grid grid-cols-4 gap-3">
         <Stat label="今日签到人数" value={stats.todayCount} sub="去重客户数" />

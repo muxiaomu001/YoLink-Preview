@@ -54,7 +54,7 @@ export function KickModal({ group: g, actor, customer: c, onClose }: Pick<GroupP
     <Modal open onClose={onClose} title={`把「${c.nickname}」移出群？`} width={420} footer={<><Button onClick={onClose}>取消</Button><Button variant="danger" onClick={submit}>移出</Button></>}>
       <div className="space-y-3 text-[13px] text-zinc-700">
         <p>移出后客户不再收到该群消息，可以通过邀请链接再次加入（要拦住用「封禁」）。如果客户是本群管理员，同时撤销。</p>
-        <Checkbox checked={purge} onChange={setPurge} label="同时删除该用户在本群的所有消息（客户端显示「消息已被管理员删除」，审计仍可查）" />
+        <Checkbox checked={purge} onChange={setPurge} label="同时删除该用户在本群发出的全部消息" />
       </div>
     </Modal>
   )

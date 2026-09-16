@@ -1,7 +1,7 @@
 import type { Message } from '@/domain/types'
 import { visibleText } from '@/store/policy'
 
-/** 客户视角的一行预览：会话列表、引用条、置顶条、回复条共用；图片 / 文件消息显示占位 */
+/** 客户视角的一行预览：会话列表、回复条、置顶条共用；图片 / 文件消息显示占位 */
 export function customerPreview(m: Message): string {
   if(m.kind==='video')return '[视频] '+m.text
   if(m.kind==='voice')return '[语音] '+m.text

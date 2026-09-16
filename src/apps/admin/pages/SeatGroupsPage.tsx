@@ -9,6 +9,7 @@ import { customersOfSeat, staffById } from '@/store/selectors'
 import { Button, Field, Input } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, SeatAvatar, Table } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
+import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 import { confirm } from '@/ui/confirm'
 
 const STRATEGY_LABEL: Record<SeatGroupStrategy, { name: string; desc: string }> = {
@@ -42,7 +43,8 @@ export function SeatGroupsPage() {
   return (
     <div>
       <PageHeader
-        title="坐席组（P1，轮询分摊）"
+        title="坐席组"
+        level="P1"
         desc="邀请组里的一个位置指向坐席组而不是具体坐席，注册时按轮询、最少客户优先或随机从组里挑一个。按职能分组，投资顾问和客户服务不放同一个队列。"
         extra={
           <Button variant="primary" onClick={() => setCreating(true)}>
@@ -51,8 +53,11 @@ export function SeatGroupsPage() {
         }
       />
       <Note>
-        P0 只做邀请组「放几个加几个」，不分摊。一个码进来的客户多到一个顾问接不过来时才需要坐席组；<b>分配的对象仍是坐席不是员工</b>。可接新数为 0 时该位置会被跳过，并提醒管理员。
+        一个码进来的客户多到一个顾问接不过来时才需要坐席组；<b>分配的对象仍是坐席不是员工</b>。可接新数为 0 时该位置会被跳过，并提醒管理员。
       </Note>
+      <DemoNote className="mt-2">
+        第一版只做邀请组「放几个加几个」，不分摊；轮询分摊排在第二版<DemoLevelTag level="P1" />。
+      </DemoNote>
       <Card className="mt-4" padded={false}>
         <Table
           rows={rows}

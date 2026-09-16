@@ -10,6 +10,7 @@ import { Button, Field, Input, Select } from '@/ui/primitives'
 import { Avatar, KV, Note, Pill, Table, TitleChip } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { linkUrl } from './InviteLinksPage.shared'
+import { DemoLevelTag } from '@/ui/DemoNote'
 
 const STATUS_LABEL: Record<InviteLinkStatus, string> = { active: '有效', expired: '已过期', revoked: '已失效' }
 
@@ -54,7 +55,7 @@ export function InviteLinkDetailModal({ link, onClose }: { link: InviteLink; onC
             { k: '创建时间', v: fmtDateTime(link.createdAt) },
             { k: '有效期', v: link.expiresAt ? fmtDate(link.expiresAt) : '永久' },
             { k: '使用情况', v: `${link.uses}/${link.maxUses ?? '不限'}` },
-            { k: '点击数（P1）', v: String(link.clicks) },
+            { k: <>点击数<DemoLevelTag level="P1" /></>, v: String(link.clicks) },
             { k: '注册数', v: String(customers.length || link.uses) },
             { k: '状态', v: <StatusPill status={link.status} /> },
           ]}

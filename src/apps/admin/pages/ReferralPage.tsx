@@ -32,14 +32,8 @@ export function ReferralPage() {
     <div>
       <PageHeader
         title="推荐奖励"
-        desc={
-          <>
-            <Pill tone="amber" className="mr-1.5">
-              P2，模块启用时显示
-            </Pill>
-            客户把邀请链接发给朋友，朋友注册后按规则给双方发{s.walletSettings.unitName}。奖励进钱包流水（referral_reward），异常账号可取消奖励。
-          </>
-        }
+        level="P2"
+        desc={`客户把邀请链接发给朋友，朋友注册后按规则给双方发${s.walletSettings.unitName}。奖励记一条「推荐奖励」钱包流水，异常账号可取消奖励。`}
       />
       <Tabs
         value={tab}

@@ -57,7 +57,7 @@ export function GroupAdminModal({
           <Button size="sm" variant="ghost" onClick={() => setPerms(PERM_META.filter((p) => !(p.channelOnly && g.kind !== 'channel')).map((p) => p.key))}>全选</Button>
           <Button size="sm" variant="ghost" onClick={() => setPerms([])}>清空</Button>
         </div>
-        {full && <div className="text-xs text-red-600">管理员已达上限 {MAX_ADMINS} 人（group.max_admins）。</div>}
+        {full && <div className="text-xs text-red-600">管理员已达上限 {MAX_ADMINS} 人，先移除一位再添加。</div>}
         {!perms.length && !full && <div className="text-xs text-red-600">至少勾选一项权限。</div>}
       </div>
     </Modal>

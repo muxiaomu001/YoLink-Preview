@@ -8,6 +8,7 @@ import { staffById } from '@/store/selectors'
 import { confirm } from '@/ui/confirm'
 import { Button, Field, Input, Select, Textarea } from '@/ui/primitives'
 import { Card, Note, Pill, Stat, Table } from '@/ui/display'
+import { DemoNote } from '@/ui/DemoNote'
 import { Modal, toast } from '@/ui/overlay'
 
 /** 知识库 */
@@ -24,7 +25,8 @@ export function KnowledgeTab() {
   }
   return (
     <div className="space-y-4">
-      <Note>当前用表单演示知识发布：草稿不参与推荐，发布后生效，修改后使用新版本，下线后停止引用。正式产品的对话式知识整理尚未在此演示。</Note>
+      <Note>草稿不参与推荐；发布后生效，修改后按新版本推荐，下线后停止引用。</Note>
+      <DemoNote>演示里用这张表单走完发布闭环，正式产品的对话式知识整理还没做进来。</DemoNote>
       <Card
         title="知识库条目"
         padded={false}

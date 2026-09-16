@@ -1,6 +1,6 @@
 /**
  * 单条消息：系统消息灰色居中；文本 URL 自动成链接；图片消息显示缩略图（点开大图）、文件消息显示文件卡，说明文字在下方；
- * 引用条可跳转；已删除的消息不进列表、不留占位；机器人、群发、转发、AI 草稿、欢迎语小标；文字菜单按权限显示（引用、删除、转发、复制、置顶）。
+ * 回复条可跳转；已删除的消息不进列表、不留占位；机器人、群发、转发、AI 草稿、欢迎语小标；菜单按权限显示（回复、复制、转发、编辑、置顶、选择多条、删除）。
  */
 import { useCallback, useState } from 'react'
 import { clsx } from 'clsx'
@@ -76,12 +76,13 @@ export function MessageItem({
 
   const copy = async () => toast((await copyText(m.text)) ? '已复制' : '复制失败：浏览器不允许访问剪贴板', 'info')
 
+  // 条目与顺序跟客户手机端保持一致，见 docs/界面文案与名词规范.md
   const actions: MessageMenuAction[] = [
-    { label: quoteSelection ? '引用所选文字' : '回复', icon: Reply, section: 0, onSelect: () => onReply(m,quoteSelection||undefined) },
-    ...(mine && seatCan(s, seat.id, 'dm.edit') ? [{ label: '编辑消息', icon: Pencil, section: 0, onSelect: () => setEditing(true) }] : []),
-    ...(m.text ? [{ label: '拷贝文本', icon: Copy, section: 0, onSelect: () => void copy() }] : []),
-    ...(showPin ? [{ label: '置顶消息', icon: Pin, section: 1, onSelect: () => onPin(m) }] : []),
-    ...(showForward ? [{ label: '转发', icon: Forward, section: 1, opensPicker: true, onSelect: () => onForward(m) }] : []),
+    { label: quoteSelection ? '回复并引用所选' : '回复', icon: Reply, section: 0, onSelect: () => onReply(m,quoteSelection||undefined) },
+    ...(m.text ? [{ label: '复制', icon: Copy, section: 0, onSelect: () => void copy() }] : []),
+    ...(showForward ? [{ label: '转发', icon: Forward, section: 0, opensPicker: true, onSelect: () => onForward(m) }] : []),
+    ...(mine && seatCan(s, seat.id, 'dm.edit') ? [{ label: '编辑', icon: Pencil, section: 1, onSelect: () => setEditing(true) }] : []),
+    ...(showPin ? [{ label: '置顶', icon: Pin, section: 1, onSelect: () => onPin(m) }] : []),
     ...(onSelect ? [{ label: '选择多条', icon: CheckSquare, section: 1, onSelect: () => onSelect(m) }] : []),
     // 只有一个删除入口，范围（仅本方 / 为所有人）在弹窗里选，超时或无权限时那一项自动置灰
     { label: '删除', icon: Trash2, section: 2, danger: true, onSelect: () => setDeleting(true) },
@@ -144,8 +145,8 @@ export function MessageItem({
             {m.isBroadcast && <span className="rounded bg-amber-50 px-1 text-amber-700">群发</span>}
             {m.aiDraftUsed && <span className="rounded bg-violet-50 px-1 text-violet-600">AI 草稿</span>}
             {m.mentionAll && <span className="rounded bg-amber-50 px-1 text-amber-700">@所有人</span>}
-            {m.senderKind === 'seat' && can('view_seat_operator') && op && <span title="客户看不到这个">实操：{op.name}</span>}
-            {bot && m.operatorId && can('view_seat_operator') && <span title="客户看不到这个">手动：{staffById(s, m.operatorId)?.name}</span>}
+            {m.senderKind === 'seat' && can('view_seat_operator') && op && <span title="仅企业内部可见，客户看不到">实操：{op.name}</span>}
+            {bot && m.operatorId && can('view_seat_operator') && <span title="仅企业内部可见，客户看不到">手动：{staffById(s, m.operatorId)?.name}</span>}
           </div>
         </div>
         <button type="button" id={`menu-trigger-${m.id}`} aria-label="更多消息操作" aria-haspopup="menu" aria-expanded={menuOpen} title="更多消息操作（也可右键消息）" className={clsx('self-start rounded p-1 text-zinc-400 transition-opacity hover:bg-zinc-200 hover:text-zinc-700 focus-visible:opacity-100 group-hover:opacity-100', menuOpen ? 'opacity-100' : 'opacity-0')} onClick={(e) => { setQuoteSelection('');const rect = e.currentTarget.getBoundingClientRect(); positionMenu(rect.left, rect.bottom + 4); setMenuOpen((v) => !v) }}><MoreHorizontal size={16} /></button>

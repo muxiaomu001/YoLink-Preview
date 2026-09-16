@@ -489,7 +489,7 @@ export interface Message {
   editedAt?: ISODate
   /** 编辑前的正文留在本地审计数据中 */
   editHistory?: { text: string; at: ISODate; operatorId: string }[]
-  /** 引用回复 */
+  /** 回复的目标消息 */
   replyToId?: string
   quoteText?: string
   /** 转发来源 */

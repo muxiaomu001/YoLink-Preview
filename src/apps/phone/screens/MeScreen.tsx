@@ -10,7 +10,8 @@ import { walletBalance } from '@/store/actions/modules'
 import { Avatar, TitleChip } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
-import { Row, SectionLabel, TabTitle } from '../parts'
+import { demoToast } from '@/ui/DemoNote'
+import { DemoHint, LevelTag, Row, SectionLabel, TabTitle } from '../parts'
 import { AppearanceScreen, InfoScreen, NotificationScreen, ProfileScreen } from './MeSubScreens'
 
 type Sub = 'profile' | 'appearance' | 'notification' | 'privacy' | 'storage' | 'security' | 'language' | 'help' | 'about' | 'wallet' | 'referral' | null
@@ -26,14 +27,14 @@ export function MeScreen({ customerId, onLoggedOut }: { customerId: string; onLo
   if (sub === 'profile') return <ProfileScreen customerId={customerId} onBack={back} />
   if (sub === 'appearance') return <AppearanceScreen customerId={customerId} onBack={back} />
   if (sub === 'notification') return <NotificationScreen onBack={back} />
-  if (sub === 'privacy') return <InfoScreen title="隐私（P1）" onBack={back} rows={[{ label: '手机号可见', value: '我的好友', level: 'P1' }, { label: '最后上线时间', value: '所有人', level: 'P1' }, { label: '头像可见', value: '所有人', level: 'P1' }, { label: '谁可以拉我入群', value: '我的好友', level: 'P1' }]} />
-  if (sub === 'storage') return <InfoScreen title="数据与存储（P1）" onBack={back} rows={[{ label: '存储用量', value: '128 MB', level: 'P1' }, { label: '清理缓存', level: 'P1' }, { label: '自动下载媒体', value: 'Wi-Fi', level: 'P1' }]} />
-  if (sub === 'security') return <InfoScreen title="账号安全（P1）" onBack={back} rows={[{ label: '修改密码', level: 'P1' }, { label: '设备管理', value: `最多 ${s.policyNumbers.maxDevices} 台在线`, level: 'P1' }, { label: '两步验证', value: '未开启', level: 'P1' }]} note={c.mustChangePassword ? '员工重置过你的密码，首次登录需强制修改。' : `同时在线设备数上限来自数值型策略（${s.policyNumbers.maxDevices} 台）。`} />
+  if (sub === 'privacy') return <InfoScreen title="隐私" onBack={back} rows={[{ label: '手机号可见', value: '我的好友', level: 'P1' }, { label: '最后上线时间', value: '所有人', level: 'P1' }, { label: '头像可见', value: '所有人', level: 'P1' }, { label: '谁可以拉我入群', value: '我的好友', level: 'P1' }]} />
+  if (sub === 'storage') return <InfoScreen title="数据与存储" onBack={back} rows={[{ label: '存储用量', value: '128 MB', level: 'P1' }, { label: '清理缓存', level: 'P1' }, { label: '自动下载媒体', value: 'Wi-Fi', level: 'P1' }]} />
+  if (sub === 'security') return <InfoScreen title="账号安全" onBack={back} rows={[{ label: '修改密码', level: 'P1' }, { label: '设备管理', value: `最多 ${s.policyNumbers.maxDevices} 台在线`, level: 'P1' }, { label: '两步验证', value: '未开启', level: 'P1' }]} note={c.mustChangePassword ? '客服为你重置过密码，请尽快修改。' : `同一账号最多 ${s.policyNumbers.maxDevices} 台设备同时在线。`} />
   if (sub === 'language') return <InfoScreen title="语言" onBack={back} rows={[{ label: '中文', value: '✓' }, { label: 'English' }]} />
   if (sub === 'help') return <InfoScreen title="帮助与反馈" onBack={back} rows={[{ label: '帮助文档', value: s.enterprise.faqUrl }, { label: '意见反馈' }]} />
-  if (sub === 'about') return <InfoScreen title="关于" onBack={back} rows={[{ label: '版本号', value: '1.0.0（演示）' }, { label: '服务条款', value: s.enterprise.agreementUrl }, { label: '隐私政策', value: s.enterprise.privacyUrl }]} />
+  if (sub === 'about') return <InfoScreen title="关于" onBack={back} rows={[{ label: '版本号', value: '1.0.0' }, { label: '服务条款', value: s.enterprise.agreementUrl }, { label: '隐私政策', value: s.enterprise.privacyUrl }]} />
   if (sub === 'wallet') return <WalletScreen customerId={customerId} onBack={back} />
-  if (sub === 'referral') return <InfoScreen title="邀请好友（P2）" onBack={back} rows={[{ label: '我的邀请码', value: c.accountId, level: 'P2' }, { label: '已邀请', value: `${c.inviteCount} 人`, level: 'P2' }, { label: '团队人数', value: `${c.teamCount} 人`, level: 'P2' }]} note="推荐奖励规则在管理后台「推荐奖励」配置。" />
+  if (sub === 'referral') return <InfoScreen title="邀请好友" onBack={back} rows={[{ label: '我的邀请码', value: c.accountId, level: 'P2' }, { label: '已邀请', value: `${c.inviteCount} 人`, level: 'P2' }, { label: '团队人数', value: `${c.teamCount} 人`, level: 'P2' }]} />
 
   const showWallet = s.enterprise.modules.wallet && can('wallet.view')
   const showCheckin = s.enterprise.modules.checkin && can('checkin.sign')
@@ -72,15 +73,15 @@ export function MeScreen({ customerId, onLoggedOut }: { customerId: string; onLo
             {showWallet && (
               <button type="button" onClick={() => setSub('wallet')} className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left active:bg-zinc-50">
                 <div className="flex items-center gap-1 text-[10px] text-zinc-500">
-                  <Wallet size={12} /> 钱包 <span className="rounded bg-zinc-100 px-1 text-[9px]">P2</span>
+                  <Wallet size={12} /> 钱包 <LevelTag level="P2" />
                 </div>
                 <div className="mt-0.5 text-[15px] font-semibold text-zinc-900">{walletBalance(s.walletTxs, customerId)} 积分</div>
               </button>
             )}
             {showCheckin && (
-              <button type="button" onClick={() => toast('签到成功，奖励已入账（演示）')} className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left active:bg-zinc-50">
+              <button type="button" onClick={() => demoToast('签到')} className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left active:bg-zinc-50">
                 <div className="flex items-center gap-1 text-[10px] text-zinc-500">
-                  <CalendarCheck size={12} /> 每日签到 <span className="rounded bg-zinc-100 px-1 text-[9px]">P2</span>
+                  <CalendarCheck size={12} /> 每日签到 <LevelTag level="P2" />
                 </div>
                 <div className="mt-0.5 text-[13px] font-medium text-brand-700">点击签到</div>
               </button>
@@ -100,7 +101,9 @@ export function MeScreen({ customerId, onLoggedOut }: { customerId: string; onLo
           {showReferral && <Row label="邀请好友" level="P2" onClick={() => setSub('referral')} />}
           {showDelete && <Row label="注销账号" level="P1" danger onClick={() => void deleteAccount()} />}
         </div>
-        <p className="px-4 py-3 text-[10px] leading-relaxed text-zinc-400">看不到的入口（钱包、签到、邀请好友、注销账号）是模块或策略关了；右侧演示控制面板列出了原因。</p>
+        <div className="px-4 py-3">
+          <DemoHint>看不到的入口（钱包、签到、邀请好友、注销账号）是模块或策略关了，右侧演示控制面板列出了原因。</DemoHint>
+        </div>
       </div>
     </div>
   )
@@ -113,7 +116,7 @@ function WalletScreen({ customerId, onBack }: { customerId: string; onBack: () =
   const txs = s.walletTxs.filter((t) => t.customerId === customerId).slice(0, 8)
   return (
     <InfoScreen
-      title="钱包（P2）"
+      title="钱包"
       onBack={onBack}
       rows={[
         { label: '积分余额', value: `${walletBalance(s.walletTxs, customerId)}`, level: 'P2' },
@@ -121,7 +124,6 @@ function WalletScreen({ customerId, onBack }: { customerId: string; onBack: () =
         ...(canBind ? [{ label: '绑定收款账户', level: 'P2' as const }] : []),
         ...txs.map((t) => ({ label: t.note || t.type, value: `${t.amount > 0 ? '+' : ''}${t.amount}` })),
       ]}
-      note={`提现入口按 wallet.withdraw（${canWithdraw ? '开' : '关'}）、绑定账户按 wallet.bind_account（${canBind ? '开' : '关'}）显示。`}
     />
   )
 }

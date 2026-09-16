@@ -5,7 +5,8 @@ import { fmtDate, fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { staffById } from '@/store/selectors'
 import { Button, Select } from '@/ui/primitives'
-import { Card, Note, PageHeader, Pill, Table, type Column } from '@/ui/display'
+import { Card, Note, PageHeader, Table, type Column } from '@/ui/display'
+import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { AttachedActionsCell } from '@/apps/workbench/pages/InvitesPage.parts'
@@ -60,9 +61,10 @@ export function InviteLinksPage() {
     {
       key: 'clicks',
       title: (
-        <span>
-          点击数 <Pill>P1</Pill>
-        </span>
+        <>
+          点击数
+          <DemoLevelTag level="P1" />
+        </>
       ),
       align: 'right',
       render: (l) => <span className="tabular-nums text-zinc-500">{l.clicks}</span>,
@@ -138,7 +140,8 @@ export function InviteLinksPage() {
       >
         <Table rows={rows} columns={columns} rowKey={(l) => l.id} empty="没有符合条件的链接" />
       </Card>
-      <p className="mt-2 text-[11px] text-zinc-400">最近一条创建于 {rows[0] ? fmtDateTime(rows[0].createdAt) : '-'}。点击数为 P1：正式版由短链服务统计。</p>
+      <p className="mt-2 text-[11px] text-zinc-400">最近一条创建于 {rows[0] ? fmtDateTime(rows[0].createdAt) : '-'}。</p>
+      <DemoNote className="mt-2">点击数由短链服务统计，排在第二版<DemoLevelTag level="P1" />。</DemoNote>
 
       {detail && <InviteLinkDetailModal link={detail} onClose={() => setDetail(null)} />}
       {creating && <InviteLinkCreateModal onClose={() => setCreating(false)} />}

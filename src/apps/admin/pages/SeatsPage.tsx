@@ -7,6 +7,7 @@ import { customersOfSeat, staffById } from '@/store/selectors'
 import { Button } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, SeatAvatar, Table, type Column } from '@/ui/display'
 import { toast } from '@/ui/overlay'
+import { DemoLevelTag } from '@/ui/DemoNote'
 import { confirm } from '@/ui/confirm'
 import { HandoverModal, SeatEditModal } from './SeatsPage.parts'
 
@@ -98,9 +99,10 @@ export function SeatsPage() {
     {
       key: 'max',
       title: (
-        <span>
-          上限 <Pill>P1</Pill>
-        </span>
+        <>
+          上限
+          <DemoLevelTag level="P1" />
+        </>
       ),
       align: 'right',
       render: (r) =>

@@ -75,8 +75,8 @@ export function chatExperienceActions(set: Set, get: Get): ChatExperienceActions
       const conv=s.conversations.find((c)=>c.id===input.convId)!, group=s.chatGroups.find((g)=>g.id===conv.chatGroupId)
       const mentions=mentionsIn(s,input.convId,text,input.selectedMentions)
       if(mentions.mentionAll&&!(input.actor.kind==='seat'?seatCan(s,input.actor.id,'group.mention_all',group?.id):customerCan(s,input.actor.id,'group.mention_all',group?.id)))return{ok:false,reason:'当前不允许 @所有人'}
-      if(input.replyToId&&!s.messages.some((m)=>m.id===input.replyToId&&m.convId===input.convId&&messageVisibleFor(s,m,input.actor)))return{ok:false,reason:'被引用的消息已不可用，请取消引用后发送'}
-      if(input.quoteText&&input.replyToId&&!s.messages.find((m)=>m.id===input.replyToId)?.text.includes(input.quoteText))return{ok:false,reason:'引用内容已变化，请重新选择'}
+      if(input.replyToId&&!s.messages.some((m)=>m.id===input.replyToId&&m.convId===input.convId&&messageVisibleFor(s,m,input.actor)))return{ok:false,reason:'要回复的消息已不可用，请取消回复后发送'}
+      if(input.quoteText&&input.replyToId&&!s.messages.find((m)=>m.id===input.replyToId)?.text.includes(input.quoteText))return{ok:false,reason:'所引用的原文已变化，请重新选择'}
       const id=newId('msg'),attemptId=newId('attempt'),at=now()
       const m:Message={id,convId:input.convId,senderKind:input.actor.kind,senderId:input.actor.id,seatId:input.actor.kind==='seat'?input.actor.id:undefined,operatorId:input.actor.staffId,kind:input.kind??'text',text,media:input.media,at,replyToId:input.replyToId,quoteText:input.quoteText,...mentions,delivery:'pending',attemptId,aiDraftUsed:input.aiDraftUsed,forwardedFrom:input.forwardedFrom,
         channelId:group?.kind==='channel'?group.id:undefined,channelSignature:group?.kind==='channel'&&input.signature?s.seats.find((x)=>x.id===input.actor.id)?.displayName:undefined,receiptMemberSeatIds:group?.memberSeatIds,receiptMemberCustomerIds:group?.memberCustomerIds}
@@ -89,7 +89,7 @@ export function chatExperienceActions(set: Set, get: Get): ChatExperienceActions
       if(!m||m.delivery!=='failed'||m.senderKind!==actor.kind||m.senderId!==actor.id||(actor.kind==='seat'&&m.operatorId!==actor.staffId)||!messageVisibleFor(s,m,actor))return{ok:false,reason:'无法重试这条消息'}
       const reason=sendFailure(s,m.convId,actor,!!m.media)
       if(reason)return{ok:false,reason}
-      if(m.replyToId&&!s.messages.some((x)=>x.id===m.replyToId&&messageVisibleFor(s,x,actor)))return{ok:false,reason:'引用已不可用，请删除失败消息后重新发送'}
+      if(m.replyToId&&!s.messages.some((x)=>x.id===m.replyToId&&messageVisibleFor(s,x,actor)))return{ok:false,reason:'要回复的消息已不可用，请删除这条失败消息后重新发送'}
       const attemptId=newId('attempt')
       set({messages:s.messages.map((x)=>x.id===id?{...x,delivery:'pending',failureReason:undefined,attemptId}:x),failNextSend:false})
       finish(id,attemptId,actor,!!s.failNextSend)

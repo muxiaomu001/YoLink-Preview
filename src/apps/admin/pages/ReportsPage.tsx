@@ -28,7 +28,7 @@ export function ReportsPage() {
     const target = customerById(s, r.targetCustomerId)
     const name = target?.nickname ?? '该客户'
     const copy: Record<Resolution, { title: string; body: string; ok: string; danger: boolean }> = {
-      blocked: { title: `拉黑「${name}」？`, body: '拉黑后该客户不能再在群里发言、不能私聊其他客户（正式产品由策略引擎执行）。举报标记为已处理，记审计日志。', ok: '拉黑', danger: true },
+      blocked: { title: `拉黑「${name}」？`, body: '拉黑后该客户不能再在群里发言，也不能私聊其他客户。举报标记为已处理，记审计日志。', ok: '拉黑', danger: true },
       deleted: { title: '删除被举报的消息？', body: '删除后客户侧不可见，审计仍可查。举报标记为已处理，记审计日志。', ok: '删除消息', danger: true },
       ignored: { title: '忽略这条举报？', body: '不做处理，举报标记为已处理并记审计日志。', ok: '忽略', danger: false },
     }
@@ -124,9 +124,9 @@ export function ReportsPage() {
 
   return (
     <div>
-      <PageHeader title="举报处理（P1）" desc="客户在 App 里举报用户或消息，进这里排队。每一次处理都记审计日志。" />
+      <PageHeader title="举报处理" level="P1" desc="客户在 App 里提交的举报会进入这里排队，按先后顺序处理。" />
       <Note>
-        被举报对象是消息时可先看上下文再决定。处理动作三选一：拉黑被举报人、删除消息（仅消息类）、忽略。<b>机器人账号被举报的记录进 15 文档事实提醒</b>，不在这里处理。
+        被举报对象是消息时可先看上下文再决定。处理动作三选一：拉黑被举报人、删除消息（仅消息类）、忽略。<b>机器人账号被举报的记录进日报的事实提醒</b>，不在这里处理。
       </Note>
 
       <Tabs

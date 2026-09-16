@@ -7,6 +7,7 @@ import { useStore } from '@/store/store'
 import { confirm } from '@/ui/confirm'
 import { Button, Field, Input, Select, Switch } from '@/ui/primitives'
 import { Card, Note, Pill, Table } from '@/ui/display'
+import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 import { Modal, toast } from '@/ui/overlay'
 
 const FIELD_TYPE_LABEL: Record<CustomField['type'], string> = { text: '文本', number: '数字', date: '日期', select: '单选' }
@@ -25,9 +26,10 @@ export function CustomFieldsTab() {
   }
   return (
     <div className="space-y-4">
-      <Note>
-        <b>P1</b>：企业自定义的客户字段，坐席在客户资料卡上填写或由接口同步写入；可作为自动化规则的条件。
-      </Note>
+      <Note>企业自定义的客户字段，坐席在客户资料卡上填写或由接口同步写入；可作为自动化规则的条件。</Note>
+      <DemoNote>
+        通用字段排在第二版<DemoLevelTag level="P1" />。
+      </DemoNote>
       <Card
         title="通用字段"
         padded={false}
@@ -130,9 +132,10 @@ export function AutomationTab() {
   }
   return (
     <div className="space-y-4">
-      <Note>
-        <b>P1</b>：触发（同步到账、定时）→ 条件（画像字段）→ 动作（挂头衔、打内部标签、提醒员工）。规则命中一次记一次执行，执行记录进审计日志。
-      </Note>
+      <Note>触发（同步到账、定时）→ 条件（画像字段）→ 动作（挂头衔、打内部标签、提醒员工）。规则命中一次记一次执行，执行记录进审计日志。</Note>
+      <DemoNote>
+        自动化规则排在第二版<DemoLevelTag level="P1" />。
+      </DemoNote>
       <Card
         title="自动化规则"
         padded={false}
@@ -238,7 +241,7 @@ function AutomationModal({ rule, onClose }: { rule?: AutomationRule; onClose: ()
           <Switch checked={form.enabled} onChange={(v) => set('enabled', v)} />
         </div>
         {error && form.name && <p className="text-xs text-red-600">{error}</p>}
-        <Note>正式版触发 / 条件 / 动作是结构化选择器，演示用文本描述。</Note>
+        <DemoNote>正式产品里触发、条件、动作都是结构化选择器，演示里用一句文本描述代替。</DemoNote>
       </div>
     </Modal>
   )

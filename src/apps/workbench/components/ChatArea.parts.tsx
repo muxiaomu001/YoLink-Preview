@@ -16,6 +16,7 @@ import { Avatar, Pill, TitleChip } from '@/ui/display'
 import { HelpTip } from '@/ui/help'
 import { Button, Checkbox, Input } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
+import { DemoNote } from '@/ui/DemoNote'
 import { useWorkbench } from '../useWorkbench'
 import { jumpToMessage, memberTotal } from './group/groupRules'
 
@@ -197,8 +198,8 @@ export function AiPanel({ drafts, onSend, onEdit, onClose }: { drafts: AiDraft[]
   return (
     <div className="border-t border-violet-100 bg-violet-50/60 px-4 py-2">
       <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-medium text-violet-700">
-        <Sparkles size={13} /> AI 回复推荐 <span className="text-[10px] font-normal">知识匹配演示</span>
-        <HelpTip text="当前仅按客户最后一句匹配已发布知识，返回原文供核对，不调用真实模型。默认手动，个人设置可开启自动弹出。" />
+        <Sparkles size={13} /> AI 回复推荐
+        <HelpTip text="按客户最后一句在已发布知识里找，返回原文供你核对后再发。默认手动触发，个人设置里可以改成自动弹出。" />
         <button type="button" onClick={onClose} className="ml-auto rounded p-0.5 text-violet-400 hover:bg-violet-100 hover:text-violet-800" aria-label="关闭 AI 推荐" title="关闭">
           <X size={14} />
         </button>
@@ -215,6 +216,7 @@ export function AiPanel({ drafts, onSend, onEdit, onClose }: { drafts: AiDraft[]
           </div>
         ))}
       </div>
+      <DemoNote compact className="mt-1.5">演示里按关键词匹配已发布的知识条目，不调用真实模型。</DemoNote>
       {source && <Modal open title={source.basis} onClose={() => setSource(null)} width={560}><p className="whitespace-pre-wrap text-sm leading-relaxed">{source.sourceBody}</p></Modal>}
     </div>
   )

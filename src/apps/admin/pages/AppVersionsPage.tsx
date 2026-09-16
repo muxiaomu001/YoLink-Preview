@@ -6,6 +6,7 @@ import type { AppPlatform, AppVersion } from '@/domain/types'
 import { useStore } from '@/store/store'
 import { Button, Field, Input, Textarea } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill } from '@/ui/display'
+import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 import { toast } from '@/ui/overlay'
 
 const PLATFORM_LABEL: Record<AppPlatform, string> = { android: 'Android', ios: 'iOS', windows: 'Windows 工作台' }
@@ -29,8 +30,9 @@ export function AppVersionsPage() {
     <div>
       <PageHeader title="App 版本管理" desc="客户端「关于」页的「检查更新」读这里。每个平台一组：最新版本、下载地址、更新说明、最低版本。" />
       <Note>
-        <b>低于最低版本的客户端启动即强制更新</b>，不能进入。热更新不做。品牌 App 每个品牌包各一组（P1，演示只有主包）。
+        <b>低于最低版本的客户端启动即强制更新</b>，不能进入。不做热更新。
       </Note>
+      <DemoNote className="mt-2">品牌 App 每个品牌包各一组<DemoLevelTag level="P1" />，演示里只有主包。</DemoNote>
       <div className="mt-4 grid grid-cols-3 gap-4">
         {versions.map((v) => (
           <VersionCard key={v.platform} version={v} />

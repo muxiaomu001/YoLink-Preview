@@ -11,6 +11,7 @@ import { Button, Field, Select } from '@/ui/primitives'
 import { KV, Note, Pill, SeatAvatar, TagChip, TitleChip } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
+import { DemoLevelTag } from '@/ui/DemoNote'
 
 const SOURCE_LABEL: Record<CustomerSeat['source'], string> = { register: '注册时添加', backfill: '补加', reassign: '改主归属时添加' }
 
@@ -115,7 +116,7 @@ export function CustomerDetailModal({ customerId, onClose }: { customerId: strin
         </section>
 
         <section className="rounded-md border border-zinc-200 p-3">
-          <h4 className="text-xs font-semibold text-zinc-700">改主归属坐席（P1）</h4>
+          <h4 className="text-xs font-semibold text-zinc-700">改主归属坐席<DemoLevelTag level="P1" /></h4>
           <p className="mt-1 text-[11px] text-zinc-500">分配错了才用。客户会看到主联系人变了，所以这是纠错手段，不是日常操作。</p>
           <div className="mt-2 flex items-end gap-2">
             <Field label="新主归属坐席">
@@ -136,7 +137,7 @@ export function CustomerDetailModal({ customerId, onClose }: { customerId: strin
 
         <section className="flex items-center justify-between rounded-md border border-red-200 bg-red-50/40 p-3">
           <div>
-            <h4 className="text-xs font-semibold text-red-800">注销客户（P1）</h4>
+            <h4 className="text-xs font-semibold text-red-800">注销客户<DemoLevelTag level="P1" /></h4>
             <p className="mt-0.5 text-[11px] text-red-700/80">无法登录、移出所有群、不再出现在工作台。数据保留，审计仍可查。</p>
           </div>
           <Button variant="danger" disabled={deleted} onClick={() => void remove()}>

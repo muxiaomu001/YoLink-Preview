@@ -5,8 +5,8 @@ import { newId } from '@/domain/ids'
 import { fmtDate } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { Button, Checkbox, Field, Input, Select, Textarea } from '@/ui/primitives'
-import { Note } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
+import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 
 /** 演示用色板，代替图片上传 */
 const PALETTE = ['#1f3b73', '#0f766e', '#7e22ce', '#b45309', '#be123c', '#0369a1', '#4d7c0f', '#334155']
@@ -20,7 +20,7 @@ const plusDays = (n: number) => fmtDate(new Date(Date.now() + n * 86400000).toIS
 /** 色块缩略图：色块 + 标题首字 */
 export function ColorThumb({ color, text, small }: { color: string; text: string; small?: boolean }) {
   return (
-    <span className={clsx('inline-flex items-center justify-center rounded text-white font-medium', small ? 'h-6 w-10 text-[11px]' : 'h-9 w-16 text-sm')} style={{ background: color }} title="演示用色块代替图片">
+    <span className={clsx('inline-flex items-center justify-center rounded text-white font-medium', small ? 'h-6 w-10 text-[11px]' : 'h-9 w-16 text-sm')} style={{ background: color }} title="横幅图片">
       {text.slice(0, 1)}
     </span>
   )
@@ -112,7 +112,7 @@ export function BannerModal({ banner, onClose }: { banner?: Banner; onClose: () 
         <Field label="标题" required hint={`${form.title.length}/32`}>
           <Input value={form.title} maxLength={32} onChange={(e) => set('title', e.target.value)} placeholder="如：四季度全球配置展望" />
         </Field>
-        <Field label="图片" hint="推荐 750×400，最大 2MB；演示用色板代替上传">
+        <Field label="图片" hint="推荐 750×400，最大 2MB" demoHint="演示里用色板代替图片上传">
           <div className="flex items-center gap-3">
             <ColorThumb color={form.imageColor} text={form.title || '图'} />
             <ColorPicker value={form.imageColor} onChange={(v) => set('imageColor', v)} />
@@ -155,7 +155,7 @@ export function BannerModal({ banner, onClose }: { banner?: Banner; onClose: () 
             <Input type="date" value={form.end} onChange={(e) => set('end', e.target.value)} />
           </Field>
         </div>
-        <Field label="目标人群" hint="P1">
+        <Field label={<>目标人群<DemoLevelTag level="P1" /></>}>
           <div className="flex h-8 items-center gap-5 text-[13px] text-zinc-700">
             <label className="flex items-center gap-1.5">
               <input type="radio" className="accent-brand-700" checked={form.audience === 'all'} onChange={() => set('audience', 'all')} /> 全部
@@ -166,7 +166,7 @@ export function BannerModal({ banner, onClose }: { banner?: Banner; onClose: () 
           </div>
         </Field>
         {form.audience === 'tags' && (
-          <Field label="标签（内部标签，客户看不到）" hint="P1，多选">
+          <Field label={<>标签（内部标签，客户看不到）<DemoLevelTag level="P1" /></>} hint="多选">
             <div className="flex flex-wrap gap-3">
               {s.tags.map((t) => (
                 <Checkbox key={t.id} checked={form.tagIds.includes(t.id)} onChange={(v) => set('tagIds', v ? [...form.tagIds, t.id] : form.tagIds.filter((x) => x !== t.id))} label={t.name} />
@@ -254,10 +254,10 @@ export function AnnouncementModal({ announcement, onClose }: { announcement?: An
         <Field label="标题" required hint={`${form.title.length}/64`}>
           <Input value={form.title} maxLength={64} onChange={(e) => set('title', e.target.value)} />
         </Field>
-        <Field label="正文" required hint={`${form.body.length}/1024；正式版是富文本编辑器`}>
+        <Field label="正文" required hint={`${form.body.length}/1024`} demoHint="正式产品这里是富文本编辑器，演示用纯文本">
           <Textarea rows={4} maxLength={1024} value={form.body} onChange={(e) => set('body', e.target.value)} />
         </Field>
-        <Field label="图片（可选）" hint="演示用色板代替上传">
+        <Field label="图片（可选）" demoHint="演示里用色板代替图片上传">
           <ColorPicker value={form.imageColor} onChange={(v) => set('imageColor', v)} allowNone />
         </Field>
         <div className="grid grid-cols-2 gap-3">
@@ -268,8 +268,8 @@ export function AnnouncementModal({ announcement, onClose }: { announcement?: An
             <Select value={form.buttonAction} onChange={(e) => set('buttonAction', e.target.value as Announcement['buttonAction'])}>
               <option value="close">关闭</option>
               <option value="link">打开链接</option>
-              <option value="checkin" disabled>打开签到（随签到模块到 P2）</option>
-              <option value="wallet" disabled>打开钱包（随钱包模块到 P2）</option>
+              <option value="checkin" disabled>打开签到（签到模块未开放）</option>
+              <option value="wallet" disabled>打开钱包（钱包模块未开放）</option>
             </Select>
           </Field>
         </div>
@@ -299,7 +299,9 @@ export function AnnouncementModal({ announcement, onClose }: { announcement?: An
           </Field>
         </div>
         {error && form.title && <p className="text-xs text-red-600">{error}</p>}
-        <Note>「打开签到」「打开钱包」两个按钮动作随对应模块到 P2 才开放，这里先禁用。</Note>
+        <DemoNote>
+          「打开签到」「打开钱包」两个按钮动作随对应模块开放<DemoLevelTag level="P2" />，这里先禁用。
+        </DemoNote>
       </div>
     </Modal>
   )

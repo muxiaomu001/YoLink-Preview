@@ -52,7 +52,7 @@ export function StatsPage() {
   if (!last) {
     return (
       <div>
-        <PageHeader title="基础统计（P1）" desc="累计注册、昨日新增、DAU、消息量等每日汇总。" />
+        <PageHeader title="基础统计" level="P1" desc="累计注册、昨日新增、DAU、消息量等每日汇总。" />
         <Empty text="还没有统计数据" />
       </div>
     )
@@ -62,7 +62,7 @@ export function StatsPage() {
 
   return (
     <div>
-      <PageHeader title="基础统计（P1）" desc={`每日汇总，最近一天为 ${last.date}。累计注册按客户表实时计算，其余指标来自每日跑批。`} />
+      <PageHeader title="基础统计" level="P1" desc={`每日汇总，最近一天为 ${last.date}。累计注册按客户表实时计算，其余指标来自每日跑批。`} />
       <Note>
         数据<b>每日 10:00 更新</b>（参考腾讯云 IM）；DAU 按 24 小时内有消息的客户算。高级统计（漏斗、留存、RFM）v1 不做，需要时从导出的数据在外部 BI 里分析。
       </Note>

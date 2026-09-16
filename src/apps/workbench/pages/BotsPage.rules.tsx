@@ -259,7 +259,7 @@ export function ReviewAndRuns() {
               <span className="text-zinc-500">「{botOf(rejecting.botId)?.nickname}」→ {groupName(rejecting.groupId)}：</span>
               {rejecting.text}
             </div>
-            <Field label="驳回原因" required hint="记入运行记录与审计">
+            <Field label="驳回原因" required hint="会写入这条发言的运行记录">
               <Textarea rows={2} maxLength={100} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="如：话题重复 / 口吻不像人设" />
             </Field>
           </div>

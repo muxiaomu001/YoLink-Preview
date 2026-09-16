@@ -8,6 +8,7 @@ import { useStore } from '@/store/store'
 import { Button } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, Table } from '@/ui/display'
 import { toast } from '@/ui/overlay'
+import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 import { confirm } from '@/ui/confirm'
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -39,7 +40,7 @@ export function BackupsPage() {
     })
     if (!ok) return
     s.restoreBackup(b.id, admin)
-    toast(`已提交恢复任务：${fmtSeconds(b.at)} 的备份（演示不真正覆盖数据）`, 'warn')
+    toast(`已提交恢复任务：${fmtSeconds(b.at)} 的备份`, 'warn')
   }
   const download = (b: Backup) => toast(`开始下载 ${fmtSeconds(b.at)} 的备份（${fmtSize(b.sizeMb)}），链接 15 分钟内有效`, 'info')
 
@@ -55,7 +56,7 @@ export function BackupsPage() {
         }
       />
       <Note>
-        备份脚本是 P0，<b>后台按钮是 P1</b>。恢复前会二次确认，恢复会覆盖当前数据并记入审计日志。
+        恢复前会二次确认，恢复会覆盖当前数据并记入审计日志。
         {latest && (
           <>
             {' '}
@@ -63,6 +64,9 @@ export function BackupsPage() {
           </>
         )}
       </Note>
+      <DemoNote className="mt-2">
+        备份脚本第一版就有；后台里的备份与恢复按钮排在第二版<DemoLevelTag level="P1" />。
+      </DemoNote>
       <Card className="mt-4" padded={false}>
         <Table
           rows={rows}

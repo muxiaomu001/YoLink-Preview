@@ -61,3 +61,11 @@ export function daysSince(s: string): number {
 export function fmtWait(s: string): string {
   return fmtAgo(s).replace('前', '')
 }
+
+/** 时长口语化：把秒数说成「2 分钟」「1 小时」「3 天」，给用户看的提示用 */
+export function fmtDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds} 秒`
+  if (seconds < 3600) return `${Math.round(seconds / 60)} 分钟`
+  if (seconds < 86400) return `${Math.round(seconds / 3600)} 小时`
+  return `${Math.round(seconds / 86400)} 天`
+}

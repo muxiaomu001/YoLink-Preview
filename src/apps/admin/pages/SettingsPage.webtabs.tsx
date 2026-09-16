@@ -10,6 +10,7 @@ import { Button, Field, Input, Switch } from '@/ui/primitives'
 import { Card, Note, Pill, Table } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
+import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 
 const MAX_TABS = 3
 const PLACEHOLDERS = ['{user_id}', '{external_id}', '{ts}', '{sig}']
@@ -40,9 +41,14 @@ export function WebTabsPane() {
       <Note>
         网址用应用内 WebView 打开，必须 HTTPS。可带占位符 {PLACEHOLDERS.join('、')}：sig 是用共享密钥对前三者的签名，客户系统验签后免登录，等同简单的可信单点登录。
       </Note>
-      {tabs.length > 1 && <Note tone="amber">P1：超过 1 个栏目时，标签进入客户 App「发现」页作为入口卡片，不再各占一个底部标签。</Note>}
+      {tabs.length > 1 && (
+        <DemoNote>
+          超过 1 个栏目时，标签进入客户 App「发现」页作为入口卡片，不再各占一个底部标签<DemoLevelTag level="P1" />。
+        </DemoNote>
+      )}
       <Card
-        title={`网站栏目（P0） · ${tabs.length}/${MAX_TABS}`}
+        title={`网站栏目 · ${tabs.length}/${MAX_TABS}`}
+        level="P0"
         padded={false}
         extra={
           <Button size="sm" variant="primary" disabled={tabs.length >= MAX_TABS} onClick={() => setCreating(true)}>
@@ -156,7 +162,7 @@ function WebTabEditor({ tab, onClose, onSave }: { tab?: WebTab; onClose: () => v
           <Field label="标题" required hint="底部标签文字，中英文，1 到 8 字">
             <Input value={form.title} maxLength={8} onChange={(e) => patch({ title: e.target.value })} placeholder="如：我的账户" />
           </Field>
-          <Field label="图标" required hint="正式产品上传图片；演示取一个字">
+          <Field label="图标" required hint="推荐 96×96 PNG" demoHint="演示里取一个字代替上传的图标">
             <Input value={form.iconText} maxLength={1} onChange={(e) => patch({ iconText: e.target.value })} className="w-16 text-center" placeholder="账" />
           </Field>
         </div>

@@ -58,7 +58,7 @@ export function GroupSettingsPanel({ group: g, actor, perm, compact, officialEdi
         <Row label="新成员可见历史消息" desc={g.settings.historyVisible ? '新成员入群可看全部历史' : '新成员只看得到加入后的消息'} disabledReason={canInfo ? undefined : '需要「修改群信息」权限'}>
           <Switch checked={g.settings.historyVisible} disabled={!canInfo} onChange={(v) => patch({ historyVisible: v }, v ? '新成员可见全部历史消息' : '新成员仅可见加入后的消息')} />
         </Row>
-        <Row label={<>官方群标记 {g.official && <Pill tone="amber">官方</Pill>}</>} desc="标记后客户不可退出（group.leave 对客户关闭）" disabledReason={officialEditable ? undefined : '仅员工角色「管理所有群」或管理后台可改'}>
+        <Row label={<>官方群标记 {g.official && <Pill tone="amber">官方</Pill>}</>} desc="标记后客户不能退出这个群" disabledReason={officialEditable ? undefined : '仅员工角色「管理所有群」或管理后台可改'}>
           <Switch checked={g.official} disabled={!officialEditable} onChange={(v) => void toggleOfficial(v)} />
         </Row>
       </div>

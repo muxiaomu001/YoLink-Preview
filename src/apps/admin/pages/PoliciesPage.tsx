@@ -11,6 +11,7 @@ import { PresetDetailModal } from './PoliciesPage.parts'
 import { MatrixTab } from './PoliciesPage.matrix'
 import { NumbersTab } from './PoliciesPage.numbers'
 import { OverridesTab } from './PoliciesPage.overrides'
+import { DemoLevelTag } from '@/ui/DemoNote'
 
 type Tab = 'matrix' | 'presets' | 'numbers' | 'overrides' | 'changes'
 
@@ -39,7 +40,7 @@ export function PoliciesPage() {
           { key: 'matrix', label: '能力矩阵', count: s.policyItems.length },
           { key: 'presets', label: '预设列表', count: s.policyPresets.length },
           { key: 'numbers', label: '数值型策略' },
-          { key: 'overrides', label: '群级 / 用户级覆盖（P1）', count: s.policyOverrides.length },
+          { key: 'overrides', label: <>群级 / 用户级覆盖<DemoLevelTag level="P1" /></>, count: s.policyOverrides.length },
           { key: 'changes', label: '变更记录', count: s.policyChanges.length },
         ]}
       />

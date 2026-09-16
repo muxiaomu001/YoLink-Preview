@@ -31,7 +31,7 @@ function WelcomeCard({ admin }: { admin: string }) {
   const ok = welcome.trim().length > 0 && welcome.length <= 500
   const seatsUsingDefault = s.seats.filter((x) => !x.welcome && x.status !== 'disabled')
   return (
-    <Card title="企业默认欢迎语（P0）">
+    <Card title="企业默认欢迎语" level="P0">
       <div className="space-y-3">
         <Field label="模板" required hint="坐席没单独配欢迎语时用这条，最多 500 字">
           <Textarea rows={5} maxLength={500} value={welcome} onChange={(ev) => setWelcome(ev.target.value)} />
@@ -112,7 +112,7 @@ function DefaultGroupsCard({ admin }: { admin: string }) {
   }
 
   return (
-    <Card title="企业默认官方群与频道（P0）">
+    <Card title="企业默认官方群与频道" level="P0">
       <div className="space-y-3">
         <Note>
           所有新客户注册后加入列表里<b>第一个未满的群</b>；全部满时不加入并提醒管理员建新群。可按顺序配多个同类官方群，与邀请组附带的群叠加。

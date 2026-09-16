@@ -6,6 +6,7 @@ import { clsx } from 'clsx'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { ChatGroup } from '@/domain/types'
 import { Avatar } from '@/ui/display'
+import { DemoNote, useDemoNotes } from '@/ui/DemoNote'
 
 /** 屏头：返回 + 标题 + 右侧 */
 export function ScreenHeader({ title, sub, onBack, right, onTitleClick }: { title: ReactNode; sub?: ReactNode; onBack?: () => void; right?: ReactNode; onTitleClick?: () => void }) {
@@ -36,9 +37,11 @@ export function TabTitle({ title, right }: { title: string; right?: ReactNode })
 }
 
 /** P1 / P2 小标 */
+/** 排期标记属于演示批注，不是产品的一部分；关掉批注后客户端就是正式产品的样子 */
 export function LevelTag({ level }: { level?: 'P1' | 'P2' }) {
-  if (!level) return null
-  return <span className="ml-1 rounded bg-zinc-100 px-1 text-[9px] leading-4 text-zinc-500">{level}</span>
+  const show = useDemoNotes()
+  if (!level || !show) return null
+  return <span className="ml-1 rounded border border-dashed border-zinc-300 px-1 text-[9px] leading-4 text-zinc-400">{level}</span>
 }
 
 /** 分组小标题 */
@@ -87,9 +90,9 @@ export function Sheet({ title, onClose, children, footer }: { title: ReactNode; 
   )
 }
 
-/** 演示说明：手机屏里灰底小字，告诉看 demo 的人这是演示 */
+/** 手机屏里的演示批注，转交给全局批注层，受同一个开关控制 */
 export function DemoHint({ children }: { children: ReactNode }) {
-  return <p className="rounded-md bg-amber-50 px-2.5 py-1.5 text-[10px] leading-relaxed text-amber-800">{children}</p>
+  return <DemoNote compact>{children}</DemoNote>
 }
 
 export function GroupAvatar({ g, size = 40 }: { g: ChatGroup; size?: number }) {

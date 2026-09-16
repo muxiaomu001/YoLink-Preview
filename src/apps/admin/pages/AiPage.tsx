@@ -7,6 +7,7 @@ import { useStore } from '@/store/store'
 import { Button, Field, Input, Select, Switch, Textarea } from '@/ui/primitives'
 import { Avatar, Card, KV, Note, PageHeader, Pill, Stat, Table, Tabs } from '@/ui/display'
 import { toast } from '@/ui/overlay'
+import { DemoNote } from '@/ui/DemoNote'
 import { KnowledgeTab, UsageTab } from './AiPage.parts'
 
 type TabKey = 'service' | 'reply' | 'knowledge' | 'group' | 'usage'
@@ -17,7 +18,7 @@ export function AiPage() {
   const [tab, setTab] = useState<TabKey>('service')
   return (
     <div>
-      <PageHeader title="AI 模块" desc="AI 只给员工出草稿、给群里起话题，永远不直接替坐席对客户下结论。密钥只写不读，客户资料是否喂给 AI 由企业自己决定。" />
+      <PageHeader title="AI 模块" desc="AI 为员工生成回复草稿、为群聊发起话题，不会直接回复客户。密钥保存后不再显示；是否把客户资料提供给 AI 由企业自行决定。" />
       <Tabs
         value={tab}
         onChange={setTab}
@@ -60,11 +61,11 @@ function ServiceTab() {
     s.updateAiSettings(patch, admin)
     setChangingKey(false)
     setNewKey('')
-    toast(changingKey && newKey ? '演示配置已保存；未保存或使用真实密钥' : 'AI 服务设置已保存')
+    toast('AI 服务设置已保存')
   }
   const test = () => {
     const ok = s.testAiConnection()
-    toast(ok ? '演示检查通过：配置项已填写，未连接真实模型' : '演示检查未通过：请填写示例配置', ok ? 'ok' : 'warn')
+    toast(ok ? '连接测试通过' : '连接测试未通过：请先填好服务地址与密钥', ok ? 'ok' : 'warn')
   }
 
   return (
@@ -74,10 +75,10 @@ function ServiceTab() {
           <Field label="服务地址" required hint="OpenAI 兼容接口地址">
             <Input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder="https://" />
           </Field>
-          <Field label="密钥" required hint="演示仅记录已配置状态，不保存密钥，请勿输入真实凭据">
+          <Field label="密钥" required hint="保存后只记录「已配置」状态，页面不回显密钥原文">
             {changingKey ? (
               <div className="flex gap-2">
-                <Input type="password" value={newKey} onChange={(e) => setNewKey(e.target.value)} placeholder="请输入虚构示例，不要填真实密钥" autoComplete="off" />
+                <Input type="password" value={newKey} onChange={(e) => setNewKey(e.target.value)} placeholder="sk-…" autoComplete="off" />
                 {ai.keyConfigured && (
                   <Button onClick={() => { setChangingKey(false); setNewKey('') }}>取消</Button>
                 )}
@@ -100,15 +101,15 @@ function ServiceTab() {
           {error && <p className="text-xs text-red-600">{error}</p>}
         </div>
       </Card>
-      <Card title="模拟配置检查" extra={<Button size="sm" onClick={test}><Plug size={13} /> 模拟配置检查</Button>}>
+      <Card title="连接测试" extra={<Button size="sm" onClick={test}><Plug size={13} /> 测试连接</Button>}>
         <KV
           items={[
             { k: '最近测试', v: ai.lastTestAt ? fmtDateTime(ai.lastTestAt) : '从未测试' },
-            { k: '结果', v: ai.lastTestOk === null ? '-' : ai.lastTestOk ? <Pill tone="green">模拟通过</Pill> : <Pill tone="red">失败</Pill> },
+            { k: '结果', v: ai.lastTestOk === null ? '-' : ai.lastTestOk ? <Pill tone="green">通过</Pill> : <Pill tone="red">失败</Pill> },
             { k: '密钥', v: ai.keyConfigured ? <Pill tone="green">已配置</Pill> : <Pill tone="red">未配置</Pill> },
           ]}
         />
-        <p className="mt-3 text-[11px] text-zinc-400">这里只检查演示配置是否填写，不发出网络请求，不证明模型可用。</p>
+        <DemoNote className="mt-3" compact>演示里只检查配置项填没填，不发网络请求、不连真实模型。密钥请填虚构示例，不要输入真实凭据。</DemoNote>
       </Card>
     </div>
   )
@@ -174,7 +175,7 @@ function GroupTab() {
   }
   return (
     <div className="space-y-4">
-      <Note tone="amber">群活跃助手为产品讨论稿：保留当前演示，首版的触发、节奏和审核细节待确认。</Note>
+      <DemoNote>群活跃助手还是产品讨论稿：这里只演示形态，首版的触发、节奏和审核细节待确认。</DemoNote>
       <div className="grid grid-cols-3 gap-3">
         <Stat label="授权机器人账号数" value={botLimit} sub="来自许可证 AI 模块" />
         <Stat label="已用" value={botUsed} sub={`剩余 ${Math.max(0, botLimit - botUsed)} 个可绑定到群`} tone={botUsed >= botLimit ? 'warn' : 'default'} />

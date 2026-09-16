@@ -1,5 +1,5 @@
 /**
- * 输入区：引用条 → 工具栏（表情 / 附件 / 语音 / 话术 / @ 提及 / AI 推荐）→ 多行输入框 → 底部「发送」。
+ * 输入区：回复条 → 工具栏（表情 / 附件 / 语音 / 话术 / @ 提及 / AI 推荐）→ 多行输入框 → 底部「发送」。
  * 三种候选浮层共用 CandidatePopover：
  * - `@` 成员选择（坐席 + 客户成员 + 「所有人」按策略），Enter / Tab 插入
  * - `/` 话术（matchQuickReplies），Enter / Tab 选中：文字插入光标处，图片 / 文件直接发出
@@ -254,9 +254,9 @@ export function ChatInput({
       {mediaPick&&<MediaComposer draftId={draftId} files={mediaPick.files} kind={mediaPick.kind} onClose={()=>setMediaPick(null)} onSend={onSendMedia}/>}
       {replyTo && (
         <div className="mx-3 mt-2 flex items-center gap-2 rounded-md border-l-2 border-brand-400 bg-zinc-50 px-2 py-1 text-[12px] text-zinc-600">
-          <span className="shrink-0 text-zinc-400">引用</span>
+          <span className="shrink-0 text-zinc-400">回复</span>
           <span className="min-w-0 flex-1 truncate">{senderName(s, replyTo)}：{quoteText&&replyTo.text.includes(quoteText)?quoteText:visibleText(replyTo,'staff')}</span>
-          <button type="button" onClick={onClearReply} className="text-zinc-400 hover:text-zinc-700" aria-label="取消引用"><X size={13} /></button>
+          <button type="button" onClick={onClearReply} className="text-zinc-400 hover:text-zinc-700" aria-label="取消回复"><X size={13} /></button>
         </div>
       )}
 

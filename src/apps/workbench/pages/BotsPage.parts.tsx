@@ -135,7 +135,7 @@ function BotModal({ bot, onClose }: { bot?: BotAccount; onClose: () => void }) {
             ))}
           </div>
         </Field>
-        <Field label="审核员工" hint="先审后发的内容进这位员工的待审列表；手动发言记真实操作者">
+        <Field label="审核员工" hint="先审后发的内容进这位员工的待审列表">
           <Select value={operator} onChange={(e) => setOperator(e.target.value)}>
             <option value="">未指定</option>
             {s.staff.filter((x) => x.status === 'active').map((x) => (

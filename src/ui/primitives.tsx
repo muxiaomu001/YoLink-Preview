@@ -1,5 +1,6 @@
 import { clsx } from 'clsx'
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
+import { DemoNote } from './DemoNote'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 type Size = 'sm' | 'md'
@@ -61,7 +62,8 @@ export function Switch({ checked, onChange, disabled }: { checked: boolean; onCh
   )
 }
 
-export function Field({ label, hint, children, required }: { label: string; hint?: string; children: ReactNode; required?: boolean }) {
+/** hint 写产品口径；demoHint 是演示批注（「这块演示里为什么不一样」），跟着批注开关一起消失 */
+export function Field({ label, hint, demoHint, children, required }: { label: ReactNode; hint?: ReactNode; demoHint?: ReactNode; children: ReactNode; required?: boolean }) {
   return (
     <label className="block">
       <div className="mb-1 flex items-baseline justify-between">
@@ -72,6 +74,7 @@ export function Field({ label, hint, children, required }: { label: string; hint
         {hint && <span className="text-[11px] text-zinc-400">{hint}</span>}
       </div>
       {children}
+      {demoHint && <DemoNote compact className="mt-1">{demoHint}</DemoNote>}
     </label>
   )
 }

@@ -11,6 +11,7 @@ import { Button, Field, Input, Select } from '@/ui/primitives'
 import { Card, Note, Pill, Table } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
+import { DemoLevelTag } from '@/ui/DemoNote'
 
 type Tri = 'inherit' | 'on' | 'off'
 
@@ -73,11 +74,8 @@ export function OverridesTab() {
       </Note>
       <Card
         className="mt-4"
-        title={
-          <span>
-            群级 / 用户级覆盖 <Pill>P1</Pill>
-          </span>
-        }
+        title="群级 / 用户级覆盖"
+        level="P1"
         extra={
           <Button size="sm" variant="primary" onClick={() => setAdding(true)}>
             <Plus size={12} /> 添加覆盖
@@ -244,7 +242,7 @@ function OverrideModal({ override, onClose }: { override?: PolicyOverride; onClo
                         <div>
                           <div className="text-[13px] text-zinc-800">
                             {p.label}
-                            {p.level !== 'P0' && <Pill className="ml-1">{p.level}</Pill>}
+                            {p.level !== 'P0' && <DemoLevelTag level={p.level} />}
                           </div>
                           <div className="font-mono text-[11px] text-zinc-400">{p.key}</div>
                         </div>

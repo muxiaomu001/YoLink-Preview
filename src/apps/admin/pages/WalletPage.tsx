@@ -21,14 +21,8 @@ export function WalletPage() {
     <div>
       <PageHeader
         title="钱包"
-        desc={
-          <>
-            <Pill tone="amber" className="mr-1.5">
-              P2，模块启用时显示
-            </Pill>
-            客户在 App 里攒{s.walletSettings.unitName}、申请提现；后台负责规则、加减与审核。所有加减与审核都记审计。
-          </>
-        }
+        level="P2"
+        desc={`客户在 App 里攒${s.walletSettings.unitName}、申请提现；后台负责规则、加减与审核。所有加减与审核都记审计。`}
       />
       <Tabs
         value={tab}

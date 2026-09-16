@@ -7,6 +7,7 @@ import type { CsvPurchaseRow, CsvReferralRow } from '@/store/actions/integration
 import { confirm } from '@/ui/confirm'
 import { Button, Field, Select, Textarea } from '@/ui/primitives'
 import { Card, KV, Note, Pill, Table } from '@/ui/display'
+import { DemoNote } from '@/ui/DemoNote'
 import { toast } from '@/ui/overlay'
 
 type Template = 'purchase' | 'referral'
@@ -113,7 +114,8 @@ export function CsvImportTab() {
 
   return (
     <div className="space-y-4">
-      <Note>演示不做文件上传，把 CSV 文本粘贴进来即可。匹配键：手机号（正式版还支持客户系统 ID）。未匹配的行不落库，只计数。</Note>
+      <Note>按手机号匹配客户，匹配不上的行不入库，只计入统计。</Note>
+      <DemoNote>演示不做文件上传，把 CSV 文本直接粘进来即可；正式产品还支持按客户系统 ID 匹配。</DemoNote>
       <div className="grid grid-cols-[1fr_320px] gap-4">
         <Card title="粘贴 CSV">
           <div className="space-y-3">

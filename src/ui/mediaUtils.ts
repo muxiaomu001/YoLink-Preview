@@ -14,7 +14,7 @@ export function isImageMedia(m: MessageMedia): boolean {
 
 export function readFileAsMedia(file: File, maxBytes = UPLOAD_MAX_BYTES): Promise<{ ok: true; media: MessageMedia } | { ok: false; error: string }> {
   return new Promise((resolve) => {
-    if (file.size > maxBytes) return resolve({ ok: false, error: `文件超过 ${formatBytes(maxBytes)}（演示存在浏览器里，正式版按策略上限）` })
+    if (file.size > maxBytes) return resolve({ ok: false, error: `文件超过 ${formatBytes(maxBytes)}` })
     const reader = new FileReader()
     reader.onerror = () => resolve({ ok: false, error: '读取文件失败' })
     reader.onload = () => {

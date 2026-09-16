@@ -38,7 +38,7 @@ export function HealthPage() {
         }
       />
       <Note>
-        P1。数据库、Redis、对象存储三项是连通性检查；在线连接数是当前 WebSocket 连接；消息延迟是平均投递延迟，超过 {LATENCY_WARN_MS} ms 标黄。对象存储异常时先去「企业设置 → 对象存储」测试连接。
+        数据库、Redis、对象存储三项是连通性检查；在线连接数是当前 WebSocket 连接；消息延迟是平均投递延迟，超过 {LATENCY_WARN_MS} ms 标黄。对象存储异常时先去「企业设置 → 对象存储」测试连接。
       </Note>
       <div className="mt-4 grid grid-cols-5 gap-3">
         <Stat label="数据库" value={<StatusValue ok={h.db === 'ok'} />} sub="PostgreSQL 连通性" />

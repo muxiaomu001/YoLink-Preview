@@ -122,7 +122,7 @@ export function QuickReplyEditor({ initial, onClose }: { initial?: QuickReply; o
           )}
         </div>
         {!isText && (
-          <Field label={form.kind === 'image' ? '图片' : '文件'} required hint={`本机选择，演示上限 ${formatBytes(UPLOAD_MAX_BYTES)}`}>
+          <Field label={form.kind === 'image' ? '图片' : '文件'} required hint={`最大 ${formatBytes(UPLOAD_MAX_BYTES)}`} demoHint="演示里附件存在本机浏览器，换台电脑打开就没有了">
             <input ref={fileInput} type="file" accept={form.kind === 'image' ? 'image/*' : undefined} className="hidden" onChange={(e) => void pickFile(e)} />
             <div className="flex items-start gap-3">
               {form.media && (form.kind === 'image' ? <ImageThumb media={form.media} maxWidth={160} /> : <FileCard media={form.media} />)}

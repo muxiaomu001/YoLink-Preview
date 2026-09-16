@@ -63,7 +63,7 @@ export function PluginsPage() {
 
   return (
     <div>
-      <PageHeader title="插件（P1）" desc="插件扩展 YoLink 的能力：同步 CRM、附加合规声明、消息翻译。每个插件自带配置表单，后台不用为它单独写页面。" />
+      <PageHeader title="插件" level="P1" desc="用插件扩展 YoLink 的能力，例如同步 CRM、附加合规声明、消息翻译。每个插件的配置项由插件自身提供。" />
       <Note>插件声明 JSON Schema，后台按 schema 渲染配置表单（文本、下拉、开关、密钥）；配置保存后插件可通过 API 读取。停用不删配置，卸载才删。</Note>
       <Card className="mt-4" padded={false}>
         <Table rows={s.plugins} columns={columns} rowKey={(p) => p.id} empty="没有安装任何插件" />

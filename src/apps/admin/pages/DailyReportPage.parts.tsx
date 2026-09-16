@@ -12,15 +12,18 @@ import { Button, Checkbox, Field, Input, Select } from '@/ui/primitives'
 import { Card, Pill, Table } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
+import { DemoLevelTag, useDemoNotes } from '@/ui/DemoNote'
 
 const CHANNELS = Object.keys(REPORT_CHANNEL_LABEL) as ReportChannel[]
 const isAvailable = (c: ReportChannel) => REPORT_CHANNEL_LABEL[c].level === 'P0'
 
-/** 渠道多选：P1/P2 渠道禁用并标注层级 */
+/** 渠道多选：还没开放的渠道禁用，旁边挂排期徽章 */
 function ChannelPicker({ value, onChange }: { value: ReportChannel[]; onChange: (v: ReportChannel[]) => void }) {
+  // 还没开放的渠道只在演示里露出来（带排期徽章）；关掉批注后就是第一版真实支持的三个渠道
+  const demoNotes = useDemoNotes()
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-      {CHANNELS.map((c) => {
+      {CHANNELS.filter((c) => demoNotes || isAvailable(c)).map((c) => {
         const meta = REPORT_CHANNEL_LABEL[c]
         const on = value.includes(c)
         return (
@@ -32,7 +35,7 @@ function ChannelPicker({ value, onChange }: { value: ReportChannel[]; onChange: 
             label={
               <span className="inline-flex items-center gap-1">
                 {meta.name}
-                {!isAvailable(c) && <Pill tone="zinc">{meta.level}</Pill>}
+                {!isAvailable(c) && <DemoLevelTag level={meta.level} />}
               </span>
             }
           />
@@ -180,7 +183,7 @@ function AddRecipientModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r:
           <Input value={name} maxLength={32} onChange={(e) => setName(e.target.value)} placeholder="如：李总（经营者）" />
         </Field>
         <div>
-          <div className="mb-1.5 text-xs font-medium text-zinc-600">渠道（App 推送需关联员工；微信服务号 P1，短信与邮件 P2）</div>
+          <div className="mb-1.5 text-xs font-medium text-zinc-600">渠道（App 推送需关联员工）</div>
           <ChannelPicker value={channels} onChange={setChannels} />
         </div>
         {errors.length > 0 && <div className="text-[11px] text-red-600">{errors.join('；')}</div>}

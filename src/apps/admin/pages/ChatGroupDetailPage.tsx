@@ -28,7 +28,7 @@ export function ChatGroupDetailPage() {
   return (
     <div>
       <BackLink />
-      <PageHeader title={`群管理：${group.name}`} desc="与工作台右侧的群信息卡是同一套组件。管理后台不看群内角色，全部权限可用；每个动作仍记管理员日志与审计。" />
+      <PageHeader title={`群管理：${group.name}`} desc="管理员对所有群拥有完整权限，不受群内角色限制。" />
       <Note>
         工作台里坐席按群内角色（群主 / 管理员的 8 项权限）显示按钮；这里以群主坐席「{s.seats.find((x) => x.id === group.ownerSeatId)?.displayName}」身份、管理员账号实操，全部可用。
       </Note>

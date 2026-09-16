@@ -9,8 +9,8 @@ import { customerById } from '@/store/selectors'
 import { customerCan } from '@/store/policy'
 import { Avatar, TitleChip } from '@/ui/display'
 import { Button, Input, Switch } from '@/ui/primitives'
-import { toast } from '@/ui/overlay'
-import { DemoHint, Row, ScreenHeader, SectionLabel } from '../parts'
+import { demoToast } from '@/ui/DemoNote'
+import { DemoHint, LevelTag, Row, ScreenHeader, SectionLabel } from '../parts'
 
 export function ProfileScreen({ customerId, onBack }: { customerId: string; onBack: () => void }) {
   const s = useStore()
@@ -25,7 +25,7 @@ export function ProfileScreen({ customerId, onBack }: { customerId: string; onBa
       <div className="flex flex-col items-center bg-white py-4">
         <Avatar text={c.nickname} size={64} />
         {canEdit && (
-          <button type="button" onClick={() => toast('演示不保存头像', 'info')} className="mt-1 text-[11px] text-brand-700">
+          <button type="button" onClick={() => demoToast('更换头像')} className="mt-1 text-[11px] text-brand-700">
             更换头像
           </button>
         )}
@@ -52,19 +52,19 @@ export function ProfileScreen({ customerId, onBack }: { customerId: string; onBa
           }
           hint="企业发的，不可编辑、不可隐藏"
         />
-        <Row label="手机号" level="P2" value={c.phone ?? '未绑定'} hint="换绑需验证码，P2" />
+        <Row label="手机号" level="P2" value={c.phone ?? '未绑定'} />
         <Row label="邮箱" level="P2" value={c.email ?? '未绑定'} />
       </div>
       <div className="px-4 py-3">
         {canEdit ? (
           <>
             {!valid && <p className="mb-1 text-[11px] text-red-600">昵称 1 到 32 字符</p>}
-            <Button variant="primary" className="h-9 w-full" disabled={!valid || nick.trim() === c.nickname} onClick={() => toast('演示不保存资料修改', 'info')}>
+            <Button variant="primary" className="h-9 w-full" disabled={!valid || nick.trim() === c.nickname} onClick={() => demoToast('保存资料')}>
               保存
             </Button>
           </>
         ) : (
-          <DemoHint>当前策略不允许修改昵称与头像（account.edit_profile 关），所以这里只读。</DemoHint>
+          <DemoHint>企业策略未开放修改昵称与头像，所以这里只读（account.edit_profile）。</DemoHint>
         )}
       </div>
     </div>
@@ -92,7 +92,7 @@ export function AppearanceScreen({ customerId, onBack }: { customerId: string; o
       </div>
       {!canTheme && (
         <div className="px-4 pt-2">
-          <DemoHint>当前策略不允许切换主题（appearance.change_theme 关），只能用企业默认主题「{THEME_LABEL[s.enterprise.defaultTheme]}」。</DemoHint>
+          <DemoHint>企业策略未开放切换主题，只能用企业默认主题「{THEME_LABEL[s.enterprise.defaultTheme]}」（appearance.change_theme）。</DemoHint>
         </div>
       )}
       {canDark ? (
@@ -110,7 +110,7 @@ export function AppearanceScreen({ customerId, onBack }: { customerId: string; o
               <button key={k} type="button" onClick={() => setDark(k)} className="flex w-full items-center justify-between border-b border-zinc-100 px-4 py-2.5 text-[13px] last:border-0">
                 <span className="text-zinc-800">
                   {label}
-                  {k === 'schedule' && <span className="ml-1 rounded bg-zinc-100 px-1 text-[9px] text-zinc-500">P1</span>}
+                  {k === 'schedule' && <LevelTag level="P1" />}
                 </span>
                 <span className="text-brand-700">{dark === k ? '✓' : ''}</span>
               </button>
@@ -119,13 +119,13 @@ export function AppearanceScreen({ customerId, onBack }: { customerId: string; o
         </>
       ) : (
         <div className="px-4 pt-2">
-          <DemoHint>暗色模式入口未显示：appearance.dark_mode 关。</DemoHint>
+          <DemoHint>企业策略未开放暗色模式，入口不显示（appearance.dark_mode）。</DemoHint>
         </div>
       )}
-      <SectionLabel>聊天外观（P1）</SectionLabel>
+      <SectionLabel>聊天外观</SectionLabel>
       <div className="bg-white">
-        <Row label="文字大小" level="P1" value="100%" onClick={() => toast('演示不调整', 'info')} />
-        <Row label="聊天背景" level="P1" value="纯色" onClick={() => toast('演示不调整', 'info')} />
+        <Row label="文字大小" level="P1" value="100%" onClick={() => demoToast('调整文字大小')} />
+        <Row label="聊天背景" level="P1" value="纯色" onClick={() => demoToast('更换聊天背景')} />
       </div>
     </div>
   )
@@ -149,7 +149,7 @@ export function NotificationScreen({ onBack }: { onBack: () => void }) {
       <div className="bg-white">
         {line('消息预览', 'preview')}
         <Row label="角标计数" level="P1" value="按会话" />
-        <Row label="例外列表" level="P1" value="0 个" onClick={() => toast('演示不配置', 'info')} />
+        <Row label="例外列表" level="P1" value="0 个" onClick={() => demoToast('配置例外列表')} />
         <Row label="应用内声音 / 震动" level="P1" value="开" />
       </div>
     </div>
@@ -163,7 +163,7 @@ export function InfoScreen({ title, rows, onBack, note }: { title: string; rows:
       <ScreenHeader onBack={onBack} title={title} />
       <div className="mt-2 bg-white">
         {rows.map((r) => (
-          <Row key={r.label} label={r.label} level={r.level} value={r.value} onClick={() => toast('演示不操作', 'info')} />
+          <Row key={r.label} label={r.label} level={r.level} value={r.value} onClick={() => demoToast(r.label)} />
         ))}
       </div>
       {note && (

@@ -8,6 +8,7 @@ import { Card, Note, PageHeader, Pill, Table, Tabs } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { CsvImportTab } from './ProfileSyncPage.csv'
 import { AutomationTab, CustomFieldsTab } from './ProfileSyncPage.parts'
+import { DemoLevelTag } from '@/ui/DemoNote'
 
 type TabKey = 'sync' | 'csv' | 'fields' | 'automation'
 
@@ -20,15 +21,15 @@ export function ProfileSyncPage() {
   const [tab, setTab] = useState<TabKey>('sync')
   return (
     <div>
-      <PageHeader title="客户画像" desc="把企业自己系统里的购买记录与邀请关系同步进来，挂在客户身上给坐席看。两条路：客户系统调接口推，或运营手动传 CSV。金额字段按角色控制可见。" />
+      <PageHeader title="客户画像" desc="把企业自有系统的购买记录与邀请关系同步过来，展示在客户资料中。支持接口推送与 CSV 导入两种方式，金额字段按角色控制可见范围。" />
       <Tabs
         value={tab}
         onChange={setTab}
         items={[
           { key: 'sync', label: '同步设置' },
           { key: 'csv', label: 'CSV 导入' },
-          { key: 'fields', label: '通用字段（P1）', count: s.customFields.length },
-          { key: 'automation', label: '自动化规则（P1）', count: s.automationRules.length },
+          { key: 'fields', label: <>通用字段<DemoLevelTag level="P1" /></>, count: s.customFields.length },
+          { key: 'automation', label: <>自动化规则<DemoLevelTag level="P1" /></>, count: s.automationRules.length },
         ]}
       />
       <div className="mt-4">
@@ -103,7 +104,7 @@ function SyncSettingsTab() {
             </div>
             <div className="rounded-md border border-dashed border-zinc-200 p-3">
               <div className="mb-2 flex items-center gap-2 text-xs font-medium text-zinc-800">
-                P1 项 <Pill>定时拉取与字段映射</Pill> <Pill>反向回传</Pill>
+                进阶同步<DemoLevelTag level="P1" />
               </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">

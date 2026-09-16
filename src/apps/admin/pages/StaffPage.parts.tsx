@@ -2,12 +2,14 @@
  * 员工页的弹窗：创建员工、编辑员工、重置密码。
  */
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import type { Staff } from '@/domain/types'
 import { useStore } from '@/store/store'
 import { staffById } from '@/store/selectors'
 import { Button, Checkbox, Field, Input, Select } from '@/ui/primitives'
-import { Note, Pill, SeatAvatar } from '@/ui/display'
+import { Note, SeatAvatar } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
+import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD = 8
@@ -199,10 +201,10 @@ export function ResetPasswordModal({ staff, onClose }: { staff: Staff; onClose: 
     toast(`已为 ${staff.name} 设置新密码${mustChange ? '，下次登录必须修改' : ''}`)
     onClose()
   }
-  const modes: { key: ResetMode; label: string; disabled?: boolean }[] = [
+  const modes: { key: ResetMode; label: ReactNode; disabled?: boolean }[] = [
     { key: 'random', label: '随机生成' },
     { key: 'manual', label: '手动设置' },
-    { key: 'email', label: '邮件发送（P2）', disabled: true },
+    { key: 'email', label: <>邮件发送<DemoLevelTag level="P2" /></>, disabled: true },
   ]
   return (
     <Modal
@@ -261,9 +263,9 @@ export function ResetPasswordModal({ staff, onClose }: { staff: Staff; onClose: 
             <Checkbox checked={mustChange} onChange={setMustChange} label="下次登录必须修改密码" />
           </>
         )}
-        <p className="text-[11px] text-zinc-400">
-          <Pill>P2</Pill> 邮件发送：随机密码发到员工邮箱，随邮件服务商一起推到 P2。
-        </p>
+        <DemoNote compact>
+          「邮件发送」（随机密码发到员工邮箱）随邮件服务商一起排在后续版本<DemoLevelTag level="P2" />。
+        </DemoNote>
       </div>
     </Modal>
   )

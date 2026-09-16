@@ -13,6 +13,7 @@ import { DemoBar } from './components/layout/DemoBar'
 import { IconRail, type RailItem } from './components/layout/IconRail'
 import { SeatSwitcher } from './components/layout/SeatSwitcher'
 import { notifyPermission, sendDesktopNotification } from './components/layout/notify'
+import { DemoNote } from '@/ui/DemoNote'
 
 const TITLE_BASE = 'YoLink 工作台'
 
@@ -99,7 +100,7 @@ export function WorkbenchLayout() {
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-700 text-[12px] font-bold text-white">{s.enterprise.name.slice(0, 1)}</span>
             <span className="text-[13px] font-semibold text-zinc-900">{s.enterprise.name}</span>
-            <span className="text-[11px] text-zinc-400">工作台 · 演示</span>
+            <span className="text-[11px] text-zinc-400">工作台</span>
           </div>
           <SeatSwitcher seats={mySeats} active={activeSeat} unreadBySeat={unreadBySeat} onPick={(id) => s.setSession({ workbenchSeatId: id })} />
           <div className="ml-auto flex items-center">
@@ -108,8 +109,8 @@ export function WorkbenchLayout() {
             </span>
           </div>
         </header>
-        {location.pathname === '/workbench/withdrawals' && <div className="shrink-0 bg-amber-50 px-4 py-2 text-xs text-amber-800">P2 · 提现审核为后续功能演示，不属于第一版交付承诺。</div>}
-        {location.pathname === '/workbench/bots' && <div className="shrink-0 bg-amber-50 px-4 py-2 text-xs text-amber-800">群活跃助手 · 保留演示供讨论，首版细节待确认。</div>}
+        {location.pathname === '/workbench/withdrawals' && <DemoNote className="mx-4 mt-3">提现审核属于后续版本的讨论稿，不在第一版交付范围内。</DemoNote>}
+        {location.pathname === '/workbench/bots' && <DemoNote className="mx-4 mt-3">群活跃助手保留在演示里供讨论，首版的触发、节奏与审核细节待确认。</DemoNote>}
         <main className="min-h-0 flex-1">
           <Outlet />
         </main>

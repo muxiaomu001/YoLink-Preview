@@ -5,8 +5,9 @@ import { useState } from 'react'
 import type { PolicyNumbers } from '@/domain/types'
 import { useStore } from '@/store/store'
 import { Button, Field, Input, Select } from '@/ui/primitives'
-import { Card, Note, Pill } from '@/ui/display'
+import { Card, Note } from '@/ui/display'
 import { toast } from '@/ui/overlay'
+import { DemoLevelTag } from '@/ui/DemoNote'
 
 interface NumberField {
   key: keyof PolicyNumbers
@@ -24,14 +25,14 @@ const FIELDS: NumberField[] = [
   { key: 'customerRecallSeconds', label: '客户「为所有人删除」时限', unit: '秒', defaultValue: 120 },
   { key: 'customerEditSeconds', label: '客户编辑时限', unit: '秒', defaultValue: 900 },
   { key: 'groupMaxMembers', label: '单群上限', unit: '人', defaultValue: 10000 },
-  { key: 'slowModeSeconds', label: '发言限流默认间隔', unit: '秒', defaultValue: 0, hint: '0 为关闭；策略键 group.slow_mode_seconds。群设置里的六档下拉 P2' },
+  { key: 'slowModeSeconds', label: '发言限流默认间隔', unit: '秒', defaultValue: 0, hint: '0 为关闭' },
   { key: 'retentionDays', label: '消息保留天数', unit: '天', defaultValue: 0, hint: '0 为永久' },
   { key: 'fileMaxMb', label: '文件最大大小', unit: 'MB', defaultValue: 20 },
   { key: 'imageMaxMb', label: '图片最大大小', unit: 'MB', defaultValue: 10 },
   { key: 'videoMaxMb', label: '视频最大大小', unit: 'MB', defaultValue: 100 },
   { key: 'voiceMaxSeconds', label: '语音最大时长', unit: '秒', defaultValue: 60 },
-  { key: 'maxDevices', label: '最大同时在线设备数', unit: '台', defaultValue: 2, hint: '03 文档 account.max_devices；超出后最早登录的设备下线' },
-  { key: 'idleDays', label: '工作台长期未跟进天数', unit: '天', defaultValue: 14, hint: '04 文档：会话列表「长期未跟进」筛选的阈值' },
+  { key: 'maxDevices', label: '最大同时在线设备数', unit: '台', defaultValue: 2, hint: '超出后最早登录的设备下线' },
+  { key: 'idleDays', label: '工作台长期未跟进天数', unit: '天', defaultValue: 14, hint: '会话列表「长期未跟进」筛选用这个阈值' },
 ]
 
 type Draft = Record<keyof PolicyNumbers, string>
@@ -55,7 +56,7 @@ export function NumbersTab() {
     if (invalid.length || !changed.length) return
     const patch = Object.fromEntries(changed.map((f) => [f.key, Number(draft[f.key])])) as Partial<PolicyNumbers>
     s.setPolicyNumbers(patch, admin)
-    toast(`已保存 ${changed.length} 项数值型策略，演示中的消息操作按新值判断`)
+    toast(`已保存 ${changed.length} 项数值型策略，消息操作即刻按新值判断`)
   }
   const reset = () => setDraft(toDraft(s.policyNumbers))
 
@@ -82,14 +83,14 @@ export function NumbersTab() {
           return (
             <Field
               key={f.key}
-              label={timeLimit ? f.label : `${f.label}（${f.unit}）${f.level ? ` ${f.level}` : ''}`}
+              label={timeLimit ? f.label : `${f.label}（${f.unit}）`}
               hint={timeLimit ? `私聊与群聊共用；填 0 表示不限时间 · 默认 ${f.defaultValue} 秒${dirty ? ` · 当前 ${s.policyNumbers[f.key]}` : ''}` : `默认 ${f.defaultValue}${dirty ? ` · 当前 ${s.policyNumbers[f.key]}` : ''}`}
             >
               <div className="flex items-center gap-2">
                 {timeLimit && <Select aria-label={`${f.label}方式`} className="w-32" value={draft[f.key] !== '' && Number(draft[f.key]) === 0 ? 'unlimited' : 'limited'} onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value === 'unlimited' ? '0' : String(unit) }))}><option value="unlimited">不限时间</option><option value="limited">限制时长</option></Select>}
                 {(!timeLimit || draft[f.key] === '' || Number(draft[f.key]) !== 0) && <Input type="number" min={0} aria-label={f.label} value={draft[f.key] === '' ? '' : Number(draft[f.key]) / unit} className={bad ? 'border-red-400' : dirty ? 'border-brand-400' : ''} onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value === '' ? '' : String(Number(e.target.value) * unit) }))} />}
                 {timeLimit && (draft[f.key] === '' || Number(draft[f.key]) !== 0) && <Select aria-label={`${f.label}单位`} className="w-24" value={unit} onChange={(e) => { const next = Number(e.target.value); setUnits((v) => ({ ...v, [f.key]: next })); setDraft((d) => ({ ...d, [f.key]: d[f.key] === '' ? '' : String(Number(d[f.key]) / unit * next) })) }}><option value={1}>秒</option><option value={60}>分钟</option><option value={3600}>小时</option><option value={86400}>天</option></Select>}
-                {f.level && <Pill>{f.level}</Pill>}
+                <DemoLevelTag level={f.level} />
               </div>
               {f.hint && <p className="mt-1 text-[11px] text-zinc-400">{f.hint}</p>}
               {bad && <p className="mt-1 text-[11px] text-red-600">须为 0 或正整数</p>}

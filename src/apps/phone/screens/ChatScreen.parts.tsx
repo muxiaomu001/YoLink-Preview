@@ -1,5 +1,6 @@
 /**
- * 聊天页零件：消息气泡（引用条、图片 / 文件附件、机器人不标）、置顶条、公告层、输入区。
+ * 聊天页零件：消息气泡（回复条、图片 / 文件附件、机器人不标）、置顶条、公告层、输入区。
+ * 消息操作统一走长按唤出的菜单，见 ChatScreen.actions.tsx；气泡旁不放常驻按钮。
  */
 import { useRef, useState } from 'react'
 import { clsx } from 'clsx'
@@ -21,8 +22,9 @@ import { MessageText } from '@/ui/MessageText'
 import { MessageReceipt } from '@/ui/MessageReceipt'
 import { Button, Input } from '@/ui/primitives'
 import { customerPreview } from './ChatScreen.shared'
+import { BubbleMenu, useBubbleActions, useLongPress } from './ChatScreen.actions'
 
-/** 引用条：被引用消息的发送者与内容 */
+/** 回复条：被回复消息的发送者与内容 */
 export function QuoteBar({ m, mine, quoteText }: { m: Message | undefined; mine: boolean; quoteText?:string }) {
   const s = useStore()
   if (!m) return <div className={clsx('mb-1 rounded border-l-2 px-2 py-0.5 text-[10px]', mine ? 'border-white/60 bg-white/15 text-white/80' : 'border-zinc-300 bg-zinc-100 text-zinc-500')}>原消息不存在</div>
@@ -33,17 +35,14 @@ export function QuoteBar({ m, mine, quoteText }: { m: Message | undefined; mine:
   )
 }
 
-/** 图片 / 文件消息的正文：不包深色气泡，附件 + 说明文字 + 「···」打开菜单 */
-function MediaBody({ m, mine, replyTo, onMenu }: { m: Message; mine: boolean; replyTo: Message | undefined; onMenu: () => void }) {
+/** 图片 / 文件消息的正文：不包深色气泡，附件 + 说明文字 */
+function MediaBody({ m, mine, replyTo }: { m: Message; mine: boolean; replyTo: Message | undefined }) {
   if (!m.media) return null
   return (
     <div className={clsx('inline-flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
       {m.replyToId && replyTo && <QuoteBar m={replyTo} quoteText={m.quoteText} mine={false} />}
       {m.kind === 'video' || m.kind === 'voice' ? <PlayableMedia kind={m.kind} media={m.media!}/> : m.kind === 'image' ? <ImageThumb media={m.media} maxWidth={200} className="shadow-sm" /> : <FileCard media={m.media} className="shadow-sm" />}
       {m.text && <div className={clsx('max-w-[200px] text-[12px] leading-relaxed whitespace-pre-wrap text-zinc-700', mine ? 'text-right' : 'text-left')}>{m.text}</div>}
-      <button type="button" onClick={onMenu} className="px-1 text-[11px] leading-none text-zinc-400 active:text-zinc-600" aria-label="消息菜单">
-        ···
-      </button>
     </div>
   )
 }
@@ -61,10 +60,21 @@ function SenderAvatar({ m }: { m: Message }) {
   return <Avatar text={customerById(s, m.senderId)?.nickname ?? '?'} size={30} />
 }
 
-/** 一条消息；系统消息灰色居中；点击弹出引用 / 编辑 / 删除小菜单 */
-export function Bubble({ m, mine, inGroup, canReply=true, onReply, onDelete, onEdit, customerId }: { customerId: string; m: Message; mine: boolean; inGroup: boolean; canReply?: boolean; onDelete: () => void; onEdit?: () => void; onReply: () => void }) {
+/** 一条消息；系统消息灰色居中；长按（或右键）气泡唤出操作菜单 */
+export function Bubble({ m, mine, inGroup, canReply = true, onReply, onDelete, onEdit, onForward, customerId }: { customerId: string; m: Message; mine: boolean; inGroup: boolean; canReply?: boolean; onDelete: () => void; onEdit?: () => void; onReply: () => void; onForward: () => void }) {
   const s = useStore()
   const [menu, setMenu] = useState(false)
+  // 菜单默认贴在气泡下方；靠近屏幕底部时翻到上方，避免被输入区盖住
+  const [above, setAbove] = useState(false)
+  const holder = useRef<HTMLDivElement>(null)
+  const press = useLongPress(() => {
+    const box = holder.current?.getBoundingClientRect()
+    const list = document.getElementById('phone-msg-list')?.getBoundingClientRect()
+    setAbove(!!box && !!list && list.bottom - box.bottom < 170)
+    setMenu(true)
+  })
+  const actions = useBubbleActions({ m, mine, customerId, convId: m.convId, canReply, onReply, onEdit, onDelete, onForward })
+
   if (m.senderKind === 'system') {
     return (
       <div id={`pm-${m.id}`} data-message-id={m.id} className="my-2 text-center">
@@ -72,15 +82,15 @@ export function Bubble({ m, mine, inGroup, canReply=true, onReply, onDelete, onE
       </div>
     )
   }
-  const channel=channelOf(s,m)
+  const channel = channelOf(s, m)
   const sCus = m.senderKind === 'customer' && !mine ? customerById(s, m.senderId) : undefined
   const title = sCus?.primaryTitleId ? s.titles.find((x) => x.id === sCus.primaryTitleId && x.enabled) : undefined
-  const replyTo = m.replyToId ? s.messages.find((x) => x.id === m.replyToId&&messageVisibleFor(s,x,{kind:'customer',id:customerId})) : undefined
+  const replyTo = m.replyToId ? s.messages.find((x) => x.id === m.replyToId && messageVisibleFor(s, x, { kind: 'customer', id: customerId })) : undefined
   const isMedia = (m.kind === 'image' || m.kind === 'file' || m.kind === 'video' || m.kind === 'voice') && !!m.media
   return (
     <div id={`pm-${m.id}`} data-message-id={m.id} className={clsx('mb-2.5 flex gap-2', mine && 'flex-row-reverse')}>
-      {!mine && (channel?<Avatar text={channel.name} color="#b45309" size={30} official={channel.official}/>:<SenderAvatar m={m}/>)}
-      <div className={clsx('relative max-w-[75%]', mine && 'text-right')}>
+      {!mine && (channel ? <Avatar text={channel.name} color="#b45309" size={30} official={channel.official} /> : <SenderAvatar m={m} />)}
+      <div ref={holder} className={clsx('relative max-w-[75%]', mine && 'text-right')}>
         {inGroup && !mine && (
           <div className="mb-0.5 flex items-center gap-1 text-[10px] text-zinc-500">
             {senderName(s, m)}
@@ -88,40 +98,31 @@ export function Bubble({ m, mine, inGroup, canReply=true, onReply, onDelete, onE
             {title && <TitleChip title={title} size="xs" />}
           </div>
         )}
-        {m.forwardedFrom&&<div className="mb-1 text-xs text-zinc-500">转发自 {m.forwardedFrom.name??'原会话'}</div>}
-        {isMedia ? (
-          <MediaBody m={m} mine={mine} replyTo={replyTo} onMenu={() => setMenu((v) => !v)} />
-        ) : (
-          <div
-            role="group"
-            onClick={() => setMenu((v) => !v)}
-            className={clsx(
-              'inline-block rounded-2xl px-3 py-2 text-left text-[13px] leading-relaxed whitespace-pre-wrap',
-              mine ? 'rounded-tr-sm bg-brand-700 text-white' : 'rounded-tl-sm bg-white text-zinc-800 shadow-sm',
-            )}
-          >
-            {m.replyToId && replyTo && <QuoteBar m={replyTo} quoteText={m.quoteText} mine={mine} />}
-            <MessageText m={m} viewerCustomerId={customerId} />
-          </div>
-        )}
-        {!isMedia && <button type="button" aria-label="消息菜单" className="ml-1 px-1 text-xs text-zinc-400" onClick={() => setMenu((v) => !v)}>···</button>}
-        <div className="mt-1 flex items-center gap-1 text-[11px] text-zinc-400">{fmtTime(m.at)}{m.editedAt && <span>已编辑</span>}{m.channelSignature&&<span>{m.channelSignature}</span>}{mine&&<MessageDelivery message={m} actor={{kind:'customer',id:customerId}}/>}{mine && <MessageReceipt m={m} />}</div>
-        {menu && (
-          <div className={clsx('absolute z-10 flex overflow-hidden rounded-md border border-zinc-200 bg-white text-[11px] shadow-md', mine ? 'right-0' : 'left-0', '-bottom-6')}>
-            {canReply&&<button
-              type="button"
-              className="px-2 py-1 text-zinc-700 active:bg-zinc-50"
-              onClick={() => {
-                setMenu(false)
-                onReply()
-              }}
+        {m.forwardedFrom && <div className="mb-1 text-[11px] text-zinc-400">转发自 {m.forwardedFrom.name ?? '其他聊天'}</div>}
+        {/* 长按整块气泡唤出菜单；单击不接管，留给图片预览和链接 */}
+        <div {...press.handlers} className={clsx('inline-block select-none', menu && 'relative z-40')}>
+          {isMedia ? (
+            <MediaBody m={m} mine={mine} replyTo={replyTo} />
+          ) : (
+            <div
+              className={clsx(
+                'inline-block rounded-2xl px-3 py-2 text-left text-[13px] leading-relaxed whitespace-pre-wrap',
+                mine ? 'rounded-tr-sm bg-brand-700 text-white' : 'rounded-tl-sm bg-white text-zinc-800 shadow-sm',
+              )}
             >
-              引用
-            </button>}
-            {mine && onEdit && <button type="button" className="border-l border-zinc-100 px-2 py-1 text-zinc-700" onClick={() => { setMenu(false); onEdit() }}>编辑</button>}
-            <button type="button" className="border-l border-zinc-100 px-2 py-1 text-red-600" onClick={()=>{setMenu(false);onDelete()}}>删除</button>
-          </div>
-        )}
+              {m.replyToId && replyTo && <QuoteBar m={replyTo} quoteText={m.quoteText} mine={mine} />}
+              <MessageText m={m} viewerCustomerId={customerId} />
+            </div>
+          )}
+        </div>
+        <div className="mt-1 flex items-center gap-1 text-[11px] text-zinc-400">
+          {fmtTime(m.at)}
+          {m.editedAt && <span>已编辑</span>}
+          {m.channelSignature && <span>{m.channelSignature}</span>}
+          {mine && <MessageDelivery message={m} actor={{ kind: 'customer', id: customerId }} />}
+          {mine && <MessageReceipt m={m} />}
+        </div>
+        {menu && <BubbleMenu actions={actions} mine={mine} above={above} onClose={() => setMenu(false)} />}
       </div>
     </div>
   )

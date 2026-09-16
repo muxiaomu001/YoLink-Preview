@@ -40,7 +40,7 @@ export function AdminHome() {
 
   return (
     <div>
-      <PageHeader title="经营首页" desc="老板看的六个数，只读。按人统计的指标按实操员工（真人）算，按归属统计的按主归属坐席算。" />
+      <PageHeader title="经营首页" desc="今日经营概览，与每日推送的经营日报口径一致。" />
       {todos.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           <span className="font-medium">待处理</span>
@@ -61,7 +61,7 @@ export function AdminHome() {
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-4">
-        <Card title="客服（每个实操员工一行，不按坐席）" padded={false}>
+        <Card title="客服接待 · 今日" padded={false}>
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50/80 text-[11px] text-zinc-500">
@@ -100,12 +100,12 @@ export function AdminHome() {
 
       <div className="mt-4">
         <Note>
-          老板日报每天早上推送这六个数到手机。产品内只给事实与对比，不换算成金额，不写建议。当前主归属分布：
+          经营日报每天早上把这几项数据推送到管理员手机。当前客户主归属分布：
           {s.seats
             .filter((x) => x.type === 'assign')
             .map((x) => `${x.displayName} ${s.customerSeats.filter((cs) => cs.seatId === x.id && cs.primary).length} 位`)
             .join('，')}
-          。通知型「{seatById(s, 'seat_notice')?.displayName}」面对全部客户，不算归属。
+          。通知型「{seatById(s, 'seat_notice')?.displayName}」面向全部客户，不计入归属。
         </Note>
       </div>
     </div>

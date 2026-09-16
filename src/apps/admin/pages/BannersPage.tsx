@@ -8,6 +8,7 @@ import { Button } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, Table, Tabs } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 import { AnnouncementModal, BannerModal, ColorThumb } from './BannersPage.parts'
+import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 
 type TabKey = 'banners' | 'announcements'
 
@@ -27,13 +28,13 @@ export function BannersPage() {
   const [tab, setTab] = useState<TabKey>('banners')
   return (
     <div>
-      <PageHeader title="公告与横幅" desc="客户 App 首页顶部的轮播横幅（P0）与启动弹窗 / 顶部通知条式公告（P1）。都只对活动期内的客户显示，过期自动下线，不用手动删。" />
+      <PageHeader title="公告与横幅" desc="客户 App 首页顶部的轮播横幅，以及启动弹窗、顶部通知条式公告。只在活动期内向客户显示，过期自动下线。" />
       <Tabs
         value={tab}
         onChange={setTab}
         items={[
-          { key: 'banners', label: '横幅（P0）', count: s.banners.length },
-          { key: 'announcements', label: '公告（P1）', count: s.announcements.length },
+          { key: 'banners', label: <>横幅<DemoLevelTag level="P0" /></>, count: s.banners.length },
+          { key: 'announcements', label: <>公告<DemoLevelTag level="P1" /></>, count: s.announcements.length },
         ]}
       />
       <div className="mt-4">{tab === 'banners' ? <BannersTab /> : <AnnouncementsTab />}</div>
@@ -76,9 +77,8 @@ function BannersTab() {
 
   return (
     <div className="space-y-4">
-      <Note>
-        排序数字越小越靠前，正式版支持拖动，演示用上移 / 下移。目标人群按标签投放、曝光与点击统计为 P1。
-      </Note>
+      <Note>排序数字越小越靠前，同一位置只展示排在最前的一条。</Note>
+      <DemoNote>正式产品的排序可以直接拖动，演示里用上移 / 下移代替。目标人群按标签投放、曝光与点击统计排在第二版<DemoLevelTag level="P1" />。</DemoNote>
       <Card
         title="横幅列表"
         padded={false}
@@ -117,12 +117,12 @@ function BannersTab() {
             { key: 'time', title: '起止时间', render: (b) => <span className="tabular-nums whitespace-nowrap text-zinc-600">{fmtDate(b.startAt)} 至 {fmtDate(b.endAt)}</span> },
             {
               key: 'audience',
-              title: <span>目标人群 <span className="font-normal text-zinc-400">P1</span></span>,
+              title: <>目标人群<DemoLevelTag level="P1" /></>,
               render: (b) => <span className="whitespace-nowrap">{b.audience === 'all' ? '全部' : `按标签：${b.tagIds.map((id) => s.tags.find((t) => t.id === id)?.name ?? id).join('、') || '未选'}`}</span>,
             },
             { key: 'status', title: '状态', render: (b) => timeStatus(b.startAt, b.endAt) },
-            { key: 'imp', title: <span>曝光 <span className="font-normal text-zinc-400">P1</span></span>, align: 'right', render: (b) => <span className="tabular-nums">{b.impressions.toLocaleString('zh-CN')}</span> },
-            { key: 'clk', title: <span>点击 <span className="font-normal text-zinc-400">P1</span></span>, align: 'right', render: (b) => <span className="tabular-nums">{b.clicks.toLocaleString('zh-CN')}</span> },
+            { key: 'imp', title: <>曝光<DemoLevelTag level="P1" /></>, align: 'right', render: (b) => <span className="tabular-nums">{b.impressions.toLocaleString('zh-CN')}</span> },
+            { key: 'clk', title: <>点击<DemoLevelTag level="P1" /></>, align: 'right', render: (b) => <span className="tabular-nums">{b.clicks.toLocaleString('zh-CN')}</span> },
             {
               key: 'ops',
               title: '操作',
@@ -156,9 +156,10 @@ function AnnouncementsTab() {
   }
   return (
     <div className="space-y-4">
-      <Note>
-        <b>P1</b>：启动弹窗在客户打开 App 时全屏弹出，顶部通知条常驻在会话列表上方。展示次数可选「一次」或「每次启动」。
-      </Note>
+      <Note>启动弹窗在客户打开 App 时全屏弹出，顶部通知条常驻在会话列表上方。展示次数可选「一次」或「每次启动」。</Note>
+      <DemoNote>
+        公告<DemoLevelTag level="P1" />排在第二版，横幅是第一版范围。
+      </DemoNote>
       <Card
         title="公告列表"
         padded={false}

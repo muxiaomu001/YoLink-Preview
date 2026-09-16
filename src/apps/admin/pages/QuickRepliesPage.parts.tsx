@@ -204,7 +204,7 @@ export function QuickReplyEditor({ item, cats, defaultCategoryId, onClose }: { i
           <div className="mt-1 text-[11px] text-zinc-400">标题和正文都会被搜索到，不用单独填关键词</div>
         </Field>
         {needMedia && (
-          <Field label={kind === 'image' ? '图片' : '文件'} required hint={`本机选择，最大 ${formatBytes(UPLOAD_MAX_BYTES)}（演示存在浏览器里）`}>
+          <Field label={kind === 'image' ? '图片' : '文件'} required hint={`最大 ${formatBytes(UPLOAD_MAX_BYTES)}`} demoHint="演示里附件存在本机浏览器，换台电脑打开就没有了">
             <input ref={fileRef} type="file" className="hidden" accept={kind === 'image' ? 'image/*' : undefined} onChange={(e) => void pickFile(e.target.files?.[0])} />
             <div className="flex items-start gap-3">
               {media && (kind === 'image' ? <ImageThumb media={media} maxWidth={160} /> : <FileCard media={media} />)}

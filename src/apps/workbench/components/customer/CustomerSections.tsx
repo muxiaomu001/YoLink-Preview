@@ -61,7 +61,7 @@ export function OfficialsSection({ c, ctl }: SectionProps) {
   const nav = useNavigate()
   const officials = seatsOfCustomer(s, c.id)
   return (
-    <CollapsibleSection title="官方联系人与归属" ctl={ctl} summary={`${officials.length} 个坐席`} help="客户看得到左边的官方联系人，看不到右边的实操员工。★ 是主归属。坐席对客户是固定的，换人走管理后台的坐席交接，这里没有「转移客户」。">
+    <CollapsibleSection title="官方联系人与归属" ctl={ctl} summary={`${officials.length} 个坐席`} help="客户只看得到官方联系人，看不到实操员工。★ 为主归属。更换实操员工请在管理后台办理坐席交接。">
       <ul className="space-y-1">
         {officials.map((o) => {
           const op = staffById(s, o.seat.operatorStaffId)

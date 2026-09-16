@@ -8,6 +8,7 @@ import { customersOfSeat, staffById } from '@/store/selectors'
 import { Button, Field, Input, Select, Switch, Textarea } from '@/ui/primitives'
 import { Note, SeatAvatar } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
+import { DemoLevelTag } from '@/ui/DemoNote'
 
 export function HandoverModal({ seat, onClose }: { seat: Seat; onClose: () => void }) {
   const s = useStore()
@@ -169,7 +170,7 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="坐席组（P1）" hint="轮询分摊用，可空">
+          <Field label={<>坐席组<DemoLevelTag level="P1" /></>} hint="轮询分摊用，可空">
             <Select value={form.seatGroupId} disabled={form.type === 'notice'} onChange={(e) => set('seatGroupId', e.target.value)}>
               <option value="">不加入坐席组</option>
               {s.seatGroups.map((g) => (
@@ -179,7 +180,7 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
               ))}
             </Select>
           </Field>
-          <Field label="客户数上限（P1）" hint="留空为无限制">
+          <Field label={<>客户数上限<DemoLevelTag level="P1" /></>} hint="留空为无限制">
             <Input type="number" min={1} value={form.maxCustomers} onChange={(e) => set('maxCustomers', e.target.value)} placeholder="达到后不再分新客户" />
           </Field>
         </div>

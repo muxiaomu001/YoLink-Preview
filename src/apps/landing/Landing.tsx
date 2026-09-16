@@ -4,6 +4,7 @@ import { useStore } from '@/store/store'
 import { Button } from '@/ui/primitives'
 import { confirm } from '@/ui/confirm'
 import { toast } from '@/ui/overlay'
+import { DemoNoteToggle, useDemoNotes } from '@/ui/DemoNote'
 
 const CARDS = [
   { to: '/phone', icon: Smartphone, title: '客户手机屏', who: '客户这边看到什么', desc: '扫码注册、加上官方联系人、聊天和查资料。客户全程只看到「顾问」，看不到背后是谁在操作。' },
@@ -23,6 +24,7 @@ const FLOWS = [
 export function Landing() {
   const enterprise = useStore((s) => s.enterprise)
   const reset = useStore((s) => s.resetDemo)
+  const notes = useDemoNotes()
   return (
     <div className="min-h-full bg-zinc-100">
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
@@ -43,6 +45,18 @@ export function Landing() {
             <RotateCcw size={14} /> 重置演示数据
           </Button>
         </header>
+
+        {/* 演示批注开关：这一层不属于产品，关掉后三个入口就是正式产品应有的样子 */}
+        <div className="mb-6 flex flex-col gap-2 rounded-lg border border-dashed border-zinc-300 bg-white/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-xs leading-relaxed text-zinc-500">
+            <span className="font-medium text-zinc-700">演示批注</span>
+            <span className="mx-1.5 text-zinc-300">|</span>
+            {notes
+              ? '灰色虚线框里的说明、标题旁的 P1 / P2 排期标记，都是给看演示的人看的，不属于产品。关掉即可看到正式产品应有的界面。'
+              : '已关闭。现在三个入口显示的每一个字，都是正式产品应该有的样子。'}
+          </div>
+          <DemoNoteToggle className="self-start sm:self-auto" />
+        </div>
 
         <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
           {CARDS.map((c) => (
@@ -78,7 +92,7 @@ export function Landing() {
 
         <footer className="mt-10 border-t border-zinc-200 pt-4 text-[11px] leading-relaxed text-zinc-400">
           <p>用法：三个入口可以在不同窗口同时打开，数据实时同步。建议把客户屏放一侧，工作台或后台放另一侧，边操作边看客户侧的变化。</p>
-          <p className="mt-1.5">关于本演示：企业、人物、对话、金额全部虚构。AI 用本地知识库匹配，不连外部模型；App 推送、账单与经营报表为样例数据，不代表真实接入效果。带 P1 / P2 标记的页面是后续需求的讨论稿，不属于第一版范围。</p>
+          <p className="mt-1.5">关于本演示：企业、人物、对话、金额全部虚构。AI 用本地知识库匹配，不连外部模型；App 推送、账单与经营报表为样例数据，不代表真实接入效果。标题旁带 P1 / P2 排期标记的页面是后续需求的讨论稿，不属于第一版范围。</p>
         </footer>
       </div>
     </div>

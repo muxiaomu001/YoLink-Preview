@@ -54,6 +54,8 @@ export interface NavItem {
   level?: Level
   /** 只有该模块启用时才显示 */
   module?: ModuleKey
+  /** 演示专属页：关掉演示批注后不出现，正式产品没有这一页 */
+  demoOnly?: boolean
 }
 
 export interface NavGroup {
@@ -67,7 +69,7 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       { to: '/admin/home', label: '经营首页', icon: Gauge },
       { to: '/admin/daily-report', label: '日报与提醒', icon: Bell },
-      { to: '/admin/demo-data', label: '演示数据', icon: Sparkles },
+      { to: '/admin/demo-data', label: '演示数据', icon: Sparkles, demoOnly: true },
     ],
   },
   {
