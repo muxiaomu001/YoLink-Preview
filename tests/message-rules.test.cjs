@@ -219,3 +219,15 @@ test('跳过的收件人不产生替换记录或消息', () => {
   assert.equal(current().messages.length, n)
   assert.equal(current().sensitiveHits.length, hits)
 })
+
+test('客户隐藏最后上线时间后，员工侧已读回执仍正常写入', () => {
+  const conv = dm()
+  const customerId = conv.customerId
+  const message = send(conv.id, seat, '请确认是否已收到')
+  current().setCustomerLastSeenVisibility(customerId, 'nobody')
+  current().customerMarkRead(conv.id, customerId, message.at)
+
+  const updated = current().conversations.find((item) => item.id === conv.id)
+  assert.equal(current().customers.find((customer) => customer.id === customerId).lastSeenVisibility, 'nobody')
+  assert.equal(updated.readAtByCustomer[customerId], message.at)
+})

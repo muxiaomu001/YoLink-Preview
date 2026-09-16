@@ -16,6 +16,7 @@ import type {
   DemoState,
   InviteGroup,
   InviteLink,
+  LastSeenVisibility,
   Message,
   MessageMedia,
   Seat,
@@ -96,6 +97,10 @@ export interface CoreActions {
   dismissProfileGuide: (customerId: string) => void
   /** 客户自己改昵称。改完就不再是系统发的默认名，软引导里那一条随之消失 */
   renameCustomer: (customerId: string, nickname: string) => { ok: boolean; error?: string }
+  /** 演示中的头像更新；资料引导只关心头像是否仍为默认 */
+  updateCustomerAvatar: (customerId: string) => void
+  /** 最后上线时间只控制对外可见范围，不影响企业侧已读数据 */
+  setCustomerLastSeenVisibility: (customerId: string, visibility: LastSeenVisibility) => void
   // 工作台
   seatSend: (convId: string, seatId: string, operatorId: string, text: string, aiDraftUsed?: boolean) => void
   recordAi: (staffId: string, convId: string, result: 'adopted' | 'edited' | 'ignored') => void
@@ -295,6 +300,12 @@ export const useStore = create<DemoStore>()(
         set((s) => ({ customers: s.customers.map((c) => (c.id === customerId ? { ...c, nickname: v, nicknameAuto: undefined } : c)) }))
         return { ok: true }
       },
+
+      updateCustomerAvatar: (customerId) =>
+        set((s) => ({ customers: s.customers.map((c) => (c.id === customerId ? { ...c, avatarUpdatedAt: now() } : c)) })),
+
+      setCustomerLastSeenVisibility: (customerId, visibility) =>
+        set((s) => ({ customers: s.customers.map((c) => (c.id === customerId ? { ...c, lastSeenVisibility: visibility } : c)) })),
 
       dismissProfileGuide: (customerId) =>
         set((s) => ({ customers: s.customers.map((c) => (c.id === customerId ? { ...c, profileGuideDismissedAt: now() } : c)) })),
