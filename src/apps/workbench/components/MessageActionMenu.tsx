@@ -43,7 +43,7 @@ export function MessageActionMenu({ actions, position, onClose, triggerId }: { t
     }
   }, [onClose, triggerId])
   return createPortal(
-    <div ref={ref} role="menu" aria-label="消息操作" style={position} className="fixed z-40 max-h-[calc(100dvh-16px)] w-[220px] max-w-[calc(100vw-16px)] overflow-y-auto rounded-2xl bg-white/95 py-2 text-zinc-900 shadow-[0_12px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl"
+    <div ref={ref} role="menu" aria-label="消息操作" style={position} className="fixed z-40 max-h-[calc(100dvh-16px)] w-44 max-w-[calc(100vw-16px)] overflow-y-auto rounded-md border border-zinc-200 bg-white py-1 text-zinc-900 shadow-lg"
       onContextMenu={(e) => { e.preventDefault(); e.stopPropagation() }}
       onKeyDown={(e) => {
         const items = Array.from(ref.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])
@@ -59,11 +59,11 @@ export function MessageActionMenu({ actions, position, onClose, triggerId }: { t
         }
       }}>
       {actions.map((action, index) => <div key={action.label}>
-        {index > 0 && action.section !== actions[index - 1].section && <div role="separator" className="mx-4 my-1 h-px bg-zinc-200/80" />}
-        <button type="button" role="menuitem" disabled={action.disabled} title={action.hint} onClick={() => { onClose(); action.onSelect() }} className={clsx('flex min-h-11 w-full items-center gap-3.5 px-5 py-2.5 text-left text-[16px] font-medium outline-none transition-colors focus-visible:bg-brand-50', action.disabled ? 'cursor-not-allowed text-zinc-400' : action.danger ? 'text-red-600 hover:bg-red-50 focus-visible:bg-red-50' : 'hover:bg-zinc-100/80')}>
-          <action.icon size={21} strokeWidth={1.7} className="shrink-0" />
-          <span className="min-w-0 flex-1">{action.label}{action.disabled && action.hint && <span className="mt-0.5 block text-xs font-normal">{action.hint}</span>}</span>
-          {action.opensPicker && <ChevronRight size={17} className="shrink-0" />}
+        {index > 0 && action.section !== actions[index - 1].section && <div role="separator" className="my-1 h-px bg-zinc-100" />}
+        <button type="button" role="menuitem" disabled={action.disabled} title={action.hint} onClick={() => { onClose(); action.onSelect() }} className={clsx('flex min-h-8 w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] outline-none transition-colors focus-visible:bg-brand-50', action.disabled ? 'cursor-not-allowed text-zinc-400' : action.danger ? 'text-red-600 hover:bg-red-50 focus-visible:bg-red-50' : 'text-zinc-700 hover:bg-zinc-100')}>
+          <action.icon size={15} strokeWidth={1.75} className="shrink-0" />
+          <span className="min-w-0 flex-1">{action.label}{action.disabled && action.hint && <span className="mt-0.5 block text-[11px]">{action.hint}</span>}</span>
+          {action.opensPicker && <ChevronRight size={13} className="shrink-0 text-zinc-400" />}
         </button>
       </div>)}
     </div>, document.body,

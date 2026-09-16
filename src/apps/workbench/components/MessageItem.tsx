@@ -4,9 +4,9 @@
  */
 import { useCallback, useState } from 'react'
 import { clsx } from 'clsx'
-import { Bot, CheckSquare, Copy, Forward, MoreHorizontal, Pencil, Pin, Reply, Trash2 } from 'lucide-react'
+import { Bot, CheckSquare, Copy, Forward, MoreHorizontal, Pencil, Pin, Reply, Trash2, Undo2 } from 'lucide-react'
 import type { ChatGroup, Message, Seat } from '@/domain/types'
-import { channelOf, messageVisibleFor } from '@/domain/messageRules'
+import { channelOf, deleteAllBlock, messageVisibleFor } from '@/domain/messageRules'
 import { fmtDateTime, fmtTime } from '@/domain/time'
 import { botById, seatCan, seatGroupPerm, senderName } from '@/store/policy'
 import { customerById, seatById, staffById } from '@/store/selectors'
@@ -77,6 +77,13 @@ export function MessageItem({
 
   const copy = async () => toast((await copyText(m.text)) ? '已复制' : '复制失败：浏览器不允许访问剪贴板', 'info')
 
+  // 撤回 = 为所有人删除自己的消息，受后台「撤回时限」约束；超时后保留为禁用项，让后台开关的效果可见
+  const recallBlock = mine && !gone ? deleteAllBlock(s, m, actor) : '不是自己发出的消息'
+  const recall = () => {
+    if (!staff) return
+    toast(s.recallMessage(m.id, staff.id) ? '已撤回' : '撤回失败，消息可能已不可用', 'info')
+  }
+
   const actions: MessageMenuAction[] = [
     { label: quoteSelection ? '引用所选文字' : '回复', icon: Reply, section: 0, onSelect: () => onReply(m,quoteSelection||undefined) },
     ...(mine && seatCan(s, seat.id, 'dm.edit') ? [{ label: '编辑消息', icon: Pencil, section: 0, onSelect: () => setEditing(true) }] : []),
@@ -84,6 +91,7 @@ export function MessageItem({
     ...(showPin ? [{ label: '置顶消息', icon: Pin, section: 1, onSelect: () => onPin(m) }] : []),
     ...(showForward ? [{ label: '转发', icon: Forward, section: 1, opensPicker: true, onSelect: () => onForward(m) }] : []),
     ...(onSelect ? [{ label: '选择多条', icon: CheckSquare, section: 1, onSelect: () => onSelect(m) }] : []),
+    ...(mine && !gone ? [{ label: '撤回', icon: Undo2, section: 2, disabled: !!recallBlock, hint: recallBlock, onSelect: recall }] : []),
     { label: '删除', icon: Trash2, section: 2, danger: true, onSelect: () => setDeleting(true) },
   ]
 
@@ -117,7 +125,7 @@ export function MessageItem({
               className={clsx('mb-0.5 block max-w-full truncate rounded border-l-2 border-brand-400 bg-zinc-100 px-2 py-0.5 text-left text-[11px] text-zinc-500 hover:bg-zinc-200', mine && 'ml-auto')}
               title="点击跳到原消息"
             >
-              {senderName(s, replyTo)}：{replyTo.recalledAt || replyTo.deletedAt ? '原消息已不可用' : (m.quoteText&&replyTo.text.includes(m.quoteText)?m.quoteText:replyTo.text).slice(0,1024)}
+              {senderName(s, replyTo)}：{replyTo.recalledAt || replyTo.deletedAt ? '原消息已不可用' : (m.quoteText&&replyTo.text.includes(m.quoteText)?m.quoteText:replyTo.text).slice(0,120)}
             </button>
           )}
           {!gone && hasMedia ? (
@@ -130,16 +138,16 @@ export function MessageItem({
           ) : (
             <div className={clsx('inline-block rounded-lg px-3 py-2 text-left text-[13px] leading-relaxed whitespace-pre-wrap', gone ? 'bg-zinc-100 text-zinc-400 italic' : bubbleCls)}>
               {m.forwardedFrom && <div className={clsx('mb-0.5 text-[11px]', mine ? 'text-brand-100' : 'text-zinc-400')}>转发自 {m.forwardedFrom.name??'原会话'}</div>}
-              {gone ? (m.recalledAt ? '消息已撤回' : '消息已被管理员删除') : <MessageText m={m} highlight={highlight} />}
+              {gone ? '消息已撤回' : <MessageText m={m} highlight={highlight} />}
             </div>
           )}
           <div className={clsx('mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400', mine && !channel && 'justify-end')}>
             <span className="tabular-nums">{fmtTime(m.at)}</span>
             {m.editedAt && !gone && <span title={`修改于 ${fmtDateTime(m.editedAt)}`}>已编辑</span>}
             {m.channelSignature && <span>{m.channelSignature}</span>}
-            {mine && <MessageDelivery message={m} actor={actor} />}
-            {(!m.delivery || m.delivery === 'sent') && (mine || group) && <MessageReceipt m={m} staffSeatId={seat.id} />}
-            {pinned && <span className="inline-flex items-center gap-0.5 text-amber-600"><Pin size={10} />已置顶</span>}
+            {mine && !gone && <MessageDelivery message={m} actor={actor} />}
+            {!gone && (!m.delivery || m.delivery === 'sent') && (mine || group) && <MessageReceipt m={m} staffSeatId={seat.id} />}
+            {pinned && !gone && <span className="inline-flex items-center gap-0.5 text-amber-600"><Pin size={10} />已置顶</span>}
             {m.isWelcome && <span className="rounded bg-zinc-100 px-1">欢迎语</span>}
             {m.isBroadcast && <span className="rounded bg-amber-50 px-1 text-amber-700">群发</span>}
             {m.aiDraftUsed && <span className="rounded bg-violet-50 px-1 text-violet-600">AI 草稿</span>}
@@ -148,7 +156,7 @@ export function MessageItem({
             {bot && m.operatorId && can('view_seat_operator') && <span title="客户看不到这个">手动：{staffById(s, m.operatorId)?.name}</span>}
           </div>
         </div>
-        {!gone && <button type="button" id={`menu-trigger-${m.id}`} aria-label="更多消息操作" aria-haspopup="menu" aria-expanded={menuOpen} title="更多消息操作（也可右键消息）" className="self-start rounded p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700" onClick={(e) => { setQuoteSelection('');const rect = e.currentTarget.getBoundingClientRect(); positionMenu(rect.left, rect.bottom + 4); setMenuOpen((v) => !v) }}><MoreHorizontal size={16} /></button>}
+        {!gone && <button type="button" id={`menu-trigger-${m.id}`} aria-label="更多消息操作" aria-haspopup="menu" aria-expanded={menuOpen} title="更多消息操作（也可右键消息）" className={clsx('self-start rounded p-1 text-zinc-400 transition-opacity hover:bg-zinc-200 hover:text-zinc-700 focus-visible:opacity-100 group-hover:opacity-100', menuOpen ? 'opacity-100' : 'opacity-0')} onClick={(e) => { setQuoteSelection('');const rect = e.currentTarget.getBoundingClientRect(); positionMenu(rect.left, rect.bottom + 4); setMenuOpen((v) => !v) }}><MoreHorizontal size={16} /></button>}
         {menuOpen && !gone && <MessageActionMenu triggerId={`menu-trigger-${m.id}`} actions={actions} position={menuPosition} onClose={closeMenu} />}
       </div>
       {deleting && <DeleteMessagesModal ids={[m.id]} actor={actor} onClose={() => setDeleting(false)} />}

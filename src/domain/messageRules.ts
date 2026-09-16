@@ -1,11 +1,6 @@
 import type { ChatActor, DemoState, Message } from './types'
 import { customerCan, customerCanSpeakIn, groupPerm, seatCan, seatGroupPerm } from '@/store/policy'
 
-/** 普通聊天不露出坐席撤回的内容，也不留撤回提示；审计保留完整对象。 */
-export function customerVisibleMessage(m: Message) {
-  return !m.recalledAt && !m.deletedAt && (!m.delivery || m.delivery === 'sent')
-}
-
 /** 0 为不限时间；演示初值用于体验，正式默认值待产品确认。 */
 export function messageLimitSeconds(s: DemoState, role: 'seat' | 'customer', action: 'recall' | 'edit') {
   if (role === 'seat') return (action === 'recall' ? s.policyNumbers.seatRecallSeconds : s.policyNumbers.seatEditSeconds) ?? 0
@@ -65,13 +60,27 @@ export function actorCanView(s: DemoState, convId: string, actor: ChatActor) {
   return !!c && !!conv && (conv.kind === 'dm' ? conv.customerId === actor.id : s.chatGroups.some((g) => g.id === conv.chatGroupId && g.memberCustomerIds.includes(actor.id)))
 }
 
-export function messageVisibleFor(s: DemoState, m: Message, actor: ChatActor) {
+function messageVisibleCore(s: DemoState, m: Message, actor: ChatActor, keepRecalled: boolean) {
   const conv = s.conversations.find((c) => c.id === m.convId)
   if(m.recipientCustomerId && (actor.kind!=='customer'||actor.id!==m.recipientCustomerId))return false
-  if (!conv || !actorCanView(s, conv.id, actor) || m.recalledAt || m.deletedAt) return false
+  if (!conv || !actorCanView(s, conv.id, actor) || m.deletedAt || (m.recalledAt && !keepRecalled)) return false
   if (m.hiddenFor?.includes(actorKey(actor)) || m.at <= (conv.clearedThroughByViewer?.[actorKey(actor)] ?? '')) return false
   if (m.delivery && m.delivery !== 'sent') return m.senderKind === actor.kind && m.senderId === actor.id && (actor.kind !== 'seat' || m.operatorId === actor.staffId)
   return true
+}
+
+/** 消息是否还「算数」：撤回与删除的都不算，用于引用、转发、搜索、未读、置顶、资料库。 */
+export function messageVisibleFor(s: DemoState, m: Message, actor: ChatActor) {
+  return messageVisibleCore(s, m, actor, false)
+}
+
+/**
+ * 聊天气泡列表专用。两种消失方式在演示里刻意不同：
+ * 撤回（本人、限时内）双方都留一条「消息已撤回」灰条，和常见 IM 一致；
+ * 管理删除（管理员清他人消息）直接消失、不留痕，免得反而把注意力引过去。原文两种都保留在审计里。
+ */
+export function messageVisibleInChat(s: DemoState, m: Message, actor: ChatActor) {
+  return messageVisibleCore(s, m, actor, true)
 }
 
 export function canManageDelete(s: DemoState, m: Message, actor: ChatActor) {
@@ -93,9 +102,9 @@ export function deleteAllBlock(s: DemoState, m: Message, actor: ChatActor) {
   if (canManageDelete(s, m, actor)) return undefined
   if (m.senderKind !== actor.kind || m.senderId !== actor.id) return '没有管理删除他人消息的权限'
   const cap = actor.kind === 'seat' ? seatCan(s, actor.id, 'dm.recall') : customerCan(s, actor.id, 'dm.recall', s.conversations.find((c) => c.id === m.convId)?.chatGroupId)
-  if (!cap) return '当前策略未开放为所有人删除'
+  if (!cap) return '当前策略未开放撤回'
   const limit = messageLimitSeconds(s, actor.kind, 'recall')
-  return limit > 0 && Date.now() - new Date(m.at).getTime() > limit * 1000 ? '已超过后台设置的删除时限' : undefined
+  return limit > 0 && Date.now() - new Date(m.at).getTime() > limit * 1000 ? '已超过后台设置的撤回时限' : undefined
 }
 
 export function sendFailure(s: DemoState, convId: string, actor: ChatActor, media = false) {

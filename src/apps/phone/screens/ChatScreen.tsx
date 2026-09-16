@@ -4,7 +4,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { ArrowDown, MoreHorizontal } from 'lucide-react'
 import type { Message } from '@/domain/types'
-import { actorKey, draftKey, messageVisibleFor } from '@/domain/messageRules'
+import { actorKey, draftKey, messageVisibleInChat } from '@/domain/messageRules'
 import { useMessageTimeline } from '@/ui/useMessageTimeline'
 import { ChatTyping } from '@/ui/ChatTyping'
 import { ChatMediaLibrary } from '@/ui/ChatMediaLibrary'
@@ -28,7 +28,7 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
   const conv = s.conversations.find((c) => c.id === convId)
   const customer = customerById(s, customerId)
   const actor=useMemo(()=>({kind:'customer' as const,id:customerId}),[customerId])
-  const msgs = useMemo(() => messagesOf(s, convId).filter((m)=>messageVisibleFor(s,m,actor)), [s, convId,actor])
+  const msgs = useMemo(() => messagesOf(s, convId).filter((m)=>messageVisibleInChat(s,m,actor)), [s, convId,actor])
   const key=draftKey(actor,convId),draft=s.chatDrafts?.[key]??{text:''}
   const setText=(text:string)=>s.saveChatDraft(convId,actor,{...(useStore.getState().chatDrafts?.[key]??{text:''}),text})
   const setReplyTo=(m?:Message)=>s.saveChatDraft(convId,actor,{...(useStore.getState().chatDrafts?.[key]??{text:''}),replyToId:m?.id})

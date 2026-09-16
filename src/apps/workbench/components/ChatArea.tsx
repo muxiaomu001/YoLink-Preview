@@ -4,9 +4,10 @@
  * AI 推荐两种触发：员工偏好「自动弹出」开着时客户来消息自动弹；或点输入栏的「AI 推荐」按钮手动生成。
  * 通过 ref 暴露 ChatAreaHandle（填入输入框 / 发文字 / 发附件），给右栏话术面板用。
  */
-import { useEffect, useImperativeHandle, useMemo, useState, type Ref } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
+import { clsx } from 'clsx'
 import { ArrowDown, CornerUpLeft, X } from 'lucide-react'
-import { actorKey, draftKey, messageVisibleFor } from '@/domain/messageRules'
+import { actorKey, draftKey, messageVisibleInChat } from '@/domain/messageRules'
 import { useStore } from '@/store/store'
 import { useMessageTimeline } from '@/ui/useMessageTimeline'
 import type { ChatMediaKind } from '@/ui/MediaComposer'
@@ -16,7 +17,7 @@ import { DeleteMessagesModal } from '@/ui/DeleteMessagesModal'
 import { Button, Checkbox } from '@/ui/primitives'
 import { draftsFor, type AiDraft } from '@/domain/ai'
 import type { Message, MessageMedia, Seat } from '@/domain/types'
-import { seatCan, seatGroupPerm } from '@/store/policy'
+import { seatCan, seatGroupPerm, senderName } from '@/store/policy'
 import { customerById, messagesOf, type ConvRow } from '@/store/selectors'
 import { toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
@@ -37,14 +38,29 @@ export interface ChatAreaHandle {
 export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo }: { ref?: Ref<ChatAreaHandle>; row: ConvRow; seat: Seat; rightOpen: boolean; onToggleRight: () => void; onGroupInfo: () => void }) {
   const { s, staff } = useWorkbench()
   const actor = useMemo(() => ({ kind: 'seat' as const, id: seat.id, staffId: staff?.id }), [seat.id, staff?.id])
-  const msgs = useMemo(() => messagesOf(s,row.conv.id).filter((m)=>messageVisibleFor(s,m,actor)), [s,row.conv.id,actor])
+  const msgs = useMemo(() => messagesOf(s,row.conv.id).filter((m)=>messageVisibleInChat(s,m,actor)), [s,row.conv.id,actor])
   const key=draftKey(actor,row.conv.id)
   const draft=s.chatDrafts?.[key]??{text:''}
-  const text=draft.text
-  const setText=(value:string|((prev:string)=>string))=>{const state=useStore.getState(),d=state.chatDrafts?.[key]??{text:''};state.saveChatDraft(row.conv.id,actor,{...d,text:typeof value==='function'?value(d.text):value})}
+  // 输入框文字放在本地 state：全局 store 挂了 persist，逐键写入会把每次按键变成一次全量 localStorage 落盘。
+  // 草稿仍然保留，只是按 400ms 防抖写；切会话前输入框会先失焦，失焦时立即落盘。
+  const [text,setTextLocal]=useState(()=>useStore.getState().chatDrafts?.[key]?.text??'')
+  const [loadedKey,setLoadedKey]=useState(key)
+  if(loadedKey!==key){setLoadedKey(key);setTextLocal(useStore.getState().chatDrafts?.[key]?.text??'')}
+  const pending=useRef({convId:row.conv.id,text})
+  useEffect(()=>{pending.current={convId:row.conv.id,text}})
+  const flushDraft=useCallback(()=>{
+    const {convId,text:latest}=pending.current
+    const state=useStore.getState(),d=state.chatDrafts?.[draftKey(actor,convId)]??{text:''}
+    if(d.text!==latest)state.saveChatDraft(convId,actor,{...d,text:latest})
+  },[actor])
+  const setText=useCallback((value:string|((prev:string)=>string))=>setTextLocal(value),[])
+  useEffect(()=>{const timer=window.setTimeout(flushDraft,400);return()=>window.clearTimeout(timer)},[text,flushDraft])
+  useEffect(()=>()=>flushDraft(),[flushDraft])
   const setReplyTo=(m?:Message,quoteText?:string)=>{const state=useStore.getState();state.saveChatDraft(row.conv.id,actor,{...(state.chatDrafts?.[key]??{text:''}),replyToId:m?.id,quoteText:m?quoteText:undefined})}
   const replyTo=msgs.find((m)=>m.id===draft.replyToId)
   const [selected,setSelected]=useState<string[]>([])
+  const selecting=!!selected.length
+  const toggleSelected=useCallback((id:string)=>setSelected((ids)=>ids.includes(id)?ids.filter((x)=>x!==id):[...ids,id]),[])
   const [forwardBatch,setForwardBatch]=useState<Message[]|null>(null)
   const [deleteSelected,setDeleteSelected]=useState(false)
   const [libraryOpen,setLibraryOpen]=useState(false)
@@ -52,6 +68,7 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
   const [firstUnreadId]=useState(()=>msgs.find((m)=>m.senderId!==actor.id&&m.at>(row.conv.readAtBySeat?.[seat.id]??'')&&(!m.delivery||m.delivery==='sent'))?.id)
   const timeline=useMessageTimeline('wb-msg-list',actorKey(actor)+':'+row.conv.id,msgs.map((m)=>m.id).join(','),firstUnreadId)
   const [draftFrom, setDraftFrom] = useState<'ai' | null>(null)
+  const aiDraftText = useRef('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [hitIdx, setHitIdx] = useState(0)
@@ -119,7 +136,7 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
     const result=s.queueChatMessage({ convId: row.conv.id, actor, signature, text: body, selectedMentions: selected, replyToId: replyTo?.id, quoteText: draft.quoteText,  aiDraftUsed: draftFrom === 'ai' || undefined })
     if(!result.ok)return toast(result.reason??'发送失败','warn')
     timeline.jumpLatest()
-    if (draftFrom === 'ai') s.recordAi(staff.id, row.conv.id, 'edited')
+    if (draftFrom === 'ai') s.recordAi(staff.id, row.conv.id, body.trim() === aiDraftText.current.trim() ? 'adopted' : 'edited')
     setText('')
     setDraftFrom(null)
     setReplyTo(undefined)
@@ -162,6 +179,7 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
     setManualDrafts(null)
   }
   const aiEdit = (d: AiDraft) => {
+    aiDraftText.current = d.text
     setText(d.text)
     setDraftFrom('ai')
   }
@@ -179,7 +197,19 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
         {msgs.map((m, i) => (
           <div key={m.id}>
           {m.id===firstUnreadId&&<div className="my-3 text-center text-xs text-brand-600">以下是未读消息</div>}
-          {!!selected.length&&<label className="flex items-center gap-2 text-xs text-zinc-500"><input type="checkbox" aria-label={`选择消息 ${m.id}`} checked={selected.includes(m.id)} onChange={()=>setSelected((ids)=>ids.includes(m.id)?ids.filter((id)=>id!==m.id):[...ids,m.id])}/>选择</label>}
+          {/* 多选模式下整行可点，但「已撤回」占位不参与勾选 */}
+          {(() => { const pickable = selecting && !m.recalledAt && !m.deletedAt; return (
+          <div
+            className={selecting?clsx('flex items-start gap-2.5 rounded-md py-0.5 pl-1',pickable&&'cursor-pointer hover:bg-zinc-50'):undefined}
+            role={pickable?'checkbox':undefined}
+            aria-checked={pickable?selected.includes(m.id):undefined}
+            aria-label={pickable?`选择 ${senderName(s,m)} 的消息`:undefined}
+            tabIndex={pickable?0:undefined}
+            onClick={pickable?()=>toggleSelected(m.id):undefined}
+            onKeyDown={pickable?(e)=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();toggleSelected(m.id)}}:undefined}
+          >
+          {selecting&&<input type="checkbox" tabIndex={-1} readOnly disabled={!pickable} checked={selected.includes(m.id)} className="pointer-events-none mt-2.5 h-4 w-4 shrink-0 accent-brand-600"/>}
+          <div className={selecting?'pointer-events-none min-w-0 flex-1':undefined}>
           <MessageItem
             key={m.id}
             m={m}
@@ -194,6 +224,9 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
             selected={selected.includes(m.id)}
             onSelect={(m)=>setSelected((ids)=>ids.includes(m.id)?ids:[...ids,m.id])}
           />
+          </div>
+          </div>
+          ) })()}
           </div>
         ))}
         {!msgs.length&&<p className="py-12 text-center text-sm text-zinc-400">暂无可见消息</p>}
@@ -217,6 +250,7 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
         onSend={send}
         onSendMedia={sendMedia}
         onAiSuggest={canAi ? aiSuggest : undefined}
+        onBlurText={flushDraft}
       />
 
       {libraryOpen&&<ChatMediaLibrary convId={row.conv.id} actor={actor} onClose={()=>setLibraryOpen(false)} onLocate={(id)=>timeline.jump(`msg-${id}`)}/>}

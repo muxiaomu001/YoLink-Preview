@@ -6,9 +6,9 @@ import { confirm } from '@/ui/confirm'
 import { toast } from '@/ui/overlay'
 
 const CARDS = [
-  { to: '/phone', icon: Smartphone, title: '客户手机屏', who: '以客户身份进入', desc: '邀请注册、官方联系人、聊天和资料。当前只覆盖部分客户 App 页面。' },
-  { to: '/workbench', icon: MonitorSmartphone, title: '客服工作台', who: '员工操作，官方身份对外', desc: '待回复、AI 推荐、话术、客户资料和群发。右下角演示控制可切换员工。' },
-  { to: '/admin', icon: Settings2, title: '管理后台', who: '管理员配置与经营展示', desc: '邀请组、员工与坐席、知识、权限、交接和看板。后续功能保留 P1/P2 标记。' },
+  { to: '/phone', icon: Smartphone, title: '客户手机屏', who: '客户这边看到什么', desc: '扫码注册、加上官方联系人、聊天和查资料。客户全程只看到「顾问」，看不到背后是谁在操作。' },
+  { to: '/workbench', icon: MonitorSmartphone, title: '客服工作台', who: '员工每天在这里干活', desc: '待我回复、AI 推荐回复、话术一键发、客户资料和群发。右下角可以切换成别的员工试。' },
+  { to: '/admin', icon: Settings2, title: '管理后台', who: '老板和管理员管什么', desc: '邀请组、员工与坐席、知识库、权限开关、人员交接、经营看板。这里改一个开关，前面两屏立刻生效。' },
 ]
 
 const FLOWS = [
@@ -28,11 +28,9 @@ export function Landing() {
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
         <header className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-brand-700 px-3 py-1 text-xs font-medium text-white">
-              YoLink · AI 私域运营系统 · 交互演示
-            </div>
-            <h1 className="text-2xl font-semibold text-zinc-900">{enterprise.name}</h1>
-            <p className="mt-1 text-sm text-zinc-500">{enterprise.slogan}。演示企业与所有人物、对话、金额均为虚构。</p>
+            <h1 className="text-2xl font-semibold tracking-[-0.02em] text-zinc-900">YoLink 交互演示</h1>
+            <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-zinc-600">一套自己的客户沟通系统：客户在手机上聊，员工在工作台接，老板在后台管。三个入口下面都打开，改一边看另一边。</p>
+            <p className="mt-1 text-xs text-zinc-400">演示环境以虚构企业「{enterprise.name}」为例（{enterprise.slogan}）。</p>
           </div>
           <Button
             variant="secondary"
@@ -60,7 +58,8 @@ export function Landing() {
           ))}
         </div>
 
-        <p className="mb-4 text-xs leading-relaxed text-zinc-600">建议按 01—05 顺序演示同一个客户。全部数据为虚构；AI 使用本地知识匹配，连接、推送、账单与报表为模拟或样例，不代表真实接入和效果。</p>
+        <h2 className="mt-8 mb-1 text-sm font-semibold text-zinc-900">五条动线，按顺序用同一个客户走一遍</h2>
+        <p className="mb-4 text-xs text-zinc-500">每条都是真实业务里会发生的一段，点右上角直接跳到对应位置。</p>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {FLOWS.map((f) => (
             <section key={f.title} className="rounded-xl border border-zinc-200 bg-white p-5">
@@ -77,9 +76,10 @@ export function Landing() {
           ))}
         </div>
 
-        <p className="mt-8 text-[11px] leading-relaxed text-zinc-400">
-          提示：三个入口可以在不同窗口同时打开，数据实时同步。建议把客户屏放在一侧，管理后台或工作台放在另一侧，边操作边看客户侧的变化。
-        </p>
+        <footer className="mt-10 border-t border-zinc-200 pt-4 text-[11px] leading-relaxed text-zinc-400">
+          <p>用法：三个入口可以在不同窗口同时打开，数据实时同步。建议把客户屏放一侧，工作台或后台放另一侧，边操作边看客户侧的变化。</p>
+          <p className="mt-1.5">关于本演示：企业、人物、对话、金额全部虚构。AI 用本地知识库匹配，不连外部模型；App 推送、账单与经营报表为样例数据，不代表真实接入效果。带 P1 / P2 标记的页面是后续需求的讨论稿，不属于第一版范围。</p>
+        </footer>
       </div>
     </div>
   )

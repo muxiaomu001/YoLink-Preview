@@ -556,7 +556,7 @@ export const useStore = create<DemoStore>()(
           chatRulesVersion: 1,
           policyMatrix: saved.chatRulesVersion ? (saved.policyMatrix ?? current.policyMatrix) : { ...(saved.policyMatrix ?? current.policyMatrix), 'dm.recall': { staff: (saved.policyMatrix ?? current.policyMatrix)['dm.recall']?.staff ?? true, customer: false } },
           policyNumbers: { ...current.policyNumbers, ...saved.policyNumbers },
-          policyItems: (saved.policyItems ?? current.policyItems).map((item) => item.key === 'dm.edit' ? { ...item, level: 'P0' as const } : item.key === 'dm.recall' ? { ...item, label: '为所有人删除自己的消息', desc: '按客户／坐席独立开关；时限见数值型策略' } : item),
+          policyItems: (saved.policyItems ?? current.policyItems).map((item) => item.key === 'dm.edit' ? { ...item, level: 'P0' as const } : item.key === 'dm.recall' ? { ...item, label: '撤回自己发出的消息', desc: '撤回即为所有人删除，会留下「已撤回」痕迹；按客户 / 坐席独立开关，时限见数值型策略' } : item),
         }
       },
       storage: createJSONStorage(() => localStorage),

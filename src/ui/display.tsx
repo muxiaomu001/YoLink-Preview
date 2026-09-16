@@ -2,7 +2,6 @@ import { clsx } from 'clsx'
 import type { ReactNode } from 'react'
 import { BadgeCheck } from 'lucide-react'
 import type { Seat, Tag, Title } from '@/domain/types'
-import { mediaUrl } from '@/domain/mediaUrl'
 import { TitleIcon } from './titleIcons'
 
 /** 客户头像：用昵称首字与稳定色 */
@@ -13,16 +12,18 @@ function hashColor(s: string) {
   return CUSTOMER_COLORS[h % CUSTOMER_COLORS.length]
 }
 
-export function Avatar({ text, color, size = 32, official, className, portrait }: { text: string; portrait?: boolean; color?: string; size?: number; official?: boolean; className?: string }) {
+/** 取展示首字：中文取名字末字（同姓多、更易区分），拉丁取首字母 */
+function initials(text: string) {
+  const t = text.trim()
+  if (!t) return '?'
+  return /^[\u4e00-\u9fa5]{2,4}$/.test(t) ? t.slice(-1) : t.slice(0, 1).toUpperCase()
+}
+
+export function Avatar({ text, color, size = 32, official, className }: { text: string; color?: string; size?: number; official?: boolean; className?: string }) {
   const bg = color ?? hashColor(text)
-  const fixed: Record<string, number> = { '林顾问': 0, '陈顾问': 1, '林薇': 4, '陈默': 3, '周敏': 2, '赵磊': 7, '王芳': 6, '老周说市': 9, 'Cindy 在港': 10, '阿杰': 13 }
-  const photo = portrait ?? (text in fixed || (!color && text.length > 1))
-  let hash = 0
-  for (const ch of text) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
-  const tile = fixed[text] ?? ((hash % 8) * 2 + (/先生|Eric|David|Kevin|Jason|Leo|Jack|Alex|Tom|Ken/.test(text) ? 1 : 0))
   return (
     <span className={clsx('relative inline-flex shrink-0 items-center justify-center rounded-full text-white font-medium select-none', className)} style={{ width: size, height: size, background: bg, fontSize: Math.round(size * 0.42) }}>
-      {photo ? <span role="img" aria-label={`${text}的头像`} className="absolute inset-0 rounded-full bg-cover" style={{ backgroundImage: `url("${mediaUrl('/media/avatars/people-grid.png')}")`, backgroundSize: '400% 400%', backgroundPosition: `${(tile % 4) * 100 / 3}% ${Math.floor(tile / 4) * 100 / 3}%` }} /> : text.slice(0, 1)}
+      {initials(text)}
       {official && (
         <span className="absolute -right-0.5 -bottom-0.5 flex items-center justify-center rounded-full bg-white" style={{ width: size * 0.42, height: size * 0.42 }} title="企业官方账号">
           <BadgeCheck className="text-brand-600" style={{ width: size * 0.38, height: size * 0.38 }} fill="#dbe4f7" />
@@ -33,7 +34,7 @@ export function Avatar({ text, color, size = 32, official, className, portrait }
 }
 
 export function SeatAvatar({ seat, size = 32, className }: { seat: Seat; size?: number; className?: string }) {
-  return <Avatar text={seat.displayName} portrait={seat.type === 'assign'} color={seat.avatarColor} size={size} official className={className} />
+  return <Avatar text={seat.avatarText || seat.displayName} color={seat.avatarColor} size={size} official className={className} />
 }
 
 /** 头衔：对外可见，官方发的 */

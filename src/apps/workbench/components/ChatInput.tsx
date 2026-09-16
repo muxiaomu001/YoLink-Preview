@@ -1,14 +1,14 @@
 /**
- * 输入区：引用条 → 工具栏（表情 / 图片 / 文件 / 话术 / @ 提及 / AI 推荐）→ 多行输入框 → 底部「发送」。
+ * 输入区：引用条 → 工具栏（表情 / 附件 / 语音 / 话术 / @ 提及 / AI 推荐）→ 多行输入框 → 底部「发送」。
  * 三种候选浮层共用 CandidatePopover：
  * - `@` 成员选择（坐席 + 客户成员 + 「所有人」按策略），Enter / Tab 插入
  * - `/` 话术（matchQuickReplies），Enter / Tab 选中：文字插入光标处，图片 / 文件直接发出
  * - 打字自动匹配（staff.prefs.quickMatch）：光标前最后一段 ≥ 2 字就在全库找（标题 / 正文 / 文件名），长的先试、没结果再往短里退；
  *   Tab / 点击选中，Enter 仍是发送，Esc 关闭后同一个词不再弹；选中文字话术用正文替换整个输入框
- * 变量 {{customer.nickname}} {{staff.name}} {{company.name}} 发送时替换；图片 / 文件按钮按策略 canMedia 显示，选本机文件后直接发出。
+ * 变量 {{customer.nickname}} {{staff.name}} {{company.name}} 发送时替换；附件按钮按策略 canMedia 显示，按文件类型自动分图片 / 视频 / 文件，进预览后再发。
  */
 import { useMemo, useRef, useState } from 'react'
-import { AtSign, Image, Mic, Paperclip, Send, Smile, Sparkles, Video, X, Zap } from 'lucide-react'
+import { AtSign, Mic, Paperclip, Send, Smile, Sparkles, X, Zap } from 'lucide-react'
 import type { ChatGroup, Customer, Message, MessageMedia, QuickReply, Seat } from '@/domain/types'
 import { DEFAULT_STAFF_PREFS } from '@/domain/seed-groups'
 import { seatCan, senderName, visibleText } from '@/store/policy'
@@ -67,6 +67,7 @@ export function ChatInput({
   onSend,
   onSendMedia,
   onAiSuggest,
+  onBlurText,
 }: {
   seat: Seat
   draftId:string
@@ -83,14 +84,14 @@ export function ChatInput({
   onSendMedia: (kind: ChatMediaKind, media: MessageMedia, text: string) => boolean
   /** 不传则不显示「AI 推荐」按钮（策略不允许） */
   onAiSuggest?: () => void
+  /** 失焦时把输入框内容落进草稿（平时按防抖写，避免逐键持久化） */
+  onBlurText?: () => void
 }) {
   const { s, staff } = useWorkbench()
   // Textarea 不透传 ref：从包裹层找 textarea
   const wrapRef = useRef<HTMLDivElement>(null)
   const ref = { get current() { return wrapRef.current?.querySelector('textarea') ?? null } }
   const [mediaPick,setMediaPick]=useState<{kind:ChatMediaKind;files:File[]}|null>(null)
-  const videoInput=useRef<HTMLInputElement>(null)
-  const imageInput = useRef<HTMLInputElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const [pop, setPopRaw] = useState<Pop | null>(null)
   const [selectedMembers, setSelectedMembers] = useState<Candidate[]>([])
@@ -194,8 +195,24 @@ export function ChatInput({
     ref.current?.focus()
   }
 
-  /** 工具栏选本机图片 / 文件：读成 media 后直接发出 */
-  const pickFile = (kind: ChatMediaKind,e:React.ChangeEvent<HTMLInputElement>)=>{const files=Array.from(e.target.files??[]);e.target.value='';if(files.length)setMediaPick({kind,files})}
+  /** 工具栏选本机附件：一个入口，按文件类型自动判断图片 / 视频 / 文件，进预览后再发 */
+  const pickAttachment = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    if (!files.length) return
+    const kind: ChatMediaKind = files.every((f) => f.type.startsWith('image/')) ? 'image' : files.every((f) => f.type.startsWith('video/')) ? 'video' : 'file'
+    setMediaPick({ kind, files })
+  }
+
+  /** 表情插到光标处，而不是无脑追加到末尾 */
+  const insertEmoji = (emoji: string) => {
+    const el = ref.current
+    const start = el?.selectionStart ?? text.length
+    const end = el?.selectionEnd ?? start
+    setText(text.slice(0, start) + emoji + text.slice(end))
+    setEmojiOpen(false)
+    window.setTimeout(() => { const t = ref.current; t?.focus(); t?.setSelectionRange(start + emoji.length, start + emoji.length) }, 0)
+  }
 
   const send = () => {
     const raw = text.trim()
@@ -229,7 +246,8 @@ export function ChatInput({
     }
   }
 
-  const mediaHint = '选择附件后预览，确认再发送'
+  // 上限值直接读后台策略：老板在后台改一个数字，这里的提示立刻跟着变
+  const mediaHint = `上限：图片 ${s.policyNumbers.imageMaxMb}MB · 视频 ${s.policyNumbers.videoMaxMb}MB · 文件 ${s.policyNumbers.fileMaxMb}MB · 语音 ${s.policyNumbers.voiceMaxSeconds} 秒（后台「策略 · 数值型」可改）`
 
   return (
     <div className="border-t border-zinc-200 bg-white">
@@ -248,13 +266,9 @@ export function ChatInput({
         <Tool label="表情" onClick={() => setEmojiOpen((v) => !v)} disabled={disabled}><Smile size={16} /></Tool>
         {canMedia && (
           <>
-            <input ref={imageInput} type="file" multiple accept="image/*" className="hidden" onChange={(e) => void pickFile('image', e)} />
-            <input ref={fileInput} multiple type="file" className="hidden" onChange={(e) => void pickFile('file', e)} />
-            <Tool label={`发送图片（${mediaHint}）`} onClick={() => imageInput.current?.click()} disabled={disabled}><Image size={16} /></Tool>
-            <input ref={videoInput} type="file" accept="video/*" className="hidden" onChange={(e)=>pickFile('video',e)}/>
-            <Tool label="发送视频" onClick={()=>videoInput.current?.click()} disabled={disabled}><Video size={16}/></Tool>
+            <input ref={fileInput} type="file" multiple className="hidden" onChange={pickAttachment} />
+            <Tool label={`附件：图片 / 视频 / 文件，选好先预览再发送。${mediaHint}`} onClick={() => fileInput.current?.click()} disabled={disabled}><Paperclip size={16} /></Tool>
             <Tool label="录制语音" onClick={()=>setMediaPick({kind:'voice',files:[]})} disabled={disabled}><Mic size={16}/></Tool>
-            <Tool label={`发送文件（${mediaHint}）`} onClick={() => fileInput.current?.click()} disabled={disabled}><Paperclip size={16} /></Tool>
           </>
         )}
         <Tool label="话术（输入 / 也可打开；右栏「话术」页签可浏览全部）" onClick={() => openPop('quick')} disabled={disabled}><Zap size={16} /></Tool>
@@ -263,7 +277,7 @@ export function ChatInput({
         {group?.kind === 'channel' && !disabledReason && <span className="ml-auto text-[11px] text-zinc-400">以频道身份发布，客户只读</span>}
       </div>
 
-      {emojiOpen && <div className="mx-3 mt-1 flex flex-wrap gap-1 rounded-md border border-zinc-200 p-2" aria-label="表情选择器">{['😊', '👍', '🙏', '🌹', '🎉', '👌', '🤝', '☀️', '❤️', '✅', '👋', '💪'].map((emoji) => <button type="button" key={emoji} aria-label={`插入表情 ${emoji}`} className="rounded p-1 text-xl hover:bg-zinc-100" onClick={() => { setText(text + emoji); setEmojiOpen(false); ref.current?.focus() }}>{emoji}</button>)}</div>}
+      {emojiOpen && <div className="mx-3 mt-1 flex flex-wrap gap-1 rounded-md border border-zinc-200 p-2" aria-label="表情选择器">{['😊', '👍', '🙏', '🌹', '🎉', '👌', '🤝', '☀️', '❤️', '✅', '👋', '💪'].map((emoji) => <button type="button" key={emoji} aria-label={`插入表情 ${emoji}`} className="rounded p-1 text-xl hover:bg-zinc-100" onClick={() => { insertEmoji(emoji) }}>{emoji}</button>)}</div>}
       <div id="wb-chat-input" className="relative px-3 pb-2" ref={wrapRef}>
         {pop && candidates.length > 0 && <CandidatePopover title={POP_TITLE[pop.kind]} items={candidates} idx={idx} onPick={pick} onHover={setIdx} />}
         <textarea
@@ -276,7 +290,7 @@ export function ChatInput({
             detect(e.target.value, e.target.selectionStart ?? e.target.value.length)
           }}
           onKeyDown={onKey}
-          onBlur={() => window.setTimeout(() => setPop(null), 150)}
+          onBlur={() => { onBlurText?.(); window.setTimeout(() => setPop(null), 150) }}
           placeholder={disabledReason ?? (group?.kind==='channel'?`向「${group.name}」发布…`:`以「${seat.displayName}」身份回复…`)}
           className="w-full resize-none border-0 bg-transparent px-1 py-1.5 text-[13px] leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none disabled:text-zinc-400"
         />

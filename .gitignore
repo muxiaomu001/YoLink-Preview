@@ -8,3 +8,6 @@ dist-ssr
 !.env.example
 npm-debug.log*
 pnpm-debug.log*
+
+# 本地设计评审快照，不入仓
+.impeccable/

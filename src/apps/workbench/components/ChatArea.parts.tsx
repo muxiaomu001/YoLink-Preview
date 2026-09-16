@@ -161,7 +161,7 @@ export function ForwardModal({ message, messages, seat, onClose }: { message: Me
         {rows.map((r) => (
           <li key={r.conv.id}>
             <button type="button" disabled={!staff || !seatMessageSendAllowed(s, r.conv.id, seat.id, staff.id, selected.some((m)=>!!m.media))} title={!staff || !seatMessageSendAllowed(s, r.conv.id, seat.id, staff.id, selected.some((m)=>!!m.media)) ? '当前不能向此会话发送' : undefined} onClick={() => setTarget(r.conv.id)} className={clsx('flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[12px] disabled:cursor-not-allowed disabled:opacity-40', target === r.conv.id ? 'bg-brand-50' : 'hover:bg-zinc-50')}>
-              <Avatar text={r.title} size={22} portrait={r.conv.kind === 'dm'} />
+              <Avatar text={r.title} size={22} />
               <span className="min-w-0 flex-1 truncate">{r.title}</span>
               <span className="text-[11px] text-zinc-400">{r.conv.kind === 'dm' ? '私聊' : r.conv.kind === 'channel' ? '频道' : '群'}</span>
             </button>
