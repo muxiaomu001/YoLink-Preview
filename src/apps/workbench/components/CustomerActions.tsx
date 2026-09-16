@@ -1,5 +1,5 @@
 /**
- * 客户资料卡「更多」菜单：重置密码、强制下线、封禁 / 解除、全局禁言 / 解除、注销。
+ * 客户资料卡「更多」菜单：重置密码、强制下线、封禁 / 解除、全群/全局禁言 / 解除、注销。
  * 确认框文案取自 domain/customerControl，与管理后台客户详情里的同名动作共用一份。
  * 危险项红字，二次确认保留。每项的可用性都有依据：主归属坐席的实操员工、员工角色能力 delete_user。
  */
@@ -7,7 +7,7 @@ import { useState } from 'react'
 import { Ban, KeyRound, LogOut, MicOff, UserX } from 'lucide-react'
 import type { Customer } from '@/domain/types'
 import { CONTROL_COPY, MUTE_OPTIONS, muteLabel } from '@/domain/customerControl'
-import { isMutedNow } from '@/domain/customerStatus'
+import { isAllGroupsMutedNow, isGlobalMutedNow } from '@/domain/customerStatus'
 import { primarySeatOfCustomer } from '@/store/selectors'
 import { Button } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
@@ -18,12 +18,13 @@ import { MenuItem, PopoverPanel } from './customer/Popover'
 export function CustomerActions({ c, open, onClose }: { c: Customer; open: boolean; onClose: () => void }) {
   const { s, staff, can } = useWorkbench()
   const [pwd, setPwd] = useState<string | null>(null)
-  const [muting, setMuting] = useState(false)
+  const [muting, setMuting] = useState<'allGroups' | 'global' | null>(null)
   if (!staff) return null
   const primary = primarySeatOfCustomer(s, c.id)
   const canReset = primary?.operatorStaffId === staff.id
   const canDelete = can('delete_user')
-  const muted = isMutedNow(c)
+  const allGroupsMuted = isAllGroupsMutedNow(c)
+  const globallyMuted = isGlobalMutedNow(c)
   const banned = !!c.bannedAt
 
   const reset = async () => {
@@ -51,15 +52,17 @@ export function CustomerActions({ c, open, onClose }: { c: Customer; open: boole
     s.setCustomerBan(c.id, !banned, staff.id)
     toast(banned ? '已解除封禁' : '已封禁，客户无法登录')
   }
-  const mute = (hours: number | null) => {
-    s.muteCustomerAll(c.id, hours, staff.id)
-    toast(`已全局禁言「${c.nickname}」${muteLabel(hours)}`)
-    setMuting(false)
+  const mute = (kind: 'allGroups' | 'global', hours: number | null) => {
+    if (kind === 'allGroups') s.muteCustomerAllGroups(c.id, hours, staff.id)
+    else s.muteCustomerGlobally(c.id, hours, staff.id)
+    toast(`已${kind === 'allGroups' ? '全群禁言' : '全局禁言'}「${c.nickname}」${muteLabel(hours)}`)
+    setMuting(null)
   }
-  const unmute = () => {
+  const unmute = (kind: 'allGroups' | 'global') => {
     onClose()
-    s.muteCustomerAll(c.id, 0, staff.id)
-    toast('已解除全局禁言')
+    if (kind === 'allGroups') s.muteCustomerAllGroups(c.id, 0, staff.id)
+    else s.muteCustomerGlobally(c.id, 0, staff.id)
+    toast(`已解除${kind === 'allGroups' ? '全群禁言' : '全局禁言'}`)
   }
   const del = async () => {
     onClose()
@@ -79,15 +82,29 @@ export function CustomerActions({ c, open, onClose }: { c: Customer; open: boole
           <MenuItem title="让该客户的所有设备退出登录" onClick={() => void kick()}>
             <LogOut size={14} /> 强制下线
           </MenuItem>
-          {muted ? (
-            <MenuItem onClick={unmute}>
+          {allGroupsMuted ? (
+            <MenuItem onClick={() => unmute('allGroups')}>
+              <MicOff size={14} /> 解除全群禁言
+            </MenuItem>
+          ) : (
+            <MenuItem
+              onClick={() => {
+                onClose()
+                setMuting('allGroups')
+              }}
+            >
+              <MicOff size={14} /> 全群禁言
+            </MenuItem>
+          )}
+          {globallyMuted ? (
+            <MenuItem onClick={() => unmute('global')}>
               <MicOff size={14} /> 解除全局禁言
             </MenuItem>
           ) : (
             <MenuItem
               onClick={() => {
                 onClose()
-                setMuting(true)
+                setMuting('global')
               }}
             >
               <MicOff size={14} /> 全局禁言
@@ -108,15 +125,15 @@ export function CustomerActions({ c, open, onClose }: { c: Customer; open: boole
         <p className="mt-3 text-[12px] text-amber-700">{CONTROL_COPY.password}</p>
       </Modal>
 
-      <Modal open={muting} onClose={() => setMuting(false)} title={`全局禁言「${c.nickname}」`} width={400}>
+      <Modal open={!!muting} onClose={() => setMuting(null)} title={`${muting === 'allGroups' ? '全群禁言' : '全局禁言'}「${c.nickname}」`} width={400}>
         <div className="grid grid-cols-2 gap-2">
           {MUTE_OPTIONS.map((o) => (
-            <Button key={o.label} onClick={() => mute(o.hours)}>
+            <Button key={o.label} onClick={() => muting && mute(muting, o.hours)}>
               {o.label}
             </Button>
           ))}
         </div>
-        <p className="mt-3 text-[12px] text-zinc-500">{CONTROL_COPY.mute}</p>
+        <p className="mt-3 text-[12px] text-zinc-500">{muting === 'allGroups' ? CONTROL_COPY.muteAllGroups : CONTROL_COPY.muteGlobal}</p>
       </Modal>
     </>
   )

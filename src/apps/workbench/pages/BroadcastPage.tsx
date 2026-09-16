@@ -16,6 +16,7 @@ import { HelpTip } from '@/ui/help'
 import { toast } from '@/ui/overlay'
 import { FileCard, ImageThumb, readFileAsMedia } from '@/ui/media'
 import { useWorkbench } from '../useWorkbench'
+import { isGlobalMutedNow } from '@/domain/customerStatus'
 import { BroadcastDetailModal, BroadcastRecords, QuickReplyPickerModal } from './BroadcastPage.parts'
 import { DELIVERY_RULES, TARGET_LABEL } from './BroadcastPage.shared'
 
@@ -83,11 +84,11 @@ export function BroadcastPage() {
     return []
   }, [friends, mine, targetKind, tagIds, product, role])
 
-  /** 发送前预估会被跳过的人：注销 / 封禁 / 屏蔽本坐席 / 今日已达每客户频控 */
+  /** 发送前预估会被跳过的人：注销 / 封禁 / 全局禁言 / 屏蔽本坐席 / 今日已达每客户频控 */
   const willSkip = useMemo(() => {
     if (!seat) return 0
     return targets.filter((c) => {
-      if (c.bannedAt || c.blockedSeatIds.includes(seat.id)) return true
+      if (c.bannedAt || isGlobalMutedNow(c) || c.blockedSeatIds.includes(seat.id)) return true
       const received = s.messages.filter((m) => m.isBroadcast && m.at.slice(0, 10) === today && s.conversations.find((x) => x.id === m.convId)?.customerId === c.id).length
       return received >= perCustomer
     }).length

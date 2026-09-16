@@ -232,8 +232,10 @@ export interface Customer {
   deletedAt?: ISODate
   /** 企业封禁：账号无法登录 */
   bannedAt?: ISODate | null
-  /** 全局禁言到期时间；null 表示未禁言 */
+  /** 全群禁言到期时间；群与频道不能发言，私聊不受影响 */
   mutedAllUntil?: ISODate | null
+  /** 全局禁言到期时间；官方联系人、群与频道都不能发消息 */
+  globalMutedUntil?: ISODate | null
   /** 员工重置过密码，首次登录强制修改 */
   mustChangePassword?: boolean
   /** 最近一次强制下线的时间；下线是一次性动作，不是持续状态 */
@@ -558,6 +560,7 @@ export type AuditType =
   | 'staff.create'
   | 'staff.update'
   | 'staff.disable'
+  | 'staff.activate'
   | 'staff.reset_password'
   | 'staff.force_logout'
   | 'role.create'
@@ -630,6 +633,7 @@ export type AuditType =
   | 'message.edit'
   | 'customer.ban'
   | 'customer.mute'
+  | 'customer.mute_all'
   | 'customer.reset_password'
   | 'customer.force_logout'
   | 'bot.update'

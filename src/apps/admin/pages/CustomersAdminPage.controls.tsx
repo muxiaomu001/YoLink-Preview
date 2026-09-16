@@ -1,5 +1,5 @@
 /**
- * 后台客户详情里的「账号管控」：重置密码、强制下线、封禁 / 解除、全局禁言 / 解除、影子模式。
+ * 后台客户详情里的「账号管控」：重置密码、强制下线、封禁 / 解除、全群/全局禁言 / 解除、影子模式。
  *
  * 这些动作原来只有工作台有，管理员要处理一个闹事的客户得先去工作台、还得是那个客户
  * 主归属坐席的实操员工才点得动。后台是管理员的地盘，不该绕这一圈。
@@ -9,7 +9,7 @@ import { useState } from 'react'
 import { Ban, EyeOff, KeyRound, LogOut, MicOff } from 'lucide-react'
 import type { Customer } from '@/domain/types'
 import { CONTROL_COPY, MUTE_OPTIONS, muteLabel } from '@/domain/customerControl'
-import { isMutedNow } from '@/domain/customerStatus'
+import { isAllGroupsMutedNow, isGlobalMutedNow } from '@/domain/customerStatus'
 import { fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { Button, Field, Input } from '@/ui/primitives'
@@ -32,11 +32,12 @@ export function CustomerControlSection({ c }: { c: Customer }) {
   const s = useStore()
   const admin = s.session.adminStaffId!
   const [pwd, setPwd] = useState<string | null>(null)
-  const [muting, setMuting] = useState(false)
+  const [muting, setMuting] = useState<'allGroups' | 'global' | null>(null)
   const [shadowing, setShadowing] = useState(false)
   const [shadowReason, setShadowReason] = useState('')
   const deleted = !!c.deletedAt
-  const muted = isMutedNow(c)
+  const allGroupsMuted = isAllGroupsMutedNow(c)
+  const globallyMuted = isGlobalMutedNow(c)
   const banned = !!c.bannedAt
   const shadowed = !!c.shadowModeAt
 
@@ -78,10 +79,11 @@ export function CustomerControlSection({ c }: { c: Customer }) {
     setShadowing(false)
     toast('已开启影子模式，客户端无任何提示')
   }
-  const mute = (hours: number | null) => {
-    s.muteCustomerAll(c.id, hours, admin)
-    toast(`已全局禁言「${c.nickname}」${muteLabel(hours)}`)
-    setMuting(false)
+  const mute = (kind: 'allGroups' | 'global', hours: number | null) => {
+    if (kind === 'allGroups') s.muteCustomerAllGroups(c.id, hours, admin)
+    else s.muteCustomerGlobally(c.id, hours, admin)
+    toast(`已${kind === 'allGroups' ? '全群禁言' : '全局禁言'}「${c.nickname}」${muteLabel(hours)}`)
+    setMuting(null)
   }
 
   return (
@@ -97,13 +99,24 @@ export function CustomerControlSection({ c }: { c: Customer }) {
           <LogOut size={13} /> 下线
         </Button>
       </Row>
-      <Row title="全局禁言" desc={muted ? `禁言中${c.mutedAllUntil!.startsWith('9999-') ? '（永久）' : `，至 ${fmtDateTime(c.mutedAllUntil!)}`}；所有官方联系人、群和频道都不能发消息` : '所有官方联系人、群和频道都不能发消息'}>
-        {muted ? (
-          <Button size="sm" disabled={deleted} onClick={() => mute(0)}>
+      <Row title="全群禁言" desc={allGroupsMuted ? `禁言中${c.mutedAllUntil!.startsWith('9999-') ? '（永久）' : `，至 ${fmtDateTime(c.mutedAllUntil!)}`}；群与频道不能发消息，私聊不受影响` : '群与频道不能发消息，私聊不受影响'}>
+        {allGroupsMuted ? (
+          <Button size="sm" disabled={deleted} onClick={() => mute('allGroups', 0)}>
             <MicOff size={13} /> 解除禁言
           </Button>
         ) : (
-          <Button size="sm" disabled={deleted} onClick={() => setMuting(true)}>
+          <Button size="sm" disabled={deleted} onClick={() => setMuting('allGroups')}>
+            <MicOff size={13} /> 禁言
+          </Button>
+        )}
+      </Row>
+      <Row title="全局禁言" desc={globallyMuted ? `禁言中${c.globalMutedUntil!.startsWith('9999-') ? '（永久）' : `，至 ${fmtDateTime(c.globalMutedUntil!)}`}；所有官方联系人、群和频道都不能发消息` : '所有官方联系人、群和频道都不能发消息'}>
+        {globallyMuted ? (
+          <Button size="sm" disabled={deleted} onClick={() => mute('global', 0)}>
+            <MicOff size={13} /> 解除禁言
+          </Button>
+        ) : (
+          <Button size="sm" disabled={deleted} onClick={() => setMuting('global')}>
             <MicOff size={13} /> 禁言
           </Button>
         )}
@@ -148,15 +161,15 @@ export function CustomerControlSection({ c }: { c: Customer }) {
         </div>
       </Modal>
 
-      <Modal open={muting} onClose={() => setMuting(false)} title={`全局禁言「${c.nickname}」`} width={400}>
+      <Modal open={!!muting} onClose={() => setMuting(null)} title={`${muting === 'allGroups' ? '全群禁言' : '全局禁言'}「${c.nickname}」`} width={400}>
         <div className="grid grid-cols-2 gap-2">
           {MUTE_OPTIONS.map((o) => (
-            <Button key={o.label} onClick={() => mute(o.hours)}>
+            <Button key={o.label} onClick={() => muting && mute(muting, o.hours)}>
               {o.label}
             </Button>
           ))}
         </div>
-        <p className="mt-3 text-[12px] text-zinc-500">{CONTROL_COPY.mute}</p>
+        <p className="mt-3 text-[12px] text-zinc-500">{muting === 'allGroups' ? CONTROL_COPY.muteAllGroups : CONTROL_COPY.muteGlobal}</p>
       </Modal>
     </section>
   )

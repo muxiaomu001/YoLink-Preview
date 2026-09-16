@@ -25,7 +25,7 @@ export const GROUP_EXTRAS: Record<string, Partial<ChatGroup>> = {
   cg_strategy: {
     admins: [
       { memberKind: 'seat', memberId: 'seat_lin', perms: ['can_post_messages', 'can_pin_messages'], promotedBySeatId: 'seat_cs', promotedAt: ago(100) },
-      { memberKind: 'seat', memberId: 'seat_chen', perms: ['can_post_messages'], promotedBySeatId: 'seat_cs', promotedAt: ago(100) },
+      { memberKind: 'seat', memberId: 'seat_chen', perms: ['can_pin_messages'], promotedBySeatId: 'seat_cs', promotedAt: ago(100) },
     ],
     settings: { allMuted: false, membersVisible: false, slowModeSeconds: null, historyVisible: true },
     inviteLinks: [{ id: 'gl_strategy_main', name: '主链接', code: 'CH-STRAT', main: true, expiresAt: null, maxUses: null, uses: 214, status: 'active', bySeatId: 'seat_cs', createdAt: ago(100) }],

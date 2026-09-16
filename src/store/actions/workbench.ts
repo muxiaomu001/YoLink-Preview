@@ -1,7 +1,7 @@
 import { runSensitiveGate } from '../sensitiveGate'
 /**
  * 工作台动作：消息操作（回复、转发、坐席删群消息）、会话操作（已读、置顶、静音）、
- * 客户操作（重置密码、封禁、全局禁言）、个人设置、客户手机端的社交动作。话术库见 quickReplies.ts。
+ * 客户操作（重置密码、封禁、全群/全局禁言）、个人设置、客户手机端的社交动作。话术库见 quickReplies.ts。
  */
 import type { MessageMedia, StaffPrefs } from '@/domain/types'
 import { messageLimitSeconds, messageVisibleFor, mentionsIn, seatConversationAllowed, seatMessageSendAllowed } from '@/domain/messageRules'
@@ -25,8 +25,10 @@ export interface WorkbenchActions {
   /** 客户忘记密码：主归属坐席的实操员工重置，返回一次性新密码 */
   resetCustomerPassword: (customerId: string, byStaffId: string) => string
   setCustomerBan: (customerId: string, on: boolean, byStaffId: string) => void
+  /** 全群禁言；hours 为 null 表示永久，0 表示解除 */
+  muteCustomerAllGroups: (customerId: string, hours: number | null, byStaffId: string) => void
   /** 全局禁言；hours 为 null 表示永久，0 表示解除 */
-  muteCustomerAll: (customerId: string, hours: number | null, byStaffId: string) => void
+  muteCustomerGlobally: (customerId: string, hours: number | null, byStaffId: string) => void
   /** 强制下线：让客户所有已登录设备退出，账号可重新登录 */
   forceLogoutCustomer: (customerId: string, byStaffId: string) => void
   /** 客户级影子模式：开了之后他发的每条群消息只有他自己和坐席看得见 */
@@ -138,13 +140,24 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
         }
       }),
 
-    muteCustomerAll: (customerId, hours, byStaffId) =>
+    muteCustomerAllGroups: (customerId, hours, byStaffId) =>
       set((s) => {
         const c = s.customers.find((x) => x.id === customerId)
         if (!c) return {}
         const until = hours === 0 ? null : hours == null ? '9999-12-31T00:00:00.000Z' : new Date(Date.now() + hours * 3600000).toISOString()
         return {
           customers: s.customers.map((x) => (x.id === customerId ? { ...x, mutedAllUntil: until } : x)),
+          audit: withAudit(s.audit, 'customer.mute_all', hours === 0 ? `解除客户「${c.nickname}」的全群禁言` : `全群禁言客户「${c.nickname}」${hours == null ? '永久' : `${hours} 小时`}`, byStaffId),
+        }
+      }),
+
+    muteCustomerGlobally: (customerId, hours, byStaffId) =>
+      set((s) => {
+        const c = s.customers.find((x) => x.id === customerId)
+        if (!c) return {}
+        const until = hours === 0 ? null : hours == null ? '9999-12-31T00:00:00.000Z' : new Date(Date.now() + hours * 3600000).toISOString()
+        return {
+          customers: s.customers.map((x) => (x.id === customerId ? { ...x, globalMutedUntil: until } : x)),
           audit: withAudit(s.audit, 'customer.mute', hours === 0 ? `解除客户「${c.nickname}」的全局禁言` : `全局禁言客户「${c.nickname}」${hours == null ? '永久' : `${hours} 小时`}`, byStaffId),
         }
       }),

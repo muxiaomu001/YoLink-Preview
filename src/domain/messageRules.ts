@@ -1,7 +1,7 @@
 import type { ChatActor, DemoState, Message } from './types'
 import { fmtDuration } from './time'
 import { customerCan, customerCanSpeakIn, groupPerm, seatCan, seatGroupPerm } from '@/store/policy'
-import { globalMuteReason } from './customerStatus'
+import { globalMuteReason, isGlobalMutedNow } from './customerStatus'
 import type { SkipReason } from './broadcastCoverage'
 
 /**
@@ -45,6 +45,7 @@ export function seatBroadcastSkipReason(s: DemoState, convId: string, seatId: st
     if (!c) return 'left'
     if (c.deletedAt) return 'deleted'
     if (c.bannedAt) return 'banned'
+    if (isGlobalMutedNow(c)) return 'globalMuted'
     if (c.blockedSeatIds.includes(seatId)) return 'blocked'
     if (conv.seatId !== seatId) return 'left'
     return seatCan(s, seatId, media ? 'dm.send_media' : 'dm.send') ? undefined : 'muted'

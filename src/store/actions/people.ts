@@ -77,7 +77,7 @@ export function peopleActions(set: Set, get: Get): PeopleActions {
         const st = s.staff.find((x) => x.id === id)
         return {
           staff: s.staff.map((x) => (x.id === id ? { ...x, status: 'active' } : x)),
-          audit: withAudit(s.audit, 'staff.disable', `激活员工 ${st?.name}`, byStaffId),
+          audit: withAudit(s.audit, 'staff.activate', `激活员工 ${st?.name}`, byStaffId),
         }
       }),
 

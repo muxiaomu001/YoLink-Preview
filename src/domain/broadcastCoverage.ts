@@ -13,13 +13,15 @@
  * 预览说"触达 137 人"就一定发 137 条。
  */
 import type { Customer, DemoState } from './types'
+import { isGlobalMutedNow } from './customerStatus'
 
 /** 群发跳过原因：单坐席与多坐席覆盖共用，用于任务详情的可读统计。 */
-export type SkipReason = 'deleted' | 'banned' | 'blocked' | 'left' | 'muted' | 'noPostingPermission' | 'noReachableSeat' | 'rateLimited' | 'senderUnavailable'
+export type SkipReason = 'deleted' | 'banned' | 'globalMuted' | 'blocked' | 'left' | 'muted' | 'noPostingPermission' | 'noReachableSeat' | 'rateLimited' | 'senderUnavailable'
 
 export const SKIP_REASON_LABEL: Record<SkipReason, string> = {
   deleted: '已注销',
   banned: '已封禁',
+  globalMuted: '全局禁言',
   blocked: '已屏蔽本坐席',
   left: '已退群',
   muted: '被禁言',
@@ -76,6 +78,7 @@ export function planCoverage(s: DemoState, seatIds: string[], at: string): Cover
     const mine = reach.get(c.id)
     if (!mine?.length) return
     if (c.bannedAt) return skipWith(c, 'banned')
+    if (isGlobalMutedNow(c, at)) return skipWith(c, 'globalMuted')
     const primaryId = s.customerSeats.find((cs) => cs.customerId === c.id && cs.primary)?.seatId
     const candidates = mine
       .filter((id) => !c.blockedSeatIds.includes(id))

@@ -12,10 +12,10 @@ import type { Customer } from './types'
 import { WATCH_LIMIT_TEXT, isWatching } from './register'
 import { fmtDateTime, fmtDuration } from './time'
 
-/** muteCustomerAll 用这个年份表示永久禁言 */
+/** 两类禁言都用这个年份表示永久。 */
 const FOREVER_PREFIX = '9999-'
 
-export type CustomerStatusKey = 'deleted' | 'banned' | 'shadowed' | 'muted' | 'mustChangePassword' | 'watching'
+export type CustomerStatusKey = 'deleted' | 'banned' | 'shadowed' | 'muted' | 'mutedAll' | 'mustChangePassword' | 'watching'
 
 /**
  * 新号观察期是风控里的正常新客，筛「正常」时不该把客户排除掉，
@@ -41,20 +41,44 @@ export function customerLoginState(c: Customer | undefined, sessionStartedAt?: s
   return 'active'
 }
 
-export function isMutedNow(c: Customer, at = new Date().toISOString()): boolean {
-  return !!c.mutedAllUntil && c.mutedAllUntil > at
+function activeUntil(until: string | null | undefined, at: string): boolean {
+  return !!until && until > at
 }
 
-export function isMutedForever(c: Customer): boolean {
-  return !!c.mutedAllUntil && c.mutedAllUntil.startsWith(FOREVER_PREFIX)
+function forever(until: string | null | undefined): boolean {
+  return !!until && until.startsWith(FOREVER_PREFIX)
+}
+
+export function isAllGroupsMutedNow(c: Customer, at = new Date().toISOString()): boolean {
+  return activeUntil(c.mutedAllUntil, at)
+}
+
+export function isAllGroupsMutedForever(c: Customer): boolean {
+  return forever(c.mutedAllUntil)
+}
+
+export function isGlobalMutedNow(c: Customer, at = new Date().toISOString()): boolean {
+  return activeUntil(c.globalMutedUntil, at)
+}
+
+export function isGlobalMutedForever(c: Customer): boolean {
+  return forever(c.globalMutedUntil)
 }
 
 /** 客户发送前的全局禁言提示；到期后自然返回 undefined。 */
 export function globalMuteReason(c: Customer, at = new Date().toISOString()): string | undefined {
-  if (!isMutedNow(c, at)) return undefined
-  if (isMutedForever(c)) return '你已被全局禁言'
-  const seconds = Math.ceil((new Date(c.mutedAllUntil!).getTime() - new Date(at).getTime()) / 1000)
+  if (!isGlobalMutedNow(c, at)) return undefined
+  if (isGlobalMutedForever(c)) return '你已被全局禁言'
+  const seconds = Math.ceil((new Date(c.globalMutedUntil!).getTime() - new Date(at).getTime()) / 1000)
   return `你已被全局禁言，剩余 ${fmtDuration(Math.max(1, seconds))}`
+}
+
+/** 客户在群或频道发送前的全群禁言提示；私聊不会走这里。 */
+export function allGroupsMuteReason(c: Customer, at = new Date().toISOString()): string | undefined {
+  if (!isAllGroupsMutedNow(c, at)) return undefined
+  if (isAllGroupsMutedForever(c)) return '你已被全群禁言，私聊不受影响'
+  const seconds = Math.ceil((new Date(c.mutedAllUntil!).getTime() - new Date(at).getTime()) / 1000)
+  return `你已被全群禁言，私聊不受影响，剩余 ${fmtDuration(Math.max(1, seconds))}`
 }
 
 /**
@@ -68,7 +92,8 @@ export function customerStatusFlags(c: Customer): CustomerStatusFlag[] {
   // 影子模式紫色单独一档：它既不是「已拦下」（红）也不是「限时限制」（黄），
   // 而是一种客户完全不知情的处理方式，后台看列表时必须一眼认出来别当成正常人
   if (c.shadowModeAt) flags.push({ key: 'shadowed', label: '影子模式', tone: 'purple', title: `开启于 ${fmtDateTime(c.shadowModeAt)}：群消息只有他自己和坐席看得见，客户端无提示${c.shadowModeReason ? `。原因：${c.shadowModeReason}` : ''}` })
-  if (isMutedNow(c)) flags.push({ key: 'muted', label: isMutedForever(c) ? '全局禁言（永久）' : '全局禁言', tone: 'amber', title: isMutedForever(c) ? '永久禁言，不能向任何官方联系人、群或频道发送消息' : `禁言至 ${fmtDateTime(c.mutedAllUntil!)}，不能向任何官方联系人、群或频道发送消息` })
+  if (isGlobalMutedNow(c)) flags.push({ key: 'muted', label: isGlobalMutedForever(c) ? '全局禁言（永久）' : '全局禁言', tone: 'amber', title: isGlobalMutedForever(c) ? '永久禁言，不能向任何官方联系人、群或频道发送消息' : `禁言至 ${fmtDateTime(c.globalMutedUntil!)}，不能向任何官方联系人、群或频道发送消息` })
+  if (isAllGroupsMutedNow(c)) flags.push({ key: 'mutedAll', label: isAllGroupsMutedForever(c) ? '全群禁言（永久）' : '全群禁言', tone: 'amber', title: isAllGroupsMutedForever(c) ? '永久禁言，群与频道不能发送消息；私聊不受影响' : `禁言至 ${fmtDateTime(c.mutedAllUntil!)}，群与频道不能发送消息；私聊不受影响` })
   if (c.mustChangePassword) flags.push({ key: 'mustChangePassword', label: '待首次改密', tone: 'zinc', title: '员工重置过密码，客户下次登录必须改' })
   if (isWatching(c, new Date().toISOString())) flags.push({ key: 'watching', label: '新号观察期', tone: 'blue', title: `观察期至 ${fmtDateTime(c.watchUntil!)}：${WATCH_LIMIT_TEXT}` })
   return flags
@@ -88,6 +113,7 @@ export const STATUS_FILTER_OPTIONS: { value: CustomerStatusFilter; label: string
   { value: 'banned', label: '封禁' },
   { value: 'shadowed', label: '影子模式' },
   { value: 'muted', label: '全局禁言' },
+  { value: 'mutedAll', label: '全群禁言' },
   { value: 'mustChangePassword', label: '待首次改密' },
   { value: 'watching', label: '新号观察期' },
   { value: 'deleted', label: '已注销' },

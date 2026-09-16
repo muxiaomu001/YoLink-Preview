@@ -15,7 +15,7 @@ function groupContext() {
   const g = current().chatGroups.find(g => g.id === 'cg_community')
   // 风控不是本测试对象，使用已存在群成员并取消本次内存夹具的观察期。
   const ids = g.memberCustomerIds.slice(0, 2)
-  store.setState({ customers: current().customers.map(c => ids.includes(c.id) ? { ...c, watchUntil: undefined, bannedAt: null, mutedAllUntil: null } : c) })
+  store.setState({ customers: current().customers.map(c => ids.includes(c.id) ? { ...c, watchUntil: undefined, bannedAt: null, mutedAllUntil: null, globalMutedUntil: null } : c) })
   return { g, conv: current().conversations.find(c => c.chatGroupId === g.id), actor: { kind: 'customer', id: ids[0] }, other: { kind: 'customer', id: ids[1] } }
 }
 function addWord(scope, action, word = '测试词') {
@@ -234,15 +234,66 @@ test('封禁的收件人不产生替换记录或消息', () => {
   assert.equal(current().sensitiveHits.length, hits)
 })
 
-test('全局禁言覆盖私聊和群聊，到期后自动解除', () => {
+test('全群禁言不拦私聊，但拦群和频道', () => {
   const { g, conv, actor } = groupContext()
   const until = new Date(Date.now() + 3600000).toISOString()
   store.setState({ customers: current().customers.map(c => c.id === actor.id ? { ...c, mutedAllUntil: until } : c) })
   const privateConv = current().conversations.find(c => c.kind === 'dm' && c.customerId === actor.id)
+  const channelConv = current().conversations.find(c => c.kind === 'channel')
+
+  assert.equal(current().queueChatMessage({ convId: privateConv.id, actor, text: '私聊消息' }).ok, true)
+  assert.match(current().queueChatMessage({ convId: conv.id, actor, text: '群聊消息' }).reason ?? '', /全群禁言.*私聊不受影响/)
+  assert.match(current().queueChatMessage({ convId: channelConv.id, actor, text: '频道消息' }).reason ?? '', /全群禁言.*私聊不受影响/)
+  assert.equal(policy.customerCanSpeakIn(current(), g, actor.id, new Date(Date.now() + 7200000).toISOString()).ok, true)
+})
+
+test('全局禁言拦私聊、群和频道，到期后自动解除', () => {
+  const { g, conv, actor } = groupContext()
+  const until = new Date(Date.now() + 3600000).toISOString()
+  store.setState({ customers: current().customers.map(c => c.id === actor.id ? { ...c, globalMutedUntil: until, mutedAllUntil: until } : c) })
+  const privateConv = current().conversations.find(c => c.kind === 'dm' && c.customerId === actor.id)
+  const channelConv = current().conversations.find(c => c.kind === 'channel')
 
   assert.match(current().queueChatMessage({ convId: privateConv.id, actor, text: '私聊消息' }).reason ?? '', /全局禁言/)
   assert.match(current().queueChatMessage({ convId: conv.id, actor, text: '群聊消息' }).reason ?? '', /全局禁言/)
+  assert.match(current().queueChatMessage({ convId: channelConv.id, actor, text: '频道消息' }).reason ?? '', /全局禁言/)
+  const flags = customerStatus.customerStatusFlags(current().customers.find(c => c.id === actor.id)).map(f => f.key)
+  assert.ok(flags.includes('muted'))
+  assert.ok(flags.includes('mutedAll'))
   assert.equal(policy.customerCanSpeakIn(current(), g, actor.id, new Date(Date.now() + 7200000).toISOString()).ok, true)
+})
+
+test('全局禁言的客户会被私聊群发跳过，全群禁言不会', () => {
+  const customerId = dm().customerId
+  const until = new Date(Date.now() + 3600000).toISOString()
+  store.setState({ customers: current().customers.map(c => c.id === customerId ? { ...c, globalMutedUntil: until } : c) })
+  const globalResult = current().sendBroadcast({ ...singleInput('私聊群发'), customerIds: [customerId] })
+  assert.equal(globalResult.sent, 0)
+  assert.equal(globalResult.skipped, 1)
+  assert.equal(current().broadcasts.at(0).skipReasons.globalMuted, 1)
+
+  reset()
+  const groupsMutedCustomerId = dm().customerId
+  store.setState({ customers: current().customers.map(c => c.id === groupsMutedCustomerId ? { ...c, mutedAllUntil: until } : c) })
+  const groupsResult = current().sendBroadcast({ ...singleInput('私聊群发'), customerIds: [groupsMutedCustomerId] })
+  assert.equal(groupsResult.sent, 1)
+  assert.equal(groupsResult.skipped, 0)
+})
+
+test('激活员工写入 staff.activate 审计类型', () => {
+  const staff = current().staff.find(st => st.id !== 'st_admin')
+  store.setState({ staff: current().staff.map(st => st.id === staff.id ? { ...st, status: 'disabled' } : st) })
+  current().activateStaff(staff.id, 'st_admin')
+  assert.equal(current().audit.at(0).type, 'staff.activate')
+})
+
+test('陈顾问在恒信官方通知频道没有发布权，林顾问仍可发布', () => {
+  const channel = current().chatGroups.find(g => g.id === 'cg_strategy')
+  const conv = current().conversations.find(c => c.chatGroupId === channel.id)
+  const chen = channel.admins.find(a => a.memberId === 'seat_chen')
+  assert.deepEqual(chen.perms, ['can_pin_messages'])
+  assert.equal(rules.seatMessageSendAllowed(current(), conv.id, 'seat_chen', 'st_chen'), false)
+  assert.equal(rules.seatMessageSendAllowed(current(), conv.id, 'seat_lin', 'st_lin'), true)
 })
 
 test('封禁状态下登录被拒，强制下线后的旧登录失效', () => {
