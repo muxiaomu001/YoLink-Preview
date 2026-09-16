@@ -51,7 +51,7 @@ import { providerLicensingActions, type ProviderLicensingActions } from './actio
 import { clearStartupSeen } from '@/domain/startupSeen'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
-export const STORAGE_KEY = 'yolink-demo-v14'
+export const STORAGE_KEY = 'yolink-demo-v15'
 
 const now = () => iso(Date.now())
 

@@ -24,7 +24,9 @@ export function groupDefaults(): Pick<ChatGroup, 'memberBotIds' | 'admins' | 'se
 export const GROUP_EXTRAS: Record<string, Partial<ChatGroup>> = {
   cg_strategy: {
     admins: [
-      { memberKind: 'seat', memberId: 'seat_lin', perms: ['can_post_messages', 'can_pin_messages'], promotedBySeatId: 'seat_cs', promotedAt: ago(100) },
+      // 「恒信官方通知」是只读通知频道，只有 owner 客户服务能发布；两位顾问只能置顶，不能发消息。
+      // 这样默认工作台身份（林薇 / 林顾问）发群发时，这个频道就是灰的，不用切身份也演得出发布权拦截。
+      { memberKind: 'seat', memberId: 'seat_lin', perms: ['can_pin_messages'], promotedBySeatId: 'seat_cs', promotedAt: ago(100) },
       { memberKind: 'seat', memberId: 'seat_chen', perms: ['can_pin_messages'], promotedBySeatId: 'seat_cs', promotedAt: ago(100) },
     ],
     settings: { allMuted: false, membersVisible: false, slowModeSeconds: null, historyVisible: true },

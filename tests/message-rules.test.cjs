@@ -157,9 +157,9 @@ test('指定群群发同样检查词库', () => {
   assert.equal(current().messages.length, n)
 })
 test('频道没有发布权限时，群发跳过且不影响其他任务', () => {
+  // 种子里林顾问在「恒信官方通知」就没有发布权，不用再改状态
   const channel = current().chatGroups.find(g => g.kind === 'channel' && g.memberSeatIds.includes(seat.id))
   const conv = current().conversations.find(c => c.chatGroupId === channel.id)
-  store.setState({ chatGroups: current().chatGroups.map(g => g.id === channel.id ? { ...g, admins: g.admins.map(a => a.memberId === seat.id ? { ...a, perms: a.perms.filter(p => p !== 'can_post_messages') } : a) } : g) })
 
   assert.equal(rules.seatMessageSendAllowed(current(), conv.id, seat.id, seat.staffId), false)
   const before = current().messages.length
@@ -287,13 +287,15 @@ test('激活员工写入 staff.activate 审计类型', () => {
   assert.equal(current().audit.at(0).type, 'staff.activate')
 })
 
-test('陈顾问在恒信官方通知频道没有发布权，林顾问仍可发布', () => {
+test('恒信官方通知只有 owner 客户服务能发布，两位顾问只能置顶', () => {
   const channel = current().chatGroups.find(g => g.id === 'cg_strategy')
   const conv = current().conversations.find(c => c.chatGroupId === channel.id)
-  const chen = channel.admins.find(a => a.memberId === 'seat_chen')
-  assert.deepEqual(chen.perms, ['can_pin_messages'])
+  assert.deepEqual(channel.admins.find(a => a.memberId === 'seat_lin').perms, ['can_pin_messages'])
+  assert.deepEqual(channel.admins.find(a => a.memberId === 'seat_chen').perms, ['can_pin_messages'])
+  assert.equal(rules.seatMessageSendAllowed(current(), conv.id, 'seat_lin', 'st_lin'), false)
   assert.equal(rules.seatMessageSendAllowed(current(), conv.id, 'seat_chen', 'st_chen'), false)
-  assert.equal(rules.seatMessageSendAllowed(current(), conv.id, 'seat_lin', 'st_lin'), true)
+  // owner 坐席不看管理员权限表，直接放行
+  assert.equal(rules.seatMessageSendAllowed(current(), conv.id, 'seat_cs', 'st_chen'), true)
 })
 
 test('封禁状态下登录被拒，强制下线后的旧登录失效', () => {
