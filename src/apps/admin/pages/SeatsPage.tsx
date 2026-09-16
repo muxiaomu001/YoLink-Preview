@@ -4,7 +4,7 @@ import type { Seat } from '@/domain/types'
 import { seatIdsOf } from '@/domain/allocation'
 import { fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
-import { customersOfSeat, staffById } from '@/store/selectors'
+import { customersOfSeat, holdsPrimary, staffById } from '@/store/selectors'
 import { Button } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, SeatAvatar, Table, type Column } from '@/ui/display'
 import { toast } from '@/ui/overlay'
@@ -29,6 +29,7 @@ export function SeatsPage() {
             .filter((g) => seatIdsOf(g).includes(seat.id))
             .map((g) => ({ name: g.name, rotating: g.rotatingSeatIds.includes(seat.id) })),
           customers,
+          primary: holdsPrimary(s, seat.id),
           off: seat.status === 'disabled',
         }
       }),
@@ -66,7 +67,6 @@ export function SeatsPage() {
     { key: 'avatar', title: '头像', width: '48px', render: (r) => dim(r, <SeatAvatar seat={r.seat} size={30} />) },
     { key: 'name', title: '显示名', render: (r) => dim(r, <span className="font-medium text-zinc-900">{r.seat.displayName}</span>) },
     { key: 'roleDesc', title: '职能说明', render: (r) => dim(r, <span className="text-zinc-600">{r.seat.roleDesc || '-'}</span>) },
-    { key: 'type', title: '类型', render: (r) => dim(r, r.seat.type === 'notice' ? <Pill tone="amber">通知型</Pill> : <Pill tone="blue">分配型</Pill>) },
     {
       key: 'operator',
       title: '当前实操员工',
@@ -103,7 +103,12 @@ export function SeatsPage() {
           ),
         ),
     },
-    { key: 'customers', title: '客户数', align: 'right', render: (r) => dim(r, <span className="tabular-nums">{r.seat.type === 'notice' ? '-' : r.customers}</span>) },
+    {
+      key: 'customers',
+      title: <span title="按主归属统计。只做固定坐席的号不占归属，显示为 -">客户数</span>,
+      align: 'right',
+      render: (r) => dim(r, r.primary ? <span className="tabular-nums">{r.customers}</span> : <span className="text-zinc-300">-</span>),
+    },
     {
       key: 'status',
       title: '状态',

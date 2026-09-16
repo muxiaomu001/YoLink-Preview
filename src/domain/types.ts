@@ -152,7 +152,6 @@ export interface Staff {
   prefs?: StaffPrefs
 }
 
-export type SeatType = 'assign' | 'notice'
 export type SeatStatus = 'accepting' | 'paused' | 'disabled'
 
 /** 坐席：客户看到的官方身份，不能登录，由员工实操 */
@@ -162,7 +161,6 @@ export interface Seat {
   avatarText: string
   avatarColor: string
   roleDesc: string
-  type: SeatType
   operatorStaffId: string | null
   status: SeatStatus
   welcome: string

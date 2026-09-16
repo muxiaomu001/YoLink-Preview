@@ -44,7 +44,7 @@ import { dExtraActions, type DExtraActions } from './actions/D-extra'
 import { quickReplyActions, type QuickReplyActions } from './actions/quickReplies'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
-export const STORAGE_KEY = 'yolink-demo-v7'
+export const STORAGE_KEY = 'yolink-demo-v8'
 
 const now = () => iso(Date.now())
 
@@ -146,12 +146,15 @@ export const useStore = create<DemoStore>()(
           group = s.inviteGroups.find((g) => g.isDefault)
           if (!group) return { ok: false, error: '企业未配置默认邀请组' }
         }
-        if (s.customers.some((c) => c.nickname === input.nickname.trim())) return { ok: false, error: '该昵称已被使用' }
+        // 昵称不做全企业唯一：客户之间本来就互不相干，撞名是常态，注册时因为别人先叫了「张先生」而被拦下没有道理。
+        // 同名带来的歧义只发生在同一个会话里，由 @ 提及那边处理（同名时不自动识别，必须从列表点选）。
+        const nickname = input.nickname.trim()
+        if (nickname.length < 1 || nickname.length > 32) return { ok: false, error: '昵称 1 到 32 字' }
 
         const at = now()
         const customer: Customer = {
           id: newId('cus'),
-          nickname: input.nickname.trim(),
+          nickname,
           accountId: `HX${String(90000 + s.customers.length).padStart(6, '0')}`,
           phone: input.phone,
           registeredAt: at,
@@ -397,7 +400,7 @@ export const useStore = create<DemoStore>()(
       createSeat: (input, byStaffId) => {
         const colors = ['#1f3b73', '#2f56ad', '#0f766e', '#b45309', '#7e22ce', '#be123c', '#0369a1']
         const seat: Seat = { ...input, id: newId('seat'), avatarText: input.displayName.slice(0, 1), avatarColor: input.avatarColor ?? colors[get().seats.length % colors.length], createdAt: now() }
-        set((s) => ({ seats: [...s.seats, seat], audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'seat.create', detail: `创建坐席「${seat.displayName}」（${seat.type === 'notice' ? '通知型' : '分配型'}），实操员工：${s.staff.find((x) => x.id === seat.operatorStaffId)?.name ?? '无'}` }, ...s.audit] }))
+        set((s) => ({ seats: [...s.seats, seat], audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'seat.create', detail: `创建坐席「${seat.displayName}」，实操员工：${s.staff.find((x) => x.id === seat.operatorStaffId)?.name ?? '无'}` }, ...s.audit] }))
         return seat
       },
 
@@ -438,7 +441,7 @@ export const useStore = create<DemoStore>()(
         const notes: string[] = []
         if (input.withSeat) {
           const colors = ['#1f3b73', '#2f56ad', '#0f766e', '#b45309', '#7e22ce', '#be123c', '#0369a1']
-          const seat: Seat = { id: newId('seat'), displayName: input.name, avatarText: input.name.slice(0, 1), avatarColor: colors[s.seats.length % colors.length], roleDesc: input.roleDesc ?? '投资顾问', type: 'assign', operatorStaffId: staff.id, status: 'accepting', welcome: '', customerDeletable: false, createdAt: now() }
+          const seat: Seat = { id: newId('seat'), displayName: input.name, avatarText: input.name.slice(0, 1), avatarColor: colors[s.seats.length % colors.length], roleDesc: input.roleDesc ?? '投资顾问', operatorStaffId: staff.id, status: 'accepting', welcome: '', customerDeletable: false, createdAt: now() }
           seats = [...seats, seat]
           notes.push(`同时创建同名坐席「${seat.displayName}」并指派`)
         }

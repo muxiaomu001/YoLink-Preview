@@ -7,7 +7,7 @@ import { Award } from 'lucide-react'
 import type { Customer, InviteGroup, Seat, Tag, Title } from '@/domain/types'
 import { fmtAgo, fmtDate } from '@/domain/time'
 import { useStore } from '@/store/store'
-import { primarySeatOfCustomer } from '@/store/selectors'
+import { holdsPrimary, primarySeatOfCustomer } from '@/store/selectors'
 import { Button, Checkbox, Input, Select } from '@/ui/primitives'
 import { Avatar, Card, Note, PageHeader, Pill, Table, TagChip, TitleChip, type Column } from '@/ui/display'
 import { toast } from '@/ui/overlay'
@@ -173,7 +173,7 @@ export function CustomersAdminPage() {
           <Select value={seatId} onChange={(e) => setSeatId(e.target.value)} className="w-40">
             <option value="">全部主归属坐席</option>
             {s.seats
-              .filter((x) => x.type === 'assign')
+              .filter((x) => holdsPrimary(s, x.id))
               .map((x) => (
                 <option key={x.id} value={x.id}>
                   {x.displayName}

@@ -88,7 +88,7 @@ export function SensitiveWordsPage() {
       <PageHeader
         title="敏感词"
         level="P1"
-        desc="客户与坐席发出的消息先过词库。拦截：消息不落库，发送方看到提示；替换：命中部分改成替换文本；放行并记录：正常送达，但留一条命中记录。"
+        desc="客户发出的消息先过词库。拦截：消息发不出去，客户看到提示；替换：命中部分改成替换文本再送达；放行并记录：正常送达，只留一条命中记录。一条消息踩中多个词时按最重的动作处理，但每个词各记一条。"
         extra={
           tab === 'words' && (
             <Button variant="primary" onClick={() => setCreating(true)}>
@@ -97,7 +97,9 @@ export function SensitiveWordsPage() {
           )
         }
       />
-      <Note>词库改动记审计日志。命中记录只读、不可删，是内容合规的证据。</Note>
+      <Note>
+        词库改动记审计日志。命中记录只读、不可删，是内容合规的证据。<b>坐席发言不查这套词库</b>——顾问说「保本」是合规事故，客户问「保本」只是提问，两边共用一个词库会误伤，坐席合规词库单独做。
+      </Note>
 
       <Tabs
         className="mt-4"

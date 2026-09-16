@@ -21,8 +21,8 @@ export function CustomerDetailModal({ customerId, onClose }: { customerId: strin
   const c = customerById(s, customerId)
   const seats = seatsOfCustomer(s, customerId)
   const primary = seats.find((x) => x.primary)
-  // 改主归属只能选分配型且未停用的坐席，排除当前主归属
-  const candidates = s.seats.filter((x) => x.type === 'assign' && x.status !== 'disabled' && x.id !== primary?.seatId)
+  // 改主归属只能选未停用的坐席，排除当前主归属
+  const candidates = s.seats.filter((x) => x.status !== 'disabled' && x.id !== primary?.seatId)
   const [newSeatId, setNewSeatId] = useState('')
 
   if (!c) return null
@@ -101,7 +101,6 @@ export function CustomerDetailModal({ customerId, onClose }: { customerId: strin
                         <Star size={12} fill="currentColor" /> 主归属
                       </span>
                     )}
-                    {x.seat.type === 'notice' && <Pill tone="amber">通知型</Pill>}
                   </div>
                   <div className="text-[11px] text-zinc-500">{x.seat.roleDesc}</div>
                 </div>
@@ -121,7 +120,7 @@ export function CustomerDetailModal({ customerId, onClose }: { customerId: strin
           <div className="mt-2 flex items-end gap-2">
             <Field label="新主归属坐席">
               <Select value={newSeatId} onChange={(e) => setNewSeatId(e.target.value)} disabled={deleted} className="w-56">
-                <option value="">选择分配型坐席</option>
+                <option value="">选择坐席</option>
                 {candidates.map((x) => (
                   <option key={x.id} value={x.id}>
                     {x.displayName}（{x.roleDesc}）

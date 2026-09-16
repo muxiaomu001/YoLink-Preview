@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fmtAgo } from '@/domain/time'
 import { useStore } from '@/store/store'
-import { dashboardNumbers, seatById, staffById } from '@/store/selectors'
+import { dashboardNumbers, holdsPrimary, seatById, staffById } from '@/store/selectors'
 import { Card, Note, PageHeader, Stat } from '@/ui/display'
 
 /** 需要管理员动手的事，从各模块汇总到首页 */
@@ -102,10 +102,10 @@ export function AdminHome() {
         <Note>
           经营日报每天早上把这几项数据推送到管理员手机。当前客户主归属分布：
           {s.seats
-            .filter((x) => x.type === 'assign')
+            .filter((x) => holdsPrimary(s, x.id))
             .map((x) => `${x.displayName} ${s.customerSeats.filter((cs) => cs.seatId === x.id && cs.primary).length} 位`)
             .join('，')}
-          。通知型「{seatById(s, 'seat_notice')?.displayName}」面向全部客户，不计入归属。
+          。只做固定坐席的号（如「{seatById(s, 'seat_notice')?.displayName}」）人人都加，但不占归属。
         </Note>
       </div>
     </div>

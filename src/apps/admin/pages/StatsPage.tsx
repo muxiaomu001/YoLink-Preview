@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { DailyStat } from '@/domain/types'
 import { useStore } from '@/store/store'
-import { customersOfSeat } from '@/store/selectors'
+import { customersOfSeat, holdsPrimary } from '@/store/selectors'
 import { Card, Empty, Note, PageHeader, Stat } from '@/ui/display'
 import { BarChart, LineChart, type Point } from '@/ui/charts'
 
@@ -39,11 +39,11 @@ export function StatsPage() {
   const dauTrend = useMemo(() => trendOf(stats, 'dau'), [stats])
   const msgTrend = useMemo(() => trendOf(stats, 'messages'), [stats])
 
-  // 各坐席客户数：按主归属统计，只算分配型坐席
+  // 各坐席客户数：按主归属统计。只做固定坐席的号不占归属，不进这张图
   const seatData = useMemo<Point[]>(
     () =>
       s.seats
-        .filter((x) => x.type === 'assign')
+        .filter((x) => holdsPrimary(s, x.id))
         .map((x) => ({ label: x.displayName, value: customersOfSeat(s, x.id).length }))
         .sort((a, b) => b.value - a.value),
     [s],
@@ -86,8 +86,8 @@ export function StatsPage() {
         <Card title="消息量趋势（最近 30 天）">
           <LineChart data={msgTrend} color="#b45309" unit=" 条" />
         </Card>
-        <Card title="各坐席客户数（按主归属，只算分配型坐席）">
-          {seatData.length ? <BarChart data={seatData} unit=" 人" /> : <Empty text="没有分配型坐席" />}
+        <Card title="各坐席客户数（按主归属；只做固定坐席的号不占归属）">
+          {seatData.length ? <BarChart data={seatData} unit=" 人" /> : <Empty text="还没有坐席分到主归属客户" />}
         </Card>
       </div>
     </div>

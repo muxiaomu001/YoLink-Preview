@@ -213,7 +213,6 @@ export const SEATS: Seat[] = [
     avatarText: '林',
     avatarColor: '#1f3b73',
     roleDesc: '资深投资顾问 · 全球资产配置',
-    type: 'assign',
     operatorStaffId: 'st_lin',
     status: 'accepting',
     welcome:
@@ -227,7 +226,6 @@ export const SEATS: Seat[] = [
     avatarText: '陈',
     avatarColor: '#2f56ad',
     roleDesc: '投资顾问 · 固收与现金管理',
-    type: 'assign',
     operatorStaffId: 'st_chen',
     status: 'accepting',
     welcome:
@@ -241,7 +239,6 @@ export const SEATS: Seat[] = [
     avatarText: '服',
     avatarColor: '#0f766e',
     roleDesc: '开户、入金、账户与资料问题',
-    type: 'assign',
     operatorStaffId: 'st_chen',
     status: 'accepting',
     welcome: '您好，这里是恒信财富客户服务。开户、入金到账、资料修改这类问题直接在这里说，工作时间 15 分钟内回复。',
@@ -254,7 +251,6 @@ export const SEATS: Seat[] = [
     avatarText: '恒',
     avatarColor: '#b45309',
     roleDesc: '官方通知 · 合规提示 · 系统公告',
-    type: 'notice',
     operatorStaffId: 'st_zhao',
     status: 'accepting',
     welcome:
@@ -721,8 +717,8 @@ function buildCustomers() {
       })
       conv.lastMessageAt = iso(welcomeAt)
 
-      if (seat.type === 'notice') {
-        // 通知型：按时间线补几条官方通知
+      if (seatId === 'seat_notice') {
+        // 公告号：按时间线补几条官方通知
         NOTICE_TEXTS.forEach((t, i) => {
           const at = registeredMs + 86400000 * (i * 3 + 1)
           if (at < Date.now()) {

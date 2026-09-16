@@ -1,5 +1,6 @@
 import type { ChatActor, ChatDraft, Message, MessageKind, MessageMedia } from '@/domain/types'
 import { actorCanView, actorKey, canManageDelete, deleteAllBlock, draftKey, messageVisibleFor, mentionsIn, sendFailure } from '@/domain/messageRules'
+import { scanSensitive, sensitiveHitsOf } from '@/domain/sensitive'
 import { customerCan, seatCan } from '../policy'
 import { newId } from '@/domain/ids'
 import { type Get, type Set, now, withAudit } from './helpers'
@@ -81,9 +82,17 @@ export function chatExperienceActions(set: Set, get: Get): ChatExperienceActions
       if(input.forwardedFrom){const from=s.conversations.find((c)=>c.id===input.forwardedFrom!.convId),fwdKey=from?.chatGroupId?'group.forward':'dm.forward'
         if(!(input.actor.kind==='seat'?seatCan(s,input.actor.id,fwdKey,from?.chatGroupId):customerCan(s,input.actor.id,fwdKey,from?.chatGroupId)))return{ok:false,reason:'当前不允许转发这条消息'}}
       const id=newId('msg'),attemptId=newId('attempt'),at=now()
-      const m:Message={id,convId:input.convId,senderKind:input.actor.kind,senderId:input.actor.id,seatId:input.actor.kind==='seat'?input.actor.id:undefined,operatorId:input.actor.staffId,kind:input.kind??'text',text,media:input.media,at,replyToId:input.replyToId,quoteText:input.quoteText,...mentions,delivery:'pending',attemptId,aiDraftUsed:input.aiDraftUsed,forwardedFrom:input.forwardedFrom,
+      // 敏感词：只查客户发言，坐席合规词库另做。拦截与替换都要落一条命中记录，后台才追得到人
+      const scan=input.actor.kind==='customer'&&text?scanSensitive(s.sensitiveWords,text):undefined
+      const hits=scan?.hits.length?sensitiveHitsOf(scan,{customerId:input.actor.id,convId:input.convId,original:text,at}):[]
+      if(scan?.action==='block'){
+        set({sensitiveHits:[...s.sensitiveHits,...hits]})
+        return{ok:false,reason:`消息里的「${scan.blockedBy!.word}」不能发送，改一下再试`}
+      }
+      const sendText=scan?.text??text
+      const m:Message={id,convId:input.convId,senderKind:input.actor.kind,senderId:input.actor.id,seatId:input.actor.kind==='seat'?input.actor.id:undefined,operatorId:input.actor.staffId,kind:input.kind??'text',text:sendText,media:input.media,at,replyToId:input.replyToId,quoteText:input.quoteText,...mentions,delivery:'pending',attemptId,aiDraftUsed:input.aiDraftUsed,forwardedFrom:input.forwardedFrom,
         channelId:group?.kind==='channel'?group.id:undefined,channelSignature:group?.kind==='channel'&&input.signature?s.seats.find((x)=>x.id===input.actor.id)?.displayName:undefined,receiptMemberSeatIds:group?.memberSeatIds,receiptMemberCustomerIds:group?.memberCustomerIds}
-      set({messages:[...s.messages,m],failNextSend:false})
+      set({messages:[...s.messages,m],sensitiveHits:hits.length?[...s.sensitiveHits,...hits]:s.sensitiveHits,failNextSend:false})
       finish(id,attemptId,input.actor,!!s.failNextSend)
       return{ok:true,id}
     },

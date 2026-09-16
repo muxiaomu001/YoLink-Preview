@@ -94,7 +94,7 @@ export function RegisterScreen({ onDone }: { onDone: (added: JustAdded) => void 
       <div className="space-y-3">
         <div>
           <div className="mb-1 text-[11px] text-zinc-500">昵称</div>
-          <Input value={nick} onChange={(e) => setNick(e.target.value)} placeholder="如：张先生" className="h-10" />
+          <Input value={nick} maxLength={32} onChange={(e) => setNick(e.target.value)} placeholder="如：张先生" className="h-10" />
         </div>
         <div>
           <div className="mb-1 text-[11px] text-zinc-500">手机号（即用户名，选填）</div>
@@ -103,11 +103,11 @@ export function RegisterScreen({ onDone }: { onDone: (added: JustAdded) => void 
         <div>
           <div className="mb-1 text-[11px] text-zinc-500">密码</div>
           <Input type="password" defaultValue="demo1234" className="h-10" />
-          <DemoHint>演示里密码不校验，注册只看昵称和邀请码。</DemoHint>
+          <DemoHint>演示里密码不校验，注册只看昵称和邀请码。昵称可以和别人重名。</DemoHint>
         </div>
         <div>
           <div className="mb-1 text-[11px] text-zinc-500">邀请码{s.enterprise.inviteCodeRequired ? '' : '（选填）'}</div>
-          <Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="6 位" className="h-10 font-mono tracking-widest uppercase" />
+          <Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="4-16 位" className="h-10 font-mono tracking-widest uppercase" />
         </div>
         {err && <div className="text-xs text-red-600">{err}</div>}
         <Button variant="primary" className="h-10 w-full text-sm" disabled={!nick.trim() || (s.enterprise.inviteCodeRequired && code.length < 4)} onClick={submit}>

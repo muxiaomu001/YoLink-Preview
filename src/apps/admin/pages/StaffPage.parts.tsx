@@ -97,7 +97,7 @@ export function CreateStaffModal({ onClose }: { onClose: () => void }) {
         </div>
         <div className="rounded-md border border-brand-100 bg-brand-50/50 p-3">
           <Checkbox checked={form.withSeat} onChange={(v) => set('withSeat', v)} label={<span className="font-medium">同时创建同名坐席并指派给他</span>} />
-          <p className="mt-1 pl-5 text-[11px] leading-relaxed text-zinc-500">默认勾选。以员工姓名为显示名建一个分配型坐席并指派给他；显示名、头像、职能说明之后在坐席页改。</p>
+          <p className="mt-1 pl-5 text-[11px] leading-relaxed text-zinc-500">默认勾选。以员工姓名为显示名建一个坐席并指派给他；显示名、头像、职能说明之后在坐席页改。</p>
           {form.withSeat && (
             <div className="mt-2 pl-5">
               <Field label="坐席职能说明">

@@ -73,7 +73,6 @@ export function HandoverModal({ seat, onClose }: { seat: Seat; onClose: () => vo
 interface SeatForm {
   displayName: string
   roleDesc: string
-  type: Seat['type']
   operatorStaffId: string
   welcome: string
   customerDeletable: boolean
@@ -93,7 +92,6 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
   const [form, setForm] = useState<SeatForm>({
     displayName: seat?.displayName ?? '',
     roleDesc: seat?.roleDesc ?? '',
-    type: seat?.type ?? 'assign',
     operatorStaffId: seat?.operatorStaffId ?? '',
     welcome: seat?.welcome ?? '',
     customerDeletable: seat?.customerDeletable ?? false,
@@ -105,7 +103,6 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
     const patch = {
       displayName: form.displayName.trim(),
       roleDesc: form.roleDesc.trim(),
-      type: form.type,
       operatorStaffId: form.operatorStaffId || null,
       welcome: form.welcome,
       customerDeletable: form.customerDeletable,
@@ -141,33 +138,25 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
         <Field label="职能说明" hint="0 到 64 字，多个官方号时客户靠它判断该找谁">
           <Input value={form.roleDesc} maxLength={64} onChange={(e) => set('roleDesc', e.target.value)} placeholder="如：资深投资顾问 · 全球资产配置" />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="类型">
-            <Select value={form.type} onChange={(e) => set('type', e.target.value as Seat['type'])}>
-              <option value="assign">分配型（双向沟通，一对一）</option>
-              <option value="notice">通知型（全企业共用，只发不收）</option>
-            </Select>
-          </Field>
-          <Field label="实操员工" hint="留空则暂停接新">
-            <Select value={form.operatorStaffId} onChange={(e) => set('operatorStaffId', e.target.value)}>
-              <option value="">无</option>
-              {s.staff
-                .filter((x) => x.status === 'active')
-                .map((st) => (
-                  <option key={st.id} value={st.id}>
-                    {st.name}
-                  </option>
-                ))}
-            </Select>
-          </Field>
-        </div>
+        <Field label="实操员工" hint="留空则暂停接新">
+          <Select value={form.operatorStaffId} onChange={(e) => set('operatorStaffId', e.target.value)}>
+            <option value="">无</option>
+            {s.staff
+              .filter((x) => x.status === 'active')
+              .map((st) => (
+                <option key={st.id} value={st.id}>
+                  {st.name}
+                </option>
+              ))}
+          </Select>
+        </Field>
         <Field label="欢迎语" hint="支持 {{customer.nickname}}、{{seat.name}}；留空用企业默认">
           <Textarea rows={3} value={form.welcome} onChange={(e) => set('welcome', e.target.value)} />
         </Field>
         <div className="flex items-center justify-between rounded-md border border-zinc-200 px-3 py-2">
           <div className="text-xs">
             <div className="font-medium text-zinc-800">客户可删除会话</div>
-            <div className="text-zinc-500">关闭时客户删不掉与该坐席的会话（主归属、通知型建议关闭）</div>
+            <div className="text-zinc-500">关闭时客户删不掉与该坐席的会话（主归属坐席、公告号建议关闭）</div>
           </div>
           <Switch checked={form.customerDeletable} onChange={(v) => set('customerDeletable', v)} />
         </div>

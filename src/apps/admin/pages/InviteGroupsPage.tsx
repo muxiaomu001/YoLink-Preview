@@ -274,17 +274,11 @@ function GroupEditor({ group, onClose }: { group?: InviteGroup; onClose: () => v
                   <div className="min-w-0 flex-1">
                     <div className="text-[13px] text-zinc-900">
                       {seat.displayName}
-                      {seat.type === 'notice' && <span className="ml-1 text-[10px] text-amber-600">通知型</span>}
                       {seat.status === 'paused' && <span className="ml-1 text-[10px] text-amber-600">暂停接新，注册时会跳过</span>}
                     </div>
                     <div className="truncate text-[11px] text-zinc-500">{seat.roleDesc}</div>
                   </div>
-                  <SlotPicker
-                    value={slot}
-                    // 通知型坐席只发通知、不接客，放进轮询队列没有意义
-                    rotatingDisabled={seat.type === 'notice'}
-                    onChange={(next) => setSlot(seat.id, next)}
-                  />
+                  <SlotPicker value={slot} onChange={(next) => setSlot(seat.id, next)} />
                   {slot !== 'none' && (
                     <div className="flex gap-0.5">
                       <Button size="sm" variant="ghost" disabled={idx === 0} onClick={() => move(seat.id, -1)}>
@@ -338,25 +332,20 @@ const SLOT_LABEL: { key: Slot; label: string }[] = [
 ]
 
 /** 三选一的槽位选择器：不加 / 轮询接待员 / 固定坐席 */
-function SlotPicker({ value, rotatingDisabled, onChange }: { value: Slot; rotatingDisabled?: boolean; onChange: (v: Slot) => void }) {
+function SlotPicker({ value, onChange }: { value: Slot; onChange: (v: Slot) => void }) {
   return (
     <div className="inline-flex overflow-hidden rounded-md border border-zinc-200">
       {SLOT_LABEL.map((o) => {
-        const disabled = o.key === 'rotating' && rotatingDisabled
         const on = value === o.key
         return (
           <button
             key={o.key}
             type="button"
-            disabled={disabled}
-            title={disabled ? '通知型坐席只发通知，不参与轮询接待' : undefined}
             onClick={() => onChange(o.key)}
             className={
               on
                 ? 'bg-brand-700 px-2.5 py-1 text-[11px] text-white'
-                : disabled
-                  ? 'px-2.5 py-1 text-[11px] text-zinc-300'
-                  : 'px-2.5 py-1 text-[11px] text-zinc-600 hover:bg-zinc-50'
+                : 'px-2.5 py-1 text-[11px] text-zinc-600 hover:bg-zinc-50'
             }
           >
             {o.label}
