@@ -14,13 +14,19 @@
  */
 import type { Customer, DemoState } from './types'
 
-export type SkipReason = 'deleted' | 'banned' | 'noReachableSeat' | 'rateLimited'
+/** 群发跳过原因：单坐席与多坐席覆盖共用，用于任务详情的可读统计。 */
+export type SkipReason = 'deleted' | 'banned' | 'blocked' | 'left' | 'muted' | 'noPostingPermission' | 'noReachableSeat' | 'rateLimited' | 'senderUnavailable'
 
 export const SKIP_REASON_LABEL: Record<SkipReason, string> = {
   deleted: '已注销',
   banned: '已封禁',
+  blocked: '已屏蔽本坐席',
+  left: '已退群',
+  muted: '被禁言',
+  noPostingPermission: '没有发布权限',
   noReachableSeat: '所选坐席都够不到（没加过或已屏蔽）',
   rateLimited: '今天收到的群发已达上限',
+  senderUnavailable: '发送身份不可用',
 }
 
 export interface CoverageDelivery {

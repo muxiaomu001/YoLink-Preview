@@ -29,9 +29,10 @@ import { buildSeed } from '@/domain/seed'
 import { newId } from '@/domain/ids'
 import { allocateSeats } from '@/domain/allocation'
 import { NICKNAME_MAX, NICKNAME_MIN, deviceRegisterCount, resolveRegisterNickname, watchUntilOf } from '@/domain/register'
-import { planCoverage } from '@/domain/broadcastCoverage'
+import { planCoverage, type SkipReason } from '@/domain/broadcastCoverage'
 import { inviteCodeError, newInviteCode, normalizeInviteCode } from '@/domain/inviteCode'
 import { iso } from '@/domain/time'
+import { seatBroadcastSkipReason } from '@/domain/messageRules'
 import { DEMO_IP } from './actions/helpers'
 import { settingsActions, type SettingsActions } from './actions/settings'
 import { peopleActions, type PeopleActions } from './actions/people'
@@ -390,29 +391,41 @@ export const useStore = create<DemoStore>()(
         const newMsgs: Message[] = []
         const convs = s.conversations.map((c) => ({ ...c }))
         let skipped = 0
+        const skipReasons: Partial<Record<SkipReason, number>> = {}
+        const skip = (reason: SkipReason) => {
+          skipped += 1
+          skipReasons[reason] = (skipReasons[reason] ?? 0) + 1
+        }
         if (input.targetKind === 'group' && input.chatGroupId) {
           // 指定群：往该群发一条群消息，不是私发群成员
           const conv = convs.find((c) => c.kind !== 'dm' && c.chatGroupId === input.chatGroupId)
-          if (conv) {
-            conv.lastMessageAt = at
-            newMsgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.contentKind ?? 'text', text: gate.text, media: input.media, at })
+          if (!conv) {
+            skip('left')
+          } else {
+            const block = seatBroadcastSkipReason(s, conv.id, input.seatId, input.operatorId, input.contentKind !== 'text')
+            if (block) {
+              skip(block)
+            } else {
+              conv.lastMessageAt = at
+              newMsgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.contentKind ?? 'text', text: gate.text, media: input.media, at, isBroadcast: true })
+            }
           }
         } else {
           // 频控二：每客户每天最多收到的群发条数，跨坐席、跨任务合并
           input.customerIds.forEach((cid) => {
-            const c = s.customers.find((x) => x.id === cid)
-            if (!c || c.deletedAt || c.bannedAt || c.blockedSeatIds.includes(input.seatId)) {
-              skipped += 1
-              return
-            }
             const conv = convs.find((x) => x.kind === 'dm' && x.customerId === cid && x.seatId === input.seatId)
             if (!conv) {
-              skipped += 1
+              skip('left')
+              return
+            }
+            const block = seatBroadcastSkipReason(s, conv.id, input.seatId, input.operatorId, input.contentKind !== 'text')
+            if (block) {
+              skip(block)
               return
             }
             const receivedToday = s.messages.filter((m) => m.senderKind === 'seat' && m.at.slice(0, 10) === today && m.isBroadcast && s.conversations.find((x) => x.id === m.convId)?.customerId === cid).length
             if (receivedToday >= s.enterprise.broadcastPerCustomerPerDay) {
-              skipped += 1
+              skip('rateLimited')
               return
             }
             conv.lastMessageAt = at
@@ -436,6 +449,7 @@ export const useStore = create<DemoStore>()(
           sentCount: input.scheduledAt ? 0 : newMsgs.length,
           skippedCount: skipped,
           readCount: 0,
+          skipReasons,
         }
         set({
           sensitiveHits: input.scheduledAt ? s.sensitiveHits : [...s.sensitiveHits, ...newMsgs.flatMap((m) => gate.hits.map((h) => ({ ...h, id: newId('sh'), senderId: m.senderId, convId: m.convId })))],

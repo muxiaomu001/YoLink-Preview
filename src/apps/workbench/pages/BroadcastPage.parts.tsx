@@ -6,6 +6,7 @@ import { mediaUrl } from '@/domain/mediaUrl'
 import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import type { Broadcast, BroadcastStatus, MessageMedia, QuickReply } from '@/domain/types'
+import { SKIP_REASON_LABEL, type SkipReason } from '@/domain/broadcastCoverage'
 import { fmtDateTime } from '@/domain/time'
 import { matchQuickReplies, quickReplyCategoriesForStaff, quickRepliesForStaff, seatById, staffById } from '@/store/selectors'
 import type { QuickReplyMatch, QuickReplySnippet } from '@/store/selectors'
@@ -22,6 +23,10 @@ const STATUS_META: Record<BroadcastStatus, { label: string; tone: 'zinc' | 'gree
   sending: { label: '发送中', tone: 'amber' },
   done: { label: '已完成', tone: 'green' },
   failed: { label: '失败', tone: 'red' },
+}
+
+function skipSummary(reasons: Record<string, number> | undefined): string {
+  return Object.entries(reasons ?? {}).filter(([, count]) => count > 0).map(([reason, count]) => `${SKIP_REASON_LABEL[reason as SkipReason] ?? reason} ${count}`).join('、')
 }
 
 export function StatusPill({ status }: { status: BroadcastStatus }) {
@@ -122,6 +127,7 @@ export function BroadcastDetailModal({ b, onClose }: { b: Broadcast; onClose: ()
             { k: '状态', v: <StatusPill status={b.status} /> },
             { k: b.status === 'scheduled' ? '计划时间' : '发送时间', v: fmtDateTime(b.status === 'scheduled' && b.scheduledAt ? b.scheduledAt : b.sentAt) },
             { k: '送达 / 已读 / 跳过', v: `${b.sentCount} / ${b.readCount} / ${b.skippedCount}` },
+            ...(b.skippedCount && skipSummary(b.skipReasons) ? [{ k: '跳过原因', v: <span className="text-zinc-600">{skipSummary(b.skipReasons)}</span> }] : []),
           ]}
         />
         {(b.text || b.contentKind === 'text') && (

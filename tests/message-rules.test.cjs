@@ -156,6 +156,20 @@ test('指定群群发同样检查词库', () => {
   assert.match(current().sendBroadcast(input)?.reason ?? '', /合规词库拦截/)
   assert.equal(current().messages.length, n)
 })
+test('频道没有发布权限时，群发跳过且不影响其他任务', () => {
+  const channel = current().chatGroups.find(g => g.kind === 'channel' && g.memberSeatIds.includes(seat.id))
+  const conv = current().conversations.find(c => c.chatGroupId === channel.id)
+  store.setState({ chatGroups: current().chatGroups.map(g => g.id === channel.id ? { ...g, admins: g.admins.map(a => a.memberId === seat.id ? { ...a, perms: a.perms.filter(p => p !== 'can_post_messages') } : a) } : g) })
+
+  assert.equal(rules.seatMessageSendAllowed(current(), conv.id, seat.id, seat.staffId), false)
+  const before = current().messages.length
+  const result = current().sendBroadcast({ ...singleInput('频道通知'), targetKind: 'group', chatGroupId: channel.id })
+
+  assert.equal(result.sent, 0)
+  assert.equal(result.skipped, 1)
+  assert.equal(current().messages.length, before)
+  assert.equal(current().broadcasts.at(0).skipReasons.noPostingPermission, 1)
+})
 test('暂停后不能放行或手动发言，恢复后只发一次', () => {
   const run = current().botRuns.find(r => r.status === 'pending_review'), n = current().messages.length, count = current().botRuns.length
   current().setBotsPausedAll(true, 'st_zhao')

@@ -2,6 +2,7 @@ import type { ChatActor, DemoState, Message } from './types'
 import { fmtDuration } from './time'
 import { customerCan, customerCanSpeakIn, groupPerm, seatCan, seatGroupPerm } from '@/store/policy'
 import { globalMuteReason } from './customerStatus'
+import type { SkipReason } from './broadcastCoverage'
 
 /**
  * 0 为不限时间；演示初值用于体验，正式默认值待产品确认。
@@ -29,15 +30,34 @@ export function seatConversationAllowed(s: DemoState, convId: string, seatId: st
   return !!s.chatGroups.find((g) => g.id === conv.chatGroupId && g.memberSeatIds.includes(seatId))
 }
 
-export function seatMessageSendAllowed(s: DemoState, convId: string, seatId: string, staffId: string, media = false) {
-  if (!seatConversationAllowed(s, convId, seatId, staffId)) return false
-  const conv = s.conversations.find((c) => c.id === convId)!
+/**
+ * 坐席发送被拦的原因。聊天入口只需要真假值，群发还要把原因记到任务详情，
+ * 因此两边都从这里取，不能各自再判断一套。
+ */
+export function seatBroadcastSkipReason(s: DemoState, convId: string, seatId: string, staffId: string, media = false): SkipReason | undefined {
+  const seat = s.seats.find((x) => x.id === seatId && x.operatorStaffId === staffId && x.status !== 'disabled')
+  const staff = s.staff.find((x) => x.id === staffId && x.status === 'active')
+  const conv = s.conversations.find((c) => c.id === convId)
+  if (!seat || !staff) return 'senderUnavailable'
+  if (!conv) return 'left'
   if (conv.kind === 'dm') {
     const c = s.customers.find((x) => x.id === conv.customerId)
-    return !!c && !c.deletedAt && !c.blockedSeatIds.includes(seatId) && seatCan(s, seatId, media ? 'dm.send_media' : 'dm.send')
+    if (!c) return 'left'
+    if (c.deletedAt) return 'deleted'
+    if (c.bannedAt) return 'banned'
+    if (c.blockedSeatIds.includes(seatId)) return 'blocked'
+    if (conv.seatId !== seatId) return 'left'
+    return seatCan(s, seatId, media ? 'dm.send_media' : 'dm.send') ? undefined : 'muted'
   }
-  const g = s.chatGroups.find((x) => x.id === conv.chatGroupId)!
-  return seatCan(s, seatId, media ? 'group.send_media' : 'group.send', g.id) && (g.kind !== 'channel' || seatGroupPerm(s, g, seatId, staffId, 'can_post_messages'))
+  const g = s.chatGroups.find((x) => x.id === conv.chatGroupId)
+  if (!g || !g.memberSeatIds.includes(seatId)) return 'left'
+  if (!seatCan(s, seatId, media ? 'group.send_media' : 'group.send', g.id)) return 'muted'
+  if (g.kind === 'channel' && !seatGroupPerm(s, g, seatId, staffId, 'can_post_messages')) return 'noPostingPermission'
+  return undefined
+}
+
+export function seatMessageSendAllowed(s: DemoState, convId: string, seatId: string, staffId: string, media = false) {
+  return !seatBroadcastSkipReason(s, convId, seatId, staffId, media)
 }
 
 /** 只将本会话成员的完整名字视为提及，避免 @林 匹配到 @林顾问。 */

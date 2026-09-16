@@ -7,6 +7,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { BookOpenText, Send, Sparkles, Upload, Users } from 'lucide-react'
 import type { Broadcast, BroadcastTargetKind, MessageMedia, QuickReply } from '@/domain/types'
+import { SKIP_REASON_LABEL } from '@/domain/broadcastCoverage'
+import { seatBroadcastSkipReason } from '@/domain/messageRules'
 import { customersOfSeat, friendsOfSeat } from '@/store/selectors'
 import { Button, Checkbox, Field, Input, Select, Textarea } from '@/ui/primitives'
 import { Card, Note, SeatAvatar } from '@/ui/display'
@@ -69,6 +71,8 @@ export function BroadcastPage() {
   const products = useMemo(() => Array.from(new Set(mine.flatMap((c) => c.purchases.map((p) => p.product)))), [mine])
   const roles = useMemo(() => Array.from(new Set(mine.map((c) => c.roleLabel).filter((r): r is string => !!r))), [mine])
   const group = s.chatGroups.find((g) => g.id === groupId)
+  const groupBlock = group && seat && staff ? seatBroadcastSkipReason(s, s.conversations.find((c) => c.chatGroupId === group.id)?.id ?? '', seat.id, staff.id, contentKind !== 'text') : undefined
+  const groupBlockText = groupBlock === 'noPostingPermission' ? '该坐席在此频道没有发布权限' : groupBlock ? SKIP_REASON_LABEL[groupBlock] : undefined
 
   const targets = useMemo(() => {
     if (targetKind === 'friends') return friends
@@ -101,12 +105,12 @@ export function BroadcastPage() {
             : targetKind === 'role'
               ? `角色 = ${role || '未选'}`
               : `群「${group?.name ?? '未选'}」`
-  const targetOk = targetKind === 'group' ? !!group : targets.length > 0 && (targetKind !== 'tag' || tagIds.length > 0) && (targetKind !== 'role' || !!role)
+  const targetOk = targetKind === 'group' ? !!group && !groupBlock : targets.length > 0 && (targetKind !== 'tag' || tagIds.length > 0) && (targetKind !== 'role' || !!role)
   const scheduleOk = mode === 'now' || (!!scheduledAt && new Date(scheduledAt).getTime() > openedAt)
   const needMedia = contentKind !== 'text'
   const contentOk = needMedia ? !!media : !!text.trim()
   const canSend = !overLimit && !!name.trim() && contentOk && targetOk && scheduleOk
-  const reason = overLimit ? `今日群发任务已达上限（${perStaff} 个）` : !name.trim() ? '填任务名称' : needMedia && !media ? (contentKind === 'image' ? '选一张图片' : '选一个文件') : !needMedia && !text.trim() ? '填内容' : !targetOk ? '目标没有命中任何人' : !scheduleOk ? '定时时间要晚于现在' : ''
+  const reason = overLimit ? `今日群发任务已达上限（${perStaff} 个）` : !name.trim() ? '填任务名称' : needMedia && !media ? (contentKind === 'image' ? '选一张图片' : '选一个文件') : !needMedia && !text.trim() ? '填内容' : targetKind === 'group' && groupBlockText ? groupBlockText : !targetOk ? '目标没有命中任何人' : !scheduleOk ? '定时时间要晚于现在' : ''
 
   const pickTarget = (k: BroadcastTargetKind) => {
     setTargetKind(k)
@@ -150,8 +154,8 @@ export function BroadcastPage() {
     if (!r) return toast(`超过频控：每个实操员工每天 ${perStaff} 个任务，明天再发`, 'warn')
     if (r.reason) return toast(r.reason, 'warn')
     if (mode === 'scheduled') toast('已创建定时任务，到点按当时人群发送', 'info')
-    else if (targetKind === 'group') toast(r.sent ? `已以「${seat.displayName}」身份往群「${group?.name}」发了一条群消息` : '群会话不存在，未发送', r.sent ? 'ok' : 'warn')
-    else toast(`已以「${seat.displayName}」身份发给 ${r.sent} 位客户${r.skipped ? `，跳过 ${r.skipped} 位（注销 / 封禁 / 屏蔽 / 频控）` : ''}`)
+    else if (targetKind === 'group') toast(r.sent ? `已以「${seat.displayName}」身份往群「${group?.name}」发了一条群消息` : '未发送，目标会话当前不可发送', r.sent ? 'ok' : 'warn')
+    else toast(`已以「${seat.displayName}」身份发给 ${r.sent} 位客户${r.skipped ? `，跳过 ${r.skipped} 位` : ''}`)
     setName('')
     setText('')
     setMedia(undefined)
@@ -230,14 +234,18 @@ export function BroadcastPage() {
                   </Field>
                 )}
                 {targetKind === 'group' && (
-                  <Field label="指定群" hint="只列本坐席所在的群">
+                  <Field label="指定群" hint={groupBlockText ?? '只列本坐席所在的群'}>
                     <Select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
                       <option value="">选择…</option>
-                      {myGroups.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.name}（{g.memberCustomerIds.length} 人）
-                        </option>
-                      ))}
+                      {myGroups.map((g) => {
+                        const block = seat && staff ? seatBroadcastSkipReason(s, s.conversations.find((c) => c.chatGroupId === g.id)?.id ?? '', seat.id, staff.id, contentKind !== 'text') : undefined
+                        const noPost = g.kind === 'channel' && block === 'noPostingPermission'
+                        return (
+                          <option key={g.id} value={g.id} disabled={!!block}>
+                            {g.name}（{g.memberCustomerIds.length} 人）{noPost ? ' · 该坐席在此频道没有发布权限' : block ? ` · ${SKIP_REASON_LABEL[block]}` : ''}
+                          </option>
+                        )
+                      })}
                     </Select>
                   </Field>
                 )}
