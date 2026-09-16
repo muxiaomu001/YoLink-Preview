@@ -1,5 +1,5 @@
 /**
- * 群活跃助手页：规则标签（表格、编辑弹窗、模拟触发）与待审核 / 运行记录两块。
+ * 群活跃助手页：规则标签（表格、编辑弹窗、立即触发）与待审核 / 运行记录两块。
  */
 import { useState } from 'react'
 import { Play, Plus } from 'lucide-react'
@@ -59,7 +59,7 @@ export function RulesTab() {
                 <div className="flex justify-end gap-1">
                   <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>编辑</Button>
                   <Button size="sm" variant="ghost" onClick={() => simulate(r)} title="走与服务端定时器同一条判定链：暂停 / 停用 / 全员禁言 / 每小时上限 → 跳过；先审后发 → 待审；否则进群">
-                    <Play size={12} /> 模拟触发一次
+                    <Play size={12} /> 立即触发一次
                   </Button>
                   <Button size="sm" variant="danger" onClick={() => void remove(r)}>删除</Button>
                 </div>
