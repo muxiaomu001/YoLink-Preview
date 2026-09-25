@@ -577,6 +577,72 @@ function registrationGroup(chatGroupIds = []) {
   return group
 }
 
+function registrationMutationSnapshot() {
+  return JSON.parse(JSON.stringify(current()))
+}
+
+test('注册：过期、用完名额、已停用的邀请链接拒绝且不改状态', () => {
+  for (const patch of [
+    { code: 'XHS202', patch: { status: 'active', expiresAt: new Date(Date.now() - 1000).toISOString() }, error: '这个邀请链接已过期' },
+    { code: 'XHS202', patch: { status: 'active', expiresAt: null, maxUses: 28, uses: 28 }, error: '这个邀请链接的名额已用完' },
+    { code: 'XHS202', patch: { status: 'revoked', expiresAt: null }, error: '这个邀请链接已停用' },
+  ]) {
+    reset()
+    const link = current().inviteLinks.find(item => item.code === patch.code)
+    store.setState({ inviteLinks: current().inviteLinks.map(item => item.id === link.id ? { ...item, ...patch.patch } : item) })
+    const before = registrationMutationSnapshot()
+    const result = current().registerCustomer({ nickname: '链接拒绝客户', inviteCode: patch.code, deviceId: `device-${patch.error}` })
+    assert.equal(result.ok, false)
+    assert.equal(result.error, patch.error)
+    assert.deepEqual(registrationMutationSnapshot(), before)
+  }
+})
+
+test('注册：邀请组停用时邀请码拒绝且不改状态', () => {
+  const group = current().inviteGroups.find(item => item.code === 'LIVE88')
+  store.setState({ inviteGroups: current().inviteGroups.map(item => item.id === group.id ? { ...item, enabled: false } : item) })
+  const before = registrationMutationSnapshot()
+  const result = current().registerCustomer({ nickname: '停用邀请组客户', inviteCode: group.code, deviceId: 'device-disabled-group' })
+  assert.equal(result.ok, false)
+  assert.equal(result.error, '邀请码无效或已失效')
+  assert.deepEqual(registrationMutationSnapshot(), before)
+})
+
+test('注册：有效邀请链接使用数加一', () => {
+  const link = current().inviteLinks.find(item => item.code === 'XHS202')
+  const beforeUses = link.uses
+  const result = current().registerCustomer({ nickname: '有效链接客户', inviteCode: link.code, deviceId: 'device-valid-link' })
+  assert.equal(result.ok, true, result.error)
+  assert.equal(current().inviteLinks.find(item => item.id === link.id).uses, beforeUses + 1)
+})
+
+test('注册：DY0901 缺少头衔时跳过 VIP 群并记录审计', () => {
+  const result = current().registerCustomer({ nickname: '缺少头衔客户', inviteCode: 'DY0901', deviceId: 'device-dy0901' })
+  assert.equal(result.ok, true, result.error)
+  assert.equal(current().chatGroups.find(item => item.id === 'cg_vip').memberCustomerIds.includes(result.customerId), false)
+  assert.deepEqual(Array.from(result.addedGroupIds), ['cg_strategy', 'cg_community'])
+  assert.match(current().audit.find(item => item.type === 'customer.register').detail, /缺少头衔未加入：私享会员群/)
+})
+
+test('员工拉人：缺少群头衔的客户仍被跳过', () => {
+  const vip = current().chatGroups.find(item => item.id === 'cg_vip')
+  const customer = current().customers.find(item => !item.titleIds.includes('t_vip') && !vip.memberCustomerIds.includes(item.id))
+  const result = current().addGroupMembers(vip.id, [customer.id], { seatId: 'seat_lin', staffId: 'st_lin' })
+  assert.equal(result.added, 0)
+  assert.deepEqual(Array.from(result.skipped), [customer.id])
+  assert.equal(current().chatGroups.find(item => item.id === vip.id).memberCustomerIds.includes(customer.id), false)
+})
+
+test('员工拉人：有群头衔的客户允许加入', () => {
+  const vip = current().chatGroups.find(item => item.id === 'cg_vip')
+  const customer = current().customers.find(item => item.titleIds.includes('t_vip'))
+  store.setState({ chatGroups: current().chatGroups.map(item => item.id === vip.id ? { ...item, memberCustomerIds: item.memberCustomerIds.filter(id => id !== customer.id) } : item) })
+  const result = current().addGroupMembers(vip.id, [customer.id], { seatId: 'seat_lin', staffId: 'st_lin' })
+  assert.equal(result.added, 1)
+  assert.deepEqual(Array.from(result.skipped), [])
+  assert.equal(current().chatGroups.find(item => item.id === vip.id).memberCustomerIds.includes(customer.id), true)
+})
+
 for (const welcome of ['', ' \t\n ']) {
   test(`注册：坐席欢迎语${welcome ? '全空白' : '为空'}时只建会话，其他坐席照常问候`, () => {
     const group = registrationGroup()
