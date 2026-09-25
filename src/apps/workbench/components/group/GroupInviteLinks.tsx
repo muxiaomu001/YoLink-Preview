@@ -37,13 +37,15 @@ export function GroupInviteLinks({ group: g, actor, perm, compact }: GroupPanelP
   const regenerate = async () => {
     const ok = await confirm({ title: '撤销并重新生成主链接？', body: '旧主链接立即失效，已经拿到旧链接的人无法再加入；新链接需要重新分发。', okText: '重新生成', danger: true })
     if (!ok) return
-    s.regenerateGroupMainLink(g.id, actor)
+    const result = s.regenerateGroupMainLink(g.id, actor)
+    if (result) return toast(result.reason, 'warn')
     toast('主链接已重新生成，旧链接已失效')
   }
   const revoke = async (l: GroupInviteLink) => {
     const ok = await confirm({ title: `撤销链接「${l.name}」？`, body: '撤销后该链接不能再加入，已加入的成员不受影响。', okText: '撤销', danger: true })
     if (!ok) return
-    s.revokeGroupInviteLink(g.id, l.id, actor)
+    const result = s.revokeGroupInviteLink(g.id, l.id, actor)
+    if (result) return toast(result.reason, 'warn')
     toast(`已撤销「${l.name}」`)
   }
 
@@ -109,6 +111,10 @@ function CreateLinkModal({ group: g, actor, onClose }: Pick<GroupPanelProps, 'gr
   const submit = () => {
     const days = LINK_EXPIRY_OPTIONS[expiryIdx].days
     const link = s.createGroupInviteLink(g.id, { name: name.trim(), expiresAt: days == null ? null : new Date(Date.now() + days * 86400000).toISOString(), maxUses: maxNum }, actor)
+    if (!('name' in link)) {
+      toast(link.reason, 'warn')
+      return
+    }
     toast(`已生成链接「${link.name}」：${GROUP_LINK_BASE}${link.code}`)
     onClose()
   }

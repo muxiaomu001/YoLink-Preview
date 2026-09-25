@@ -17,6 +17,7 @@ export type ISODate = string
 /** 员工角色能力键（工作台与管理后台功能，作用在员工上） */
 export type Capability =
   | 'manage_messages'
+  | 'moderate_customers'
   | 'view_all_conversations'
   | 'view_all_customers'
   | 'create_invite'
@@ -1162,6 +1163,7 @@ export interface DemoState {
   chatDrafts?: Record<string, ChatDraft>
   failNextSend?: boolean
   chatRulesVersion?: number
+  customerModerationVersion?: number
   enterprise: Enterprise
   roles: Role[]
   staff: Staff[]

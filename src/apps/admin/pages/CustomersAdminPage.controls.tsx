@@ -8,7 +8,7 @@
 import { useState } from 'react'
 import { Ban, EyeOff, KeyRound, LogOut, MicOff } from 'lucide-react'
 import type { Customer } from '@/domain/types'
-import { CONTROL_COPY, MUTE_OPTIONS, muteLabel } from '@/domain/customerControl'
+import { CONTROL_COPY, MUTE_OPTIONS, muteLabel, customerModerationBlocker, customerPasswordResetBlocker } from '@/domain/customerControl'
 import { isAllGroupsMutedNow, isGlobalMutedNow } from '@/domain/customerStatus'
 import { fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
@@ -36,6 +36,8 @@ export function CustomerControlSection({ c }: { c: Customer }) {
   const [shadowing, setShadowing] = useState(false)
   const [shadowReason, setShadowReason] = useState('')
   const deleted = !!c.deletedAt
+  const resetBlocker = customerPasswordResetBlocker(s, c.id, admin)
+  const moderationBlocker = customerModerationBlocker(s, c.id, admin)
   const allGroupsMuted = isAllGroupsMutedNow(c)
   const globallyMuted = isGlobalMutedNow(c)
   const banned = !!c.bannedAt
@@ -44,12 +46,15 @@ export function CustomerControlSection({ c }: { c: Customer }) {
   const reset = async () => {
     const ok = await confirm({ title: `重置「${c.nickname}」的密码？`, body: CONTROL_COPY.resetPassword, okText: '生成' })
     if (!ok) return
-    setPwd(s.resetCustomerPassword(c.id, admin))
+    const result = s.resetCustomerPassword(c.id, admin)
+    if (!result.ok) return toast(result.reason, 'warn')
+    setPwd(result.password)
   }
   const kick = async () => {
     const ok = await confirm({ title: `强制下线「${c.nickname}」？`, body: CONTROL_COPY.forceLogout, okText: '强制下线', danger: true })
     if (!ok) return
-    s.forceLogoutCustomer(c.id, admin)
+    const error = s.forceLogoutCustomer(c.id, admin)
+    if (error) return toast(error, 'warn')
     toast('已强制下线，客户所有设备被登出')
   }
   const toggleBan = async () => {
@@ -60,7 +65,8 @@ export function CustomerControlSection({ c }: { c: Customer }) {
       danger: !banned,
     })
     if (!ok) return
-    s.setCustomerBan(c.id, !banned, admin)
+    const error = s.setCustomerBan(c.id, !banned, admin)
+    if (error) return toast(error, 'warn')
     toast(banned ? '已解除封禁' : '已封禁，客户无法登录')
   }
   const toggleShadow = async () => {
@@ -80,8 +86,8 @@ export function CustomerControlSection({ c }: { c: Customer }) {
     toast('已开启影子模式，客户端无任何提示')
   }
   const mute = (kind: 'allGroups' | 'global', hours: number | null) => {
-    if (kind === 'allGroups') s.muteCustomerAllGroups(c.id, hours, admin)
-    else s.muteCustomerGlobally(c.id, hours, admin)
+    const error = kind === 'allGroups' ? s.muteCustomerAllGroups(c.id, hours, admin) : s.muteCustomerGlobally(c.id, hours, admin)
+    if (error) return toast(error, 'warn')
     toast(`已${kind === 'allGroups' ? '群聊禁言' : '全部禁言'}「${c.nickname}」${muteLabel(hours)}`)
     setMuting(null)
   }
@@ -90,39 +96,39 @@ export function CustomerControlSection({ c }: { c: Customer }) {
     <section className="rounded-md border border-zinc-200 p-3">
       <h4 className="mb-1.5 text-xs font-semibold text-zinc-700">账号管控</h4>
       <Row title="重置密码" desc={c.mustChangePassword ? '客户还没用新密码登录过，仍处于待首次改密' : '生成一次性新密码，只显示一次；客户首次登录强制改'}>
-        <Button size="sm" disabled={deleted} onClick={() => void reset()}>
+        <Button size="sm" disabled={deleted || !!resetBlocker} title={resetBlocker ?? undefined} onClick={() => void reset()}>
           <KeyRound size={13} /> 重置
         </Button>
       </Row>
       <Row title="强制下线" desc={c.sessionsRevokedAt ? `上次下线于 ${fmtDateTime(c.sessionsRevokedAt)}；客户可重新登录` : '让所有已登录设备退出，客户可重新登录'}>
-        <Button size="sm" disabled={deleted} onClick={() => void kick()}>
+        <Button size="sm" disabled={deleted || !!moderationBlocker} title={moderationBlocker ?? undefined} onClick={() => void kick()}>
           <LogOut size={13} /> 下线
         </Button>
       </Row>
       <Row title="群聊禁言" desc={allGroupsMuted ? `禁言中${c.mutedAllUntil!.startsWith('9999-') ? '（永久）' : `，至 ${fmtDateTime(c.mutedAllUntil!)}`}；群与频道不能发消息，私聊不受影响` : '群与频道不能发消息，私聊不受影响'}>
         {allGroupsMuted ? (
-          <Button size="sm" disabled={deleted} onClick={() => mute('allGroups', 0)}>
+          <Button size="sm" disabled={deleted || !!moderationBlocker} title={moderationBlocker ?? undefined} onClick={() => mute('allGroups', 0)}>
             <MicOff size={13} /> 解除禁言
           </Button>
         ) : (
-          <Button size="sm" disabled={deleted} onClick={() => setMuting('allGroups')}>
+          <Button size="sm" disabled={deleted || !!moderationBlocker} title={moderationBlocker ?? undefined} onClick={() => setMuting('allGroups')}>
             <MicOff size={13} /> 禁言
           </Button>
         )}
       </Row>
       <Row title="全部禁言" desc={globallyMuted ? `禁言中${c.globalMutedUntil!.startsWith('9999-') ? '（永久）' : `，至 ${fmtDateTime(c.globalMutedUntil!)}`}；所有坐席、群和频道都不能发消息` : '所有坐席、群和频道都不能发消息'}>
         {globallyMuted ? (
-          <Button size="sm" disabled={deleted} onClick={() => mute('global', 0)}>
+          <Button size="sm" disabled={deleted || !!moderationBlocker} title={moderationBlocker ?? undefined} onClick={() => mute('global', 0)}>
             <MicOff size={13} /> 解除禁言
           </Button>
         ) : (
-          <Button size="sm" disabled={deleted} onClick={() => setMuting('global')}>
+          <Button size="sm" disabled={deleted || !!moderationBlocker} title={moderationBlocker ?? undefined} onClick={() => setMuting('global')}>
             <MicOff size={13} /> 禁言
           </Button>
         )}
       </Row>
       <Row title="封禁" desc={banned ? `封禁于 ${fmtDateTime(c.bannedAt!)}；账号无法登录` : '账号无法登录，所有已登录设备会退出'}>
-        <Button size="sm" variant={banned ? 'secondary' : 'danger'} disabled={deleted} onClick={() => void toggleBan()}>
+        <Button size="sm" variant={banned ? 'secondary' : 'danger'} disabled={deleted || !!moderationBlocker} title={moderationBlocker ?? undefined} onClick={() => void toggleBan()}>
           <Ban size={13} /> {banned ? '解除封禁' : '封禁'}
         </Button>
       </Row>

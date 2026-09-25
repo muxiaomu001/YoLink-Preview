@@ -157,6 +157,7 @@ export function BulkGroupModal({ ids, onClose }: { ids: string[]; onClose: () =>
   const apply = () => {
     if (!g) return
     const r = s.addGroupMembers(g.id, ids, { seatId: seat.id, staffId: staff.id })
+    if ('reason' in r) return toast(r.reason, 'warn')
     toast(r.added ? `已把 ${r.added} 人拉入「${g.name}」${r.skipped.length ? `，跳过 ${r.skipped.length} 人（已在群、已满、被禁止再进或不满足头衔条件）` : ''}` : '没有人被拉入：都已在群、已满、被禁止再进或不满足头衔条件', r.added ? 'ok' : 'warn')
     onClose()
   }

@@ -35,11 +35,13 @@ export function SeatsPage() {
   type Row = (typeof rows)[number]
 
   const pause = (seat: Seat) => {
-    s.updateSeat(seat.id, { status: 'paused' }, admin)
+    const error = s.updateSeat(seat.id, { status: 'paused' }, admin)
+    if (error) return toast(error, 'warn')
     toast(`「${seat.displayName}」已暂停接新：不再分新客户，已有客户的会话仍归它`)
   }
   const resume = (seat: Seat) => {
-    s.updateSeat(seat.id, { status: 'accepting' }, admin)
+    const error = s.updateSeat(seat.id, { status: 'accepting' }, admin)
+    if (error) return toast(error, 'warn')
     toast(`「${seat.displayName}」已恢复接新`)
   }
 
@@ -155,7 +157,7 @@ export function SeatsPage() {
       </Card>
 
       {handover && <HandoverModal seat={handover} onClose={() => setHandover(null)} />}
-      {editing && <SeatEditModal seat={editing} onClose={() => setEditing(null)} />}
+      {editing && <SeatEditModal seat={editing} onClose={() => setEditing(null)} onHandover={() => { setHandover(editing); setEditing(null) }} />}
       {creating && <SeatEditModal onClose={() => setCreating(false)} />}
     </div>
   )

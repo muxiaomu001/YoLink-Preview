@@ -51,11 +51,13 @@ export function GroupMembers({ group: g, actor, perm, compact, canViewAll }: Gro
   const shownSeats = kw ? seats.filter((x) => x.displayName.includes(kw)) : seats
 
   const demote = (t: Target) => {
-    s.demoteGroupAdmin(g.id, t.kind, t.id, actor)
+    const result = s.demoteGroupAdmin(g.id, t.kind, t.id, actor)
+    if (result) return toast(result.reason, 'warn')
     toast(`已撤销「${t.name}」的管理员`)
   }
   const lift = (c: Customer) => {
-    s.liftGroupRestriction(g.id, c.id, actor)
+    const result = s.liftGroupRestriction(g.id, c.id, actor)
+    if (result) return toast(result.reason, 'warn')
     toast(`已解除「${c.nickname}」的限制`)
   }
   const adminPerms = (kind: GroupMemberKind, id: string) => g.admins.find((a) => a.memberKind === kind && a.memberId === id)?.perms ?? []
@@ -197,7 +199,8 @@ function AddSeatModal({ group: g, actor, onClose }: Pick<GroupPanelProps, 'group
   const options = s.seats.filter((x) => !g.memberSeatIds.includes(x.id))
   const [seatId, setSeatId] = useState(options[0]?.id ?? '')
   const submit = () => {
-    s.addGroupSeat(g.id, seatId, actor)
+    const result = s.addGroupSeat(g.id, seatId, actor)
+    if (result) return toast(result.reason, 'warn')
     toast(`坐席「${seatById(s, seatId)?.displayName}」已加入群`)
     onClose()
   }

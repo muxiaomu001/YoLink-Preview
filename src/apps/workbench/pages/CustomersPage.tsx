@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, Search, Send, SlidersHorizontal } from 'lucide-react'
 import type { Customer } from '@/domain/types'
+import { customerModerationBlocker } from '@/domain/customerControl'
 import { fmtAgo, fmtDate } from '@/domain/time'
 import { activeCustomers, customersOfSeat, primarySeatOfCustomer, staffById } from '@/store/selectors'
 import { Button, Input } from '@/ui/primitives'
@@ -52,7 +53,8 @@ export function CustomersPage() {
     const on = !c.bannedAt
     const ok = await confirm({ title: on ? `封禁「${c.nickname}」？` : `解除「${c.nickname}」的封禁？`, body: on ? '封禁后账号无法登录，所有已登录设备会退出。群发不再投递给该客户。' : '解除后客户可以重新登录。', okText: on ? '封禁' : '解除', danger: on })
     if (!ok || !staff) return
-    s.setCustomerBan(c.id, on, staff.id)
+    const error = s.setCustomerBan(c.id, on, staff.id)
+    if (error) return toast(error, 'warn')
     toast(on ? '已封禁' : '已解除封禁')
   }
 
@@ -179,7 +181,7 @@ export function CustomersPage() {
                       <Button size="sm" variant="ghost" onClick={() => openChat(c)}>
                         聊天
                       </Button>
-                      <Button size="sm" variant="ghost" className={c.bannedAt ? '' : 'text-red-700'} onClick={() => void toggleBan(c)}>
+                      <Button size="sm" variant="ghost" className={c.bannedAt ? '' : 'text-red-700'} disabled={!!customerModerationBlocker(s, c.id, staff?.id ?? '')} title={customerModerationBlocker(s, c.id, staff?.id ?? '') ?? undefined} onClick={() => void toggleBan(c)}>
                         {c.bannedAt ? '解除封禁' : '封禁'}
                       </Button>
                     </div>

@@ -95,7 +95,8 @@ export function PinnedBar({ group, canPin }: { group: ChatGroup; canPin: boolean
   const jump = (id: string) => !jumpToMessage(id) && toast('该消息不在当前视图', 'info')
   const unpin = (id: string) => {
     if (!seat || !staff) return
-    s.unpinMessage(group.id, id, { seatId: seat.id, staffId: staff.id })
+    const result = s.unpinMessage(group.id, id, { seatId: seat.id, staffId: staff.id })
+    if (result) return toast(result.reason, 'warn')
     toast('已取消置顶')
   }
   return (
@@ -177,7 +178,8 @@ export function PinModal({ message, group, onClose }: { message: Message; group:
   const shadowed = !!messageShadow(s, s.messages.find((m) => m.id === message.id) ?? message).shadowedAt
   const submit = () => {
     if (!seat || !staff) return
-    s.pinMessage(group.id, message.id, notify && !shadowed, { seatId: seat.id, staffId: staff.id })
+    const result = s.pinMessage(group.id, message.id, notify && !shadowed, { seatId: seat.id, staffId: staff.id })
+    if (result) return toast(result.reason, 'warn')
     toast(notify && !shadowed ? '已置顶，并向成员发出系统消息' : '已置顶')
     onClose()
   }

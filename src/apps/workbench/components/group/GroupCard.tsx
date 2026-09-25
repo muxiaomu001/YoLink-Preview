@@ -2,7 +2,6 @@
  * 群信息卡（组合）：工作台右栏与管理后台群管理页共用。
  * compact（工作台右栏）只渲染一张摘要卡，管理项收进「管理」弹窗；
  * 非 compact（管理后台）保持全部面板展开：身份行 + 基础信息、公告、置顶、群设置、成员、邀请链接、管理员日志。
- * 权限判定全部由 perm() 注入：工作台用 seatGroupPerm，管理后台恒 true。
  */
 import { groupRoleOf } from '@/store/policy'
 import { GroupAnnouncementPanel } from './GroupAnnouncementPanel'
@@ -21,7 +20,6 @@ export interface GroupCardProps extends GroupPanelProps {
   officialEditable?: boolean
   /** 批量拉人里"全部客户"范围：员工角色 view_all_customers 或管理后台 */
   canViewAllCustomers?: boolean
-  /** 顶部身份行的补充说明（例如管理后台："以群主坐席身份操作"） */
   identityNote?: string
 }
 

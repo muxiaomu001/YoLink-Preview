@@ -263,7 +263,7 @@ test('第十批界面：客户只看到显示名与官方小标', () => {
 
 test('第十批：群成员限制与解除使用新文案，账号封禁保持不变', () => {
   const { g: group, actor: customerActor } = groupContext()
-  const actor = { seatId: group.ownerSeatId, staffId: 'st_admin' }
+  const actor = { seatId: group.ownerSeatId, staffId: current().seats.find(seatRecord => seatRecord.id === group.ownerSeatId).operatorStaffId }
   const customer = current().customers.find(item => item.id === customerActor.id)
   const html = renderPage('src/apps/workbench/components/group/GroupMemberModals.tsx', 'RestrictModal', { group, actor, customer, kind: 'ban', onClose() {} })
   assert.match(html, /移出并禁止再进/)
@@ -312,6 +312,538 @@ function addWord(scope, action, word = '测试词') {
 function singleInput(text) {
   return { name: '规则验收', seatId: seat.id, operatorId: seat.staffId, targetKind: 'friends', targetDesc: '测试客户', text, customerIds: [dm().customerId] }
 }
+
+function groupPermissionFixture(perms = []) {
+  const { g: group, conv, actor: customer } = groupContext()
+  const actor = { seatId: 'seat_lin', staffId: 'st_lin' }
+  const targetSeatId = 'seat_cs'
+  const addedCustomerId = current().customers.find(item => !item.deletedAt && item.id !== customer.id).id
+  const messageId = current().messages.find(message => message.convId === conv.id).id
+  store.setState({
+    chatGroups: current().chatGroups.map(item => item.id === group.id ? {
+      ...item, ownerSeatId: 'seat_chen', memberSeatIds: ['seat_chen', actor.seatId], official: false,
+      admins: [
+        { memberKind: 'seat', memberId: actor.seatId, perms, promotedBySeatId: 'seat_chen', promotedAt: new Date().toISOString() },
+        { memberKind: 'customer', memberId: customer.id, perms: ['can_change_info'], promotedBySeatId: 'seat_chen', promotedAt: new Date().toISOString() },
+      ],
+      memberCustomerIds: item.memberCustomerIds.filter(customerId => customerId !== addedCustomerId),
+      pinnedMessageIds: [], requiredTitleId: null, maxMembers: 10000,
+    } : item),
+  })
+  return { groupId: group.id, actor, customerId: customer.id, addedCustomerId, messageId, targetSeatId, linkId: group.inviteLinks[0].id }
+}
+
+const groupPermissionCases = [
+  ['设置', 'can_change_info', fixture => current().updateGroupSettings(fixture.groupId, { allMuted: true }, fixture.actor)],
+  ['公告', 'can_change_info', fixture => current().setGroupAnnouncement(fixture.groupId, { title: '权限验收', content: '群公告', notify: true }, fixture.actor)],
+  ['置顶', 'can_pin_messages', fixture => current().pinMessage(fixture.groupId, fixture.messageId, true, fixture.actor)],
+  ['取消置顶', 'can_pin_messages', fixture => current().unpinMessage(fixture.groupId, fixture.messageId, fixture.actor)],
+  ['拉客户', 'can_invite_users', fixture => current().addGroupMembers(fixture.groupId, [fixture.addedCustomerId], fixture.actor)],
+  ['拉坐席', 'can_invite_users', fixture => current().addGroupSeat(fixture.groupId, fixture.targetSeatId, fixture.actor)],
+  ['踢人', 'can_restrict_members', fixture => current().kickGroupMember(fixture.groupId, fixture.customerId, true, fixture.actor)],
+  ['任命', 'can_promote_members', fixture => current().promoteGroupAdmin(fixture.groupId, 'customer', fixture.customerId, ['can_invite_users'], fixture.actor)],
+  ['撤销管理员', 'can_promote_members', fixture => current().demoteGroupAdmin(fixture.groupId, 'customer', fixture.customerId, fixture.actor)],
+  ['移出并禁止再进', 'can_restrict_members', fixture => current().restrictGroupMember(fixture.groupId, fixture.customerId, 'ban', null, '测试', fixture.actor)],
+  ['禁言', 'can_restrict_members', fixture => current().restrictGroupMember(fixture.groupId, fixture.customerId, 'mute', 1, '测试', fixture.actor)],
+  ['解除限制', 'can_restrict_members', fixture => current().liftGroupRestriction(fixture.groupId, fixture.customerId, fixture.actor)],
+  ['创建链接', 'can_invite_users', fixture => current().createGroupInviteLink(fixture.groupId, { name: '测试', expiresAt: null, maxUses: null }, fixture.actor)],
+  ['撤销链接', 'can_invite_users', fixture => current().revokeGroupInviteLink(fixture.groupId, fixture.linkId, fixture.actor)],
+  ['重建主链接', 'can_invite_users', fixture => current().regenerateGroupMainLink(fixture.groupId, fixture.actor)],
+]
+
+for (const [label, permission, invoke] of groupPermissionCases) {
+  test(`权限兜底：群${label}无对应权限时拒绝，数据、日志与审计均不变`, () => {
+    const fixture = groupPermissionFixture([permission === 'can_pin_messages' ? 'can_invite_users' : 'can_pin_messages'])
+    const before = current()
+    const result = invoke(fixture)
+    assert.equal(result.ok, false)
+    assert.match(result.reason, /没有.*权限/)
+    assert.equal(current(), before)
+  })
+  test(`权限兜底：群${label}只有对应单项权限时允许`, () => {
+    const fixture = groupPermissionFixture([permission])
+    const before = current()
+    const result = invoke(fixture)
+    assert.notEqual(result?.ok, false)
+    assert.equal(current().groupLogs.length, before.groupLogs.length + 1)
+    assert.equal(current().audit.length, before.audit.length + 1)
+    assert.equal(current().audit[0].actorStaffId, fixture.actor.staffId)
+    assert.notEqual(current().chatGroups, before.chatGroups)
+  })
+  test(`权限兜底：群${label}拒绝冒用坐席、无效员工和停用员工`, () => {
+    const fixture = groupPermissionFixture([permission])
+    for (const staffId of ['st_admin', 'missing']) {
+      const before = current()
+      assert.equal(invoke({ ...fixture, actor: { ...fixture.actor, staffId } }).ok, false)
+      assert.equal(current(), before)
+    }
+    store.setState({ staff: current().staff.map(staff => staff.id === fixture.actor.staffId ? { ...staff, status: 'disabled' } : staff) })
+    const before = current()
+    assert.equal(invoke(fixture).ok, false)
+    assert.equal(current(), before)
+  })
+}
+
+test('权限兜底：群主与有管理所有群能力的真实实操员工允许；不存在的群或坐席拒绝', () => {
+  const fixture = groupPermissionFixture()
+  const owner = { seatId: 'seat_chen', staffId: current().seats.find(item => item.id === 'seat_chen').operatorStaffId }
+  assert.equal(current().setGroupAnnouncement(fixture.groupId, null, owner), undefined)
+  store.setState({ roles: current().roles.map(role => role.id === 'role_cs' ? { ...role, caps: [...role.caps, 'manage_groups'] } : role) })
+  assert.equal(current().setGroupAnnouncement(fixture.groupId, null, fixture.actor), undefined)
+  for (const input of [{ ...fixture, groupId: 'missing' }, { ...fixture, actor: { ...fixture.actor, seatId: 'missing' } }]) {
+    const before = current()
+    assert.equal(current().setGroupAnnouncement(input.groupId, null, input.actor).ok, false)
+    assert.equal(current(), before)
+  }
+})
+
+test('权限兜底：有权限可取消真实置顶和解除真实限制，无权限时原记录保留', () => {
+  const fixture = groupPermissionFixture(['can_pin_messages', 'can_restrict_members'])
+  const group = () => current().chatGroups.find(item => item.id === fixture.groupId)
+  current().pinMessage(fixture.groupId, fixture.messageId, false, fixture.actor)
+  current().restrictGroupMember(fixture.groupId, fixture.customerId, 'mute', 1, '验收', fixture.actor)
+  assert.ok(group().pinnedMessageIds.includes(fixture.messageId))
+  assert.ok(group().restrictions.some(item => item.customerId === fixture.customerId))
+  store.setState({ chatGroups: current().chatGroups.map(item => item.id === fixture.groupId ? { ...item, admins: item.admins.map(admin => admin.memberId === fixture.actor.seatId ? { ...admin, perms: [] } : admin) } : item) })
+  const before = current()
+  assert.equal(current().unpinMessage(fixture.groupId, fixture.messageId, fixture.actor).ok, false)
+  assert.equal(current().liftGroupRestriction(fixture.groupId, fixture.customerId, fixture.actor).ok, false)
+  assert.equal(current(), before)
+  const owner = { seatId: 'seat_chen', staffId: 'st_chen' }
+  current().unpinMessage(fixture.groupId, fixture.messageId, owner)
+  current().liftGroupRestriction(fixture.groupId, fixture.customerId, owner)
+  assert.equal(group().pinnedMessageIds.includes(fixture.messageId), false)
+  assert.equal(group().restrictions.some(item => item.customerId === fixture.customerId), false)
+})
+
+test('权限兜底：交接拒绝不存在、停用、同一员工与不存在的坐席', () => {
+  store.setState({ staff: current().staff.map(staff => staff.id === 'st_wang' ? { ...staff, status: 'disabled' } : staff) })
+  for (const [seatId, staffId, reason] of [['seat_lin', 'missing', /不存在/], ['seat_lin', 'st_wang', /停用/], ['seat_lin', 'st_lin', /当前实操员工/], ['missing', 'st_wang', /坐席不存在/]]) {
+    const before = current()
+    assert.match(current().handoverSeat(seatId, staffId, '交接验收', 'st_admin'), reason)
+    assert.equal(current(), before)
+  }
+})
+
+test('权限兜底：合法交接保留记录，旧员工失去会话与当前坐席，新员工可访问', () => {
+  const conversation = dm()
+  const before = current()
+  assert.equal(current().handoverSeat('seat_lin', 'st_wang', '交接验收', 'st_admin'), null)
+  assert.equal(current().seats.find(item => item.id === 'seat_lin').operatorStaffId, 'st_wang')
+  assert.notEqual(current().session.workbenchSeatId, 'seat_lin')
+  assert.equal(current().handovers.length, before.handovers.length + 1)
+  assert.equal(current().handovers.at(-1).fromStaffId, 'st_lin')
+  assert.equal(current().handovers.at(-1).toStaffId, 'st_wang')
+  assert.equal(current().audit[0].type, 'seat.handover')
+  assert.equal(rules.actorCanView(current(), conversation.id, seat), false)
+  assert.equal(rules.actorCanView(current(), conversation.id, { ...seat, staffId: 'st_wang' }), true)
+})
+
+test('权限兜底：updateSeat 拒绝任何实操员工字段，允许普通资料更新', () => {
+  for (const operatorStaffId of ['st_wang', 'st_lin', undefined]) {
+    const before = current()
+    assert.match(current().updateSeat('seat_lin', { displayName: '不应生效', operatorStaffId }, 'st_admin'), /只能通过交接/)
+    assert.equal(current(), before)
+  }
+  assert.equal(current().updateSeat('seat_lin', { displayName: '资料更新', status: 'paused' }, 'st_admin'), null)
+  assert.equal(current().seats.find(item => item.id === 'seat_lin').displayName, '资料更新')
+  assert.equal(current().seats.find(item => item.id === 'seat_lin').operatorStaffId, 'st_lin')
+})
+
+test('权限兜底：创建坐席只允许存在且在职的实操员工', () => {
+  const template = { ...current().seats[0], displayName: '权限验收' }
+  store.setState({ staff: current().staff.map(staff => staff.id === 'st_wang' ? { ...staff, status: 'disabled' } : staff) })
+  for (const operatorStaffId of ['missing', 'st_wang']) {
+    const before = current()
+    assert.equal(current().createSeat({ ...template, operatorStaffId }, 'st_admin'), null)
+    assert.equal(current(), before)
+  }
+  const created = current().createSeat({ ...template, operatorStaffId: 'st_lin' }, 'st_admin')
+  assert.equal(created.operatorStaffId, 'st_lin')
+  assert.ok(current().seats.includes(created))
+})
+
+test('权限兜底：创建员工接手多个坐席逐一交接，旧工作台失效且未选坐席不变', () => {
+  const selected = ['seat_lin', 'seat_chen']
+  const before = current()
+  const created = current().createStaff({ name: '接手员工', username: 'handover-test', roleId: 'role_cs', withSeat: false, assignSeatIds: [...selected, 'seat_lin', 'missing'] }, 'st_admin')
+  assert.equal(current().handovers.length, before.handovers.length + selected.length)
+  assert.equal(current().audit.filter(entry => entry.type === 'seat.handover').length, before.audit.filter(entry => entry.type === 'seat.handover').length + selected.length)
+  for (const seatId of selected) {
+    assert.equal(current().seats.find(item => item.id === seatId).operatorStaffId, created.id)
+    assert.equal(current().handovers.findLast(entry => entry.seatId === seatId).toStaffId, created.id)
+  }
+  assert.notEqual(current().session.workbenchSeatId, 'seat_lin')
+  assert.ok(current().seats.filter(item => !selected.includes(item.id)).every(item => item === before.seats.find(original => original.id === item.id)))
+})
+
+test('权限兜底：新建员工不接手已有坐席时不产生交接，允许同时创建同名坐席', () => {
+  const before = current()
+  const created = current().createStaff({ name: '新员工', username: 'new-test', roleId: 'role_cs', withSeat: true }, 'st_admin')
+  assert.equal(current().handovers, before.handovers)
+  assert.ok(current().seats.slice(0, before.seats.length).every((item, index) => item === before.seats[index]))
+  assert.equal(current().seats.at(-1).operatorStaffId, created.id)
+  assert.equal(current().session.workbenchSeatId, before.session.workbenchSeatId)
+})
+
+test('权限兜底：主归属实操员工、管理员、超级管理员均可重置客户密码', () => {
+  const customerId = dm().customerId
+  store.setState({
+    customerSeats: current().customerSeats.map(link => link.customerId === customerId ? { ...link, primary: link.seatId === 'seat_lin' } : link),
+    staff: current().staff.map(staff => staff.id === 'st_wang' ? { ...staff, roleId: 'role_admin' } : staff),
+  })
+  for (const staffId of ['st_lin', 'st_wang', 'st_admin']) {
+    const before = current()
+    const result = current().resetCustomerPassword(customerId, staffId)
+    assert.equal(result.ok, true)
+    assert.ok(result.password.length > 0)
+    assert.equal(current().audit.length, before.audit.length + 1)
+    assert.equal(current().audit[0].actorStaffId, staffId)
+    assert.equal(current().customers.find(customer => customer.id === customerId).mustChangePassword, true)
+  }
+})
+
+test('权限兜底：非主归属员工、停用员工与不存在客户拒绝重置，不生成密码或成功审计', () => {
+  const customerId = dm().customerId
+  store.setState({
+    customerSeats: current().customerSeats.map(link => link.customerId === customerId ? { ...link, primary: link.seatId === 'seat_chen' } : link),
+    staff: current().staff.map(staff => staff.id === 'st_admin' ? { ...staff, status: 'disabled' } : staff),
+  })
+  const originalRandom = Math.random
+  let randomCalls = 0
+  Math.random = () => { randomCalls += 1; return 0.5 }
+  try {
+    for (const [target, staffId] of [[customerId, 'st_lin'], [customerId, 'missing'], [customerId, 'st_admin'], ['missing', 'st_lin']]) {
+      const before = current()
+      const result = current().resetCustomerPassword(target, staffId)
+      assert.equal(result.ok, false)
+      assert.ok(result.reason)
+      assert.equal(Object.hasOwn(result, 'password'), false)
+      assert.equal(current(), before)
+    }
+    assert.equal(randomCalls, 0)
+  } finally {
+    Math.random = originalRandom
+  }
+})
+
+const customerModerationCases = [
+  ['封禁', (customerId, staffId) => current().setCustomerBan(customerId, true, staffId), customer => !!customer.bannedAt],
+  ['解除封禁', (customerId, staffId) => current().setCustomerBan(customerId, false, staffId), customer => customer.bannedAt === null],
+  ['群聊禁言', (customerId, staffId) => current().muteCustomerAllGroups(customerId, 1, staffId), customer => customerStatus.isAllGroupsMutedNow(customer)],
+  ['解除群聊禁言', (customerId, staffId) => current().muteCustomerAllGroups(customerId, 0, staffId), customer => customer.mutedAllUntil === null],
+  ['全部禁言', (customerId, staffId) => current().muteCustomerGlobally(customerId, 1, staffId), customer => customerStatus.isGlobalMutedNow(customer)],
+  ['解除全部禁言', (customerId, staffId) => current().muteCustomerGlobally(customerId, 0, staffId), customer => customer.globalMutedUntil === null],
+  ['强制下线', (customerId, staffId) => current().forceLogoutCustomer(customerId, staffId), customer => !!customer.sessionsRevokedAt],
+]
+
+for (const [label, invoke, verify] of customerModerationCases) {
+  test(`权限兜底：客户${label}按能力允许非主归属员工，拒绝无能力的主归属员工`, () => {
+    const customerId = dm().customerId
+    store.setState({ customerSeats: current().customerSeats.map(link => link.customerId === customerId ? { ...link, primary: link.seatId === 'seat_lin' } : link) })
+    const before = current()
+    assert.match(invoke(customerId, 'st_lin'), /没有客户处置权限/)
+    assert.equal(current(), before)
+    store.setState({
+      roles: [...current().roles, { id: 'role_moderator', name: '客户处置', builtin: false, caps: ['moderate_customers'] }],
+      staff: current().staff.map(staff => staff.id === 'st_wang' ? { ...staff, roleId: 'role_moderator' } : staff),
+    })
+    assert.equal(invoke(customerId, 'st_wang'), null)
+    assert.equal(verify(current().customers.find(customer => customer.id === customerId)), true)
+    assert.equal(current().audit[0].actorStaffId, 'st_wang')
+    assert.equal(invoke(customerId, 'st_admin'), null)
+    store.setState({ roles: current().roles.map(role => role.id === 'role_moderator' ? { ...role, caps: [] } : role) })
+    const revoked = current()
+    assert.match(invoke(customerId, 'st_wang'), /没有客户处置权限/)
+    assert.equal(current(), revoked)
+    store.setState({ staff: current().staff.map(staff => staff.id === 'st_admin' ? { ...staff, status: 'disabled' } : staff) })
+    const disabled = current()
+    assert.match(invoke(customerId, 'st_admin'), /停用/)
+    assert.match(invoke('missing', 'st_wang'), /客户不存在/)
+    assert.match(invoke(customerId, 'missing'), /员工不存在/)
+    assert.equal(current(), disabled)
+  })
+}
+
+test('权限兜底：旧存档只为内置管理员补客户处置能力，不给客服或自定义角色授权', () => {
+  const merge = store.persist.getOptions().merge
+  const roles = current().roles.map(role => ({ ...role, caps: role.caps.filter(capability => capability !== 'moderate_customers') }))
+  const migrated = merge({ roles }, current())
+  for (const role of migrated.roles) assert.equal(role.caps.includes('moderate_customers'), ['role_super', 'role_admin'].includes(role.id))
+  assert.equal(migrated.customerModerationVersion, 1)
+  const subsequent = merge({ roles, customerModerationVersion: 1 }, current())
+  assert.ok(subsequent.roles.every(role => !role.caps.includes('moderate_customers')))
+})
+
+for (const exit of ['主动退群', '移出并禁止再进']) {
+  test(`权限兜底：客户管理员${exit}后重新入群只能是普通成员`, () => {
+    const fixture = groupPermissionFixture(['can_restrict_members', 'can_invite_users'])
+    const group = () => current().chatGroups.find(item => item.id === fixture.groupId)
+    assert.equal(policy.groupRoleOf(group(), 'customer', fixture.customerId), 'admin')
+    if (exit === '主动退群') current().customerLeaveGroup(fixture.groupId, fixture.customerId)
+    else current().restrictGroupMember(fixture.groupId, fixture.customerId, 'ban', null, '验收', fixture.actor)
+    assert.equal(group().memberCustomerIds.includes(fixture.customerId), false)
+    assert.equal(policy.groupRoleOf(group(), 'customer', fixture.customerId), 'none')
+    if (exit !== '主动退群') {
+      assert.equal(current().addGroupMembers(fixture.groupId, [fixture.customerId], fixture.actor).added, 0)
+      assert.equal(current().liftGroupRestriction(fixture.groupId, fixture.customerId, fixture.actor), undefined)
+    }
+    assert.equal(current().addGroupMembers(fixture.groupId, [fixture.customerId], fixture.actor).added, 1)
+    assert.equal(policy.groupRoleOf(group(), 'customer', fixture.customerId), 'member')
+    assert.equal(policy.groupPerm(group(), 'customer', fixture.customerId, 'can_change_info'), false)
+  })
+}
+
+test('权限兜底：群内禁言不清管理员身份，官方群拒绝退群且保留原身份', () => {
+  const fixture = groupPermissionFixture(['can_restrict_members'])
+  const group = () => current().chatGroups.find(item => item.id === fixture.groupId)
+  current().restrictGroupMember(fixture.groupId, fixture.customerId, 'mute', 1, '验收', fixture.actor)
+  assert.equal(policy.groupRoleOf(group(), 'customer', fixture.customerId), 'admin')
+  store.setState({ chatGroups: current().chatGroups.map(item => item.id === fixture.groupId ? { ...item, official: true } : item) })
+  const before = current()
+  current().customerLeaveGroup(fixture.groupId, fixture.customerId)
+  assert.equal(current().chatGroups, before.chatGroups)
+  assert.equal(current().messages, before.messages)
+  assert.equal(current().groupLogs, before.groupLogs)
+  assert.equal(policy.groupRoleOf(group(), 'customer', fixture.customerId), 'admin')
+})
+
+function renderCurrentState(render) {
+  const React = require('react')
+  const originalUseSyncExternalStore = React.useSyncExternalStore
+  React.useSyncExternalStore = (subscribe, getSnapshot) => originalUseSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  try {
+    return render()
+  } finally {
+    React.useSyncExternalStore = originalUseSyncExternalStore
+  }
+}
+
+function renderCurrentPage(relative, component, props = {}) {
+  return renderCurrentState(() => renderPage(relative, component, props))
+}
+
+function buttonByText(html, text) {
+  const button = html.match(/<button\b[\s\S]*?<\/button>/g)?.find(item => item.includes(text))
+  assert.ok(button, `找不到按钮：${text}`)
+  return button
+}
+
+test('权限兜底界面：坐席编辑只读展示实操员工并提供交接，创建可选择在职员工', () => {
+  const seatRecord = current().seats.find(item => item.id === 'seat_lin')
+  const props = { onClose() {}, onHandover() {} }
+  const editing = renderCurrentPage('src/apps/admin/pages/SeatsPage.parts.tsx', 'SeatEditModal', { ...props, seat: seatRecord })
+  assert.match(editing, /林薇/)
+  assert.doesNotMatch(editing, /<select/)
+  assert.doesNotMatch(buttonByText(editing, '交接'), / disabled=/)
+  store.setState({ staff: current().staff.map(staff => staff.id === 'st_wang' ? { ...staff, status: 'disabled' } : staff) })
+  const creating = renderCurrentPage('src/apps/admin/pages/SeatsPage.parts.tsx', 'SeatEditModal', props)
+  assert.match(creating, /<option value="st_lin"/)
+  assert.doesNotMatch(creating, /<option value="st_wang"/)
+  const handover = renderCurrentPage('src/apps/admin/pages/SeatsPage.parts.tsx', 'HandoverModal', { ...props, seat: seatRecord })
+  assert.doesNotMatch(handover, /<option value="st_lin"|<option value="st_wang"/)
+  assert.match(handover, /<option value="st_chen"/)
+})
+
+test('权限兜底界面：主归属客服只能重置密码，非主归属管理员可处置和重置', () => {
+  const customerId = dm().customerId
+  store.setState({ customerSeats: current().customerSeats.map(link => link.customerId === customerId ? { ...link, primary: link.seatId === 'seat_lin' } : link) })
+  const customer = current().customers.find(item => item.id === customerId)
+  const props = { c: customer, open: true, onClose() {} }
+  const render = () => renderCurrentPage('src/apps/workbench/components/CustomerActions.tsx', 'CustomerActions', props)
+  const ordinary = render()
+  assert.doesNotMatch(buttonByText(ordinary, '重置密码'), / disabled=/)
+  for (const label of ['强制下线', '群聊禁言', '全部禁言', '封禁']) {
+    assert.match(buttonByText(ordinary, label), / disabled=""/)
+    assert.match(buttonByText(ordinary, label), /没有客户处置权限/)
+  }
+  store.setState({ session: { ...current().session, workbenchStaffId: 'st_wang', workbenchSeatId: null } })
+  assert.match(buttonByText(render(), '重置密码'), / disabled=""/)
+  store.setState({ staff: current().staff.map(staff => staff.id === 'st_wang' ? { ...staff, roleId: 'role_admin' } : staff) })
+  const admin = render()
+  for (const label of ['重置密码', '强制下线', '群聊禁言', '全部禁言', '封禁']) assert.doesNotMatch(buttonByText(admin, label), / disabled=/)
+})
+
+test('权限兜底界面：后台客户处置同样受员工能力控制', () => {
+  const customer = current().customers.find(item => item.id === dm().customerId)
+  const render = () => renderCurrentPage('src/apps/admin/pages/CustomersAdminPage.controls.tsx', 'CustomerControlSection', { c: customer })
+  assert.doesNotMatch(buttonByText(render(), '下线'), / disabled=/)
+  store.setState({ session: { ...current().session, adminStaffId: 'st_lin' } })
+  assert.match(buttonByText(render(), '下线'), / disabled=""/)
+})
+
+test('权限兜底界面：客户列表封禁入口无处置能力禁用，有能力时启用', () => {
+  coverageFixture()
+  const { createElement } = require('react')
+  const { renderToStaticMarkup } = require('react-dom/server')
+  const { MemoryRouter } = require('react-router-dom')
+  const { CustomersPage } = loadSource('src/apps/workbench/pages/CustomersPage.tsx')
+  const render = () => renderCurrentState(() => renderToStaticMarkup(createElement(MemoryRouter, null, createElement(CustomersPage))))
+  assert.match(buttonByText(render(), '封禁'), / disabled=""/)
+  store.setState({ roles: current().roles.map(role => role.id === 'role_cs' ? { ...role, caps: [...role.caps, 'moderate_customers'] } : role) })
+  assert.doesNotMatch(buttonByText(render(), '封禁'), / disabled=/)
+})
+
+test('权限兜底界面：全员禁言和慢速模式与动作层统一使用修改群信息权限', () => {
+  const fixture = groupPermissionFixture()
+  const group = current().chatGroups.find(item => item.id === fixture.groupId)
+  const render = permission => renderCurrentPage('src/apps/workbench/components/group/GroupSettingsPanel.tsx', 'GroupSettingsPanel', { group, actor: fixture.actor, officialEditable: false, perm: requested => requested === permission })
+  const denied = render('can_restrict_members')
+  assert.match(denied.match(/<button[^>]+role="switch"[^>]*>/)[0], / disabled=""/)
+  assert.match(denied.match(/<select[^>]*>/)[0], / disabled=""/)
+  const allowed = render('can_change_info')
+  assert.doesNotMatch(allowed.match(/<button[^>]+role="switch"[^>]*>/)[0], / disabled=/)
+  assert.doesNotMatch(allowed.match(/<select[^>]*>/)[0], / disabled=/)
+})
+
+test('权限兜底界面：没有群公告权限隐藏编辑入口，有权限显示；旧实操身份也不可用', () => {
+  const fixture = groupPermissionFixture()
+  const group = () => current().chatGroups.find(item => item.id === fixture.groupId)
+  const render = () => renderCurrentPage('src/apps/workbench/components/group/GroupAnnouncementPanel.tsx', 'GroupAnnouncementPanel', {
+    group: group(), actor: fixture.actor, perm: permission => policy.seatGroupPerm(current(), group(), fixture.actor.seatId, fixture.actor.staffId, permission),
+  })
+  assert.doesNotMatch(render(), />编辑<|>删除</)
+  store.setState({ chatGroups: current().chatGroups.map(item => item.id === fixture.groupId ? { ...item, admins: item.admins.map(admin => admin.memberId === fixture.actor.seatId ? { ...admin, perms: ['can_change_info'] } : admin) } : item) })
+  assert.doesNotMatch(buttonByText(render(), '编辑'), / disabled=/)
+  current().handoverSeat(fixture.actor.seatId, 'st_wang', '权限失效', 'st_admin')
+  assert.doesNotMatch(render(), />编辑<|>删除</)
+})
+
+test('权限兜底界面：后台无实操坐席时只读，分配自己的坐席后才能管理群', () => {
+  const { createElement } = require('react')
+  const { renderToStaticMarkup } = require('react-dom/server')
+  const { MemoryRouter, Routes, Route } = require('react-router-dom')
+  const { ChatGroupDetailPage } = loadSource('src/apps/admin/pages/ChatGroupDetailPage.tsx')
+  renderCurrentState(() => {
+    const render = () => renderToStaticMarkup(createElement(MemoryRouter, { initialEntries: ['/admin/groups/cg_community'] }, createElement(Routes, null, createElement(Route, { path: '/admin/groups/:groupId', element: createElement(ChatGroupDetailPage) }))))
+    const readonly = render()
+    assert.match(readonly, /只读：没有实操坐席/)
+    assert.doesNotMatch(readonly, />编辑<|>拉人<|以群主坐席身份/)
+    current().handoverSeat('seat_cs', 'st_admin', '后台群管理', 'st_admin')
+    const allowed = render()
+    assert.match(allowed, /当前实操坐席：/)
+    assert.doesNotMatch(buttonByText(allowed, '编辑'), / disabled=/)
+  })
+})
+
+function coverageFixture(change = {}) {
+  const conversation = dm()
+  const customer = current().customers.find(item => item.id === conversation.customerId)
+  store.setState({
+    customers: [{ ...customer, deletedAt: null, bannedAt: null, globalMutedUntil: null, mutedAllUntil: null, blockedSeatIds: [], ...change }],
+    customerSeats: [{ customerId: customer.id, seatId: 'seat_lin', primary: true }],
+    conversations: [conversation], messages: [], broadcasts: [],
+    enterprise: { ...current().enterprise, broadcastPerCustomerPerDay: 10, broadcastPerStaffPerDay: 100 },
+  })
+  return { customerId: customer.id, conversation, at: new Date().toISOString() }
+}
+
+function assertBroadcastParity(fixture, reason) {
+  const { planCoverage } = loadSource('src/domain/broadcastCoverage.ts')
+  const before = current()
+  const operatorId = before.seats.find(item => item.id === 'seat_lin')?.operatorStaffId ?? ''
+  const plan = planCoverage(before, ['seat_lin'], fixture.at)
+  assert.equal(rules.seatBroadcastSkipReason(before, fixture.conversation.id, 'seat_lin', operatorId, false, fixture.at), reason)
+  assert.equal(plan.skips[0]?.reason, reason)
+  assert.equal(plan.deliveries.length, reason ? 0 : 1)
+  if (reason) assert.equal(plan.skipReasons[reason], 1)
+  const single = current().sendBroadcast({ name: '单坐席验收', seatId: 'seat_lin', operatorId, targetKind: 'friends', targetDesc: '验收', text: '权限验收', customerIds: [fixture.customerId] })
+  const singleRecord = current().broadcasts[0]
+  store.setState(before)
+  const coverage = current().sendCoverageBroadcast({ name: '覆盖验收', seatIds: ['seat_lin'], operatorId: 'st_admin', text: '权限验收' })
+  assert.equal(coverage.sent, single.sent)
+  assert.equal(coverage.skipped, single.skipped)
+  assert.deepEqual({ ...current().broadcasts[0].skipReasons }, { ...singleRecord.skipReasons })
+  if (reason) {
+    assert.equal(singleRecord.skipReasons[reason], 1)
+    assert.equal(current().messages.length, before.messages.length)
+  }
+}
+
+for (const [label, change, reason] of [
+  ['正常', {}, undefined],
+  ['注销', { deletedAt: '2026-01-01T00:00:00.000Z' }, 'deleted'],
+  ['封禁', { bannedAt: '2026-01-01T00:00:00.000Z' }, 'banned'],
+  ['全部禁言', { globalMutedUntil: '9999-12-31T00:00:00.000Z' }, 'globalMuted'],
+  ['屏蔽坐席', { blockedSeatIds: ['seat_lin'] }, 'blocked'],
+  ['群聊禁言不影响私聊群发', { mutedAllUntil: '9999-12-31T00:00:00.000Z' }, undefined],
+]) {
+  test(`权限兜底：全覆盖与单坐席群发对${label}客户的投递和跳过原因一致`, () => {
+    assertBroadcastParity(coverageFixture(change), reason)
+  })
+}
+
+for (const stateChange of ['员工不存在', '员工停用', '坐席不存在', '没有会话', '没有会话且员工停用', '暂停接新', '禁止文本发送']) {
+  test(`权限兜底：全覆盖与单坐席群发在${stateChange}时一致`, () => {
+    const fixture = coverageFixture()
+    let reason = 'senderUnavailable'
+    if (stateChange.includes('员工不存在')) store.setState({ seats: current().seats.map(item => item.id === 'seat_lin' ? { ...item, operatorStaffId: 'missing' } : item) })
+    if (stateChange.includes('员工停用')) store.setState({ staff: current().staff.map(staff => staff.id === 'st_lin' ? { ...staff, status: 'disabled' } : staff) })
+    if (stateChange === '坐席不存在') store.setState({ seats: current().seats.filter(item => item.id !== 'seat_lin') })
+    if (stateChange.includes('没有会话')) {
+      store.setState({ conversations: [] })
+      if (stateChange === '没有会话') reason = 'left'
+    }
+    if (stateChange === '暂停接新') {
+      store.setState({ seats: current().seats.map(item => item.id === 'seat_lin' ? { ...item, status: 'paused' } : item) })
+      reason = undefined
+    }
+    if (stateChange === '禁止文本发送') {
+      store.setState({ policyItems: [...current().policyItems, { key: 'dm.send', label: '私聊发送', group: '私聊', level: 'P0' }], policyMatrix: { ...current().policyMatrix, 'dm.send': { staff: false, customer: true } } })
+      reason = 'muted'
+    }
+    assertBroadcastParity(fixture, reason)
+  })
+}
+
+test('权限兜底：覆盖优先主归属；主归属不可用时回退另一个可用坐席且只发一次', () => {
+  const fixture = coverageFixture()
+  const { planCoverage } = loadSource('src/domain/broadcastCoverage.ts')
+  store.setState({
+    customerSeats: [...current().customerSeats, { customerId: fixture.customerId, seatId: 'seat_chen', primary: false }, ...current().customerSeats],
+    conversations: [...current().conversations, { ...fixture.conversation, id: 'dm_fallback', seatId: 'seat_chen' }],
+  })
+  assert.equal(planCoverage(current(), ['seat_chen', 'seat_lin'], fixture.at).deliveries[0].seatId, 'seat_lin')
+  store.setState({ customers: current().customers.map(customer => ({ ...customer, blockedSeatIds: ['seat_lin'] })) })
+  const plan = planCoverage(current(), ['seat_lin', 'seat_chen'], fixture.at)
+  assert.equal(plan.deliveries.length, 1)
+  assert.equal(plan.deliveries[0].seatId, 'seat_chen')
+  assert.equal(plan.skips.length, 0)
+  const result = current().sendCoverageBroadcast({ name: '回退验收', seatIds: ['seat_lin', 'seat_chen'], operatorId: 'st_admin', text: '权限验收' })
+  assert.equal(result.sent, 1)
+  assert.equal(current().messages.length, 1)
+  assert.equal(current().messages[0].senderId, 'seat_chen')
+})
+
+test('权限兜底：所有覆盖坐席都不可用时记录优先候选原始原因，判断早于频控', () => {
+  const fixture = coverageFixture({ blockedSeatIds: ['seat_lin'] })
+  const { planCoverage } = loadSource('src/domain/broadcastCoverage.ts')
+  store.setState({
+    customerSeats: [...current().customerSeats, { customerId: fixture.customerId, seatId: 'seat_chen', primary: false }],
+    conversations: [...current().conversations, { ...fixture.conversation, id: 'dm_fallback', seatId: 'seat_chen' }],
+    staff: current().staff.map(staff => staff.id === 'st_chen' ? { ...staff, status: 'disabled' } : staff),
+    enterprise: { ...current().enterprise, broadcastPerCustomerPerDay: 0 },
+  })
+  const plan = planCoverage(current(), ['seat_chen', 'seat_lin'], fixture.at)
+  assert.equal(plan.deliveries.length, 0)
+  assert.equal(plan.skips[0].reason, 'blocked')
+  assert.equal(plan.skipReasons.blocked, 1)
+})
+
+test('权限兜底：覆盖预览按计划时刻判断禁言，到期可发且客户频控原因与单坐席一致', () => {
+  const fixture = coverageFixture({ globalMutedUntil: '2026-09-25T01:00:00.000Z' })
+  const { planCoverage } = loadSource('src/domain/broadcastCoverage.ts')
+  assert.equal(planCoverage(current(), ['seat_lin'], '2026-09-25T00:00:00.000Z').skips[0].reason, 'globalMuted')
+  assert.equal(planCoverage(current(), ['seat_lin'], '2026-09-25T02:00:00.000Z').deliveries.length, 1)
+  store.setState({ customers: current().customers.map(customer => ({ ...customer, globalMutedUntil: null })), enterprise: { ...current().enterprise, broadcastPerCustomerPerDay: 0 } })
+  const before = current()
+  assert.equal(planCoverage(before, ['seat_lin'], fixture.at).skips[0].reason, 'rateLimited')
+  current().sendBroadcast({ name: '频控验收', seatId: 'seat_lin', operatorId: 'st_lin', targetKind: 'friends', targetDesc: '验收', text: '权限验收', customerIds: [fixture.customerId] })
+  assert.equal(current().broadcasts[0].skipReasons.rateLimited, 1)
+  store.setState(before)
+  current().sendCoverageBroadcast({ name: '覆盖频控验收', seatIds: ['seat_lin'], operatorId: 'st_admin', text: '权限验收' })
+  assert.equal(current().broadcasts[0].skipReasons.rateLimited, 1)
+})
 test('坐席编辑不能绕过敏感词；失败保留正文与历史，不创建假修改', () => {
   const c = dm(), m = send(c.id, seat, '你好')
   const oldHits = current().sensitiveHits.length

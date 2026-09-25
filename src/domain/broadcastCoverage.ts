@@ -13,7 +13,7 @@
  * 预览说"触达 137 人"就一定发 137 条。
  */
 import type { Customer, DemoState } from './types'
-import { isGlobalMutedNow } from './customerStatus'
+import { seatBroadcastSkipReason } from './messageRules'
 
 /** 群发跳过原因：单坐席与多坐席覆盖共用，用于任务详情的可读统计。 */
 export type SkipReason = 'deleted' | 'banned' | 'globalMuted' | 'blocked' | 'left' | 'muted' | 'noPostingPermission' | 'noReachableSeat' | 'rateLimited' | 'senderUnavailable'
@@ -74,26 +74,20 @@ export function planCoverage(s: DemoState, seatIds: string[], at: string): Cover
   })
 
   s.customers.forEach((c) => {
-    if (c.deletedAt) return skipWith(c, 'deleted')
     const mine = reach.get(c.id)
     if (!mine?.length) return
-    if (c.bannedAt) return skipWith(c, 'banned')
-    if (isGlobalMutedNow(c, at)) return skipWith(c, 'globalMuted')
     const primaryId = s.customerSeats.find((cs) => cs.customerId === c.id && cs.primary)?.seatId
-    const candidates = mine
-      .filter((id) => !c.blockedSeatIds.includes(id))
+    const candidates = [...new Set(mine)]
       .map((id) => ({ id, conv: s.conversations.find((x) => x.kind === 'dm' && x.customerId === c.id && x.seatId === id) }))
-      .filter((x) => !!x.conv)
       .sort((a, b) => (a.id === primaryId ? -1 : b.id === primaryId ? 1 : (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0)))
-    if (!candidates.length) return skipWith(c, 'noReachableSeat')
+    const checked = candidates.map((candidate) => ({ candidate, reason: seatBroadcastSkipReason(s, candidate.conv?.id ?? '', candidate.id, s.seats.find((seat) => seat.id === candidate.id)?.operatorStaffId ?? '', false, at) }))
+    const available = checked.find((item) => !item.reason)
+    if (!available?.candidate.conv) return skipWith(c, checked[0]?.reason ?? 'noReachableSeat')
     if (broadcastsReceivedToday(s, c.id, today) >= perCustomerCap) return skipWith(c, 'rateLimited')
-    deliveries.push({ customer: c, seatId: candidates[0].id, convId: candidates[0].conv!.id })
+    deliveries.push({ customer: c, seatId: available.candidate.id, convId: available.candidate.conv.id })
   })
 
   function skipWith(c: Customer, reason: SkipReason) {
-    // 没加过任何所选坐席的客户不算"跳过"，他本来就不在这次的目标里；
-    // 只有够得到却发不出去的才进跳过清单，否则跳过数会变成一个没意义的大数字
-    if (reason === 'deleted' && !reach.has(c.id)) return
     skips.push({ customer: c, reason })
   }
 

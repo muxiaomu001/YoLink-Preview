@@ -33,6 +33,7 @@ export function JoinGroupModal({ c, open, onClose }: { c: Customer; open: boolea
   const join = () => {
     if (!picked) return
     const r = s.addGroupMembers(picked.id, [c.id], { seatId: seat.id, staffId: staff.id })
+    if ('reason' in r) return toast(r.reason, 'warn')
     if (r.added) toast(`已把「${c.nickname}」拉入「${picked.name}」`)
     else toast(`未拉入「${picked.name}」：${skipReason(s, picked, c)}`, 'warn')
     close()

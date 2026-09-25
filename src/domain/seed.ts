@@ -100,6 +100,7 @@ export const ENTERPRISE: Enterprise = {
 
 export const ALL_CAPS: Role['caps'] = [
   'manage_messages',
+  'moderate_customers',
   'view_all_conversations',
   'view_all_customers',
   'create_invite',
@@ -917,6 +918,7 @@ export function buildSeed(): DemoState {
     }
   }
   return {
+    customerModerationVersion: 1,
     enterprise: ENTERPRISE,
     roles: ROLES,
     staff: STAFF,

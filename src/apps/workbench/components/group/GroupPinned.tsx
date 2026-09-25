@@ -23,7 +23,8 @@ export function GroupPinned({ group: g, actor, perm, compact }: GroupPanelProps)
     if (!jumpToMessage(id)) toast('该消息不在当前聊天视图里', 'info')
   }
   const unpin = (id: string) => {
-    s.unpinMessage(g.id, id, actor)
+    const result = s.unpinMessage(g.id, id, actor)
+    if (result) return toast(result.reason, 'warn')
     toast('已取消置顶')
   }
 
