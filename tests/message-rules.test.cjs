@@ -352,6 +352,22 @@ const groupPermissionCases = [
 ]
 
 for (const [label, permission, invoke] of groupPermissionCases) {
+  test(`后台群管理：无坐席的超级管理员可以执行群${label}，日志记录员工本人`, () => {
+    const fixture = groupPermissionFixture()
+    const group = current().chatGroups.find(item => item.id === fixture.groupId)
+    assert.equal(current().seats.some(item => item.operatorStaffId === 'st_admin'), false)
+    const before = current()
+    const result = invoke({ ...fixture, actor: { seatId: '', staffId: 'st_admin', source: 'admin' } })
+    assert.notEqual(result?.ok, false)
+    assert.equal(current().audit.length, before.audit.length + 1)
+    assert.equal(current().audit[0].actorStaffId, 'st_admin')
+    assert.match(current().audit[0].detail, /管理员后台，以群主坐席/)
+    assert.equal(current().groupLogs.length, before.groupLogs.length + 1)
+    assert.equal(current().groupLogs[0].actorKind, 'staff')
+    assert.equal(current().groupLogs[0].actorId, 'st_admin')
+    assert.equal(current().groupLogs[0].actorSeatId, group.ownerSeatId)
+    assert.equal(current().groupLogs[0].actorSource, 'admin')
+  })
   test(`权限兜底：群${label}无对应权限时拒绝，数据、日志与审计均不变`, () => {
     const fixture = groupPermissionFixture([permission === 'can_pin_messages' ? 'can_invite_users' : 'can_pin_messages'])
     const before = current()
@@ -372,7 +388,7 @@ for (const [label, permission, invoke] of groupPermissionCases) {
   })
   test(`权限兜底：群${label}拒绝冒用坐席、无效员工和停用员工`, () => {
     const fixture = groupPermissionFixture([permission])
-    for (const staffId of ['st_admin', 'missing']) {
+    for (const staffId of ['st_wang', 'missing']) {
       const before = current()
       assert.equal(invoke({ ...fixture, actor: { ...fixture.actor, staffId } }).ok, false)
       assert.equal(current(), before)
@@ -383,6 +399,95 @@ for (const [label, permission, invoke] of groupPermissionCases) {
     assert.equal(current(), before)
   })
 }
+
+test('后台群管理：无坐席超级管理员改公告、移出成员，客户只看见群主坐席署名', () => {
+  const { g: group, conv, actor: customer } = groupContext()
+  const owner = current().seats.find(item => item.id === group.ownerSeatId)
+  const admin = current().staff.find(staff => staff.id === 'st_admin')
+  const by = { seatId: 'seat_cs', staffId: admin.id, source: 'admin' }
+  const before = current().messages.length
+  assert.equal(current().setGroupAnnouncement(group.id, { title: '后台公告', content: '验收内容', notify: true }, by), undefined)
+  assert.equal(current().chatGroups.find(item => item.id === group.id).announcement.bySeatId, owner.id)
+  assert.equal(current().kickGroupMember(group.id, customer.id, false, by), undefined)
+  assert.equal(current().chatGroups.find(item => item.id === group.id).memberCustomerIds.includes(customer.id), false)
+  const notifications = current().messages.slice(before)
+  assert.equal(notifications.length, 2)
+  assert.match(notifications[0].text, /修改了群公告：后台公告/)
+  assert.match(notifications[1].text, /移出群聊/)
+  for (const message of notifications) {
+    assert.equal(message.convId, conv.id)
+    assert.equal(message.kind, 'system')
+    assert.equal(message.seatId, owner.id)
+    assert.ok(message.text.startsWith(owner.displayName))
+    assert.equal(message.text.includes(admin.name), false)
+    assert.doesNotMatch(message.text, /员工|坐席|管理员后台/)
+  }
+  for (const entry of current().audit.slice(0, 2)) assert.equal(entry.actorStaffId, admin.id)
+  for (const entry of current().groupLogs.slice(0, 2)) assert.equal(entry.actorId, admin.id)
+  const html = renderCurrentPage('src/apps/workbench/components/group/GroupLogPanel.tsx', 'GroupLogPanel', { group, actor: by, perm: () => true })
+  assert.ok(html.includes(`${admin.name}（管理员后台，以群主坐席「${owner.displayName}」身份）`))
+})
+
+test('后台群管理：自定义角色撤销管理所有群后，无坐席员工从后台和工作台调用都拒绝且零写入', () => {
+  const fixture = groupPermissionFixture()
+  store.setState({
+    roles: [...current().roles, { id: 'role_group_test', name: '群管理测试', builtin: false, caps: ['manage_groups'] }],
+    staff: current().staff.map(staff => staff.id === 'st_wang' ? { ...staff, roleId: 'role_group_test' } : staff),
+  })
+  assert.equal(current().seats.some(item => item.operatorStaffId === 'st_wang'), false)
+  assert.equal(current().setGroupAnnouncement(fixture.groupId, null, { seatId: '', staffId: 'st_wang', source: 'admin' }), undefined)
+  store.setState({ roles: current().roles.map(role => role.id === 'role_group_test' ? { ...role, caps: [] } : role) })
+  for (const source of ['admin', 'workbench']) {
+    const actor = { seatId: current().chatGroups.find(item => item.id === fixture.groupId).ownerSeatId, staffId: 'st_wang', source }
+    const before = current()
+    for (const [, , invoke] of groupPermissionCases) {
+      const result = invoke({ ...fixture, actor })
+      assert.equal(result.ok, false)
+      assert.ok(result.reason)
+      assert.equal(current(), before)
+    }
+  }
+})
+
+test('后台群管理：停用或不存在的员工即使带管理身份也不能操作', () => {
+  const fixture = groupPermissionFixture()
+  store.setState({ staff: current().staff.map(staff => staff.id === 'st_admin' ? { ...staff, status: 'disabled' } : staff) })
+  for (const staffId of ['st_admin', 'missing']) {
+    const before = current()
+    for (const [, , invoke] of groupPermissionCases) {
+      assert.equal(invoke({ ...fixture, actor: { seatId: '', staffId, source: 'admin' } }).ok, false)
+      assert.equal(current(), before)
+    }
+  }
+})
+
+test('工作台群管理：管理所有群不受群内角色限制，有当前坐席用当前坐席，无坐席用群主', () => {
+  const fixture = groupPermissionFixture()
+  const group = current().chatGroups.find(item => item.id === fixture.groupId)
+  store.setState({
+    staff: current().staff.map(staff => staff.id === 'st_lin' || staff.id === 'st_wang' ? { ...staff, roleId: 'role_lead' } : staff),
+    chatGroups: current().chatGroups.map(item => item.id === group.id ? { ...item, memberSeatIds: [item.ownerSeatId], admins: [] } : item),
+  })
+  for (const [staffId, seatId, expectedSeatId] of [['st_lin', 'seat_lin', 'seat_lin'], ['st_wang', '', group.ownerSeatId]]) {
+    const by = { staffId, seatId, source: 'workbench' }
+    assert.equal(current().setGroupAnnouncement(group.id, { title: '跨群管理', content: '验收', notify: true }, by), undefined)
+    assert.equal(current().chatGroups.find(item => item.id === group.id).announcement.bySeatId, expectedSeatId)
+    const notice = current().messages.at(-1)
+    assert.equal(notice.seatId, expectedSeatId)
+    assert.ok(notice.text.startsWith(current().seats.find(item => item.id === expectedSeatId).displayName))
+    assert.equal(current().groupLogs[0].actorId, staffId)
+    assert.equal(current().groupLogs[0].actorSource, 'workbench')
+    assert.equal(current().audit[0].actorStaffId, staffId)
+  }
+})
+
+test('工作台群管理：管理所有群能力不允许借群主坐席发送普通聊天或群发', () => {
+  const { g: group, conv } = groupContext()
+  assert.equal(policy.seatGroupPerm(current(), group, group.ownerSeatId, 'st_admin', 'can_change_info'), true)
+  assert.equal(rules.actorCanView(current(), conv.id, { kind: 'seat', id: group.ownerSeatId, staffId: 'st_admin' }), false)
+  assert.equal(rules.seatBroadcastSkipReason(current(), conv.id, group.ownerSeatId, 'st_admin'), 'senderUnavailable')
+  assert.equal(current().queueChatMessage({ convId: conv.id, actor: { kind: 'seat', id: group.ownerSeatId, staffId: 'st_admin' }, text: '不应发出' }).ok, false)
+})
 
 test('权限兜底：群主与有管理所有群能力的真实实操员工允许；不存在的群或坐席拒绝', () => {
   const fixture = groupPermissionFixture()
@@ -709,21 +814,91 @@ test('权限兜底界面：没有群公告权限隐藏编辑入口，有权限�
   assert.doesNotMatch(render(), />编辑<|>删除</)
 })
 
-test('权限兜底界面：后台无实操坐席时只读，分配自己的坐席后才能管理群', () => {
+test('权限兜底界面：后台无管理所有群权限时只读，授权后无坐席也能管理群', () => {
   const { createElement } = require('react')
   const { renderToStaticMarkup } = require('react-dom/server')
   const { MemoryRouter, Routes, Route } = require('react-router-dom')
   const { ChatGroupDetailPage } = loadSource('src/apps/admin/pages/ChatGroupDetailPage.tsx')
+  store.setState({
+    roles: [...current().roles, { id: 'role_group_test', name: '群管理测试', builtin: false, caps: [] }],
+    staff: current().staff.map(staff => staff.id === 'st_wang' ? { ...staff, roleId: 'role_group_test' } : staff),
+    session: { ...current().session, adminStaffId: 'st_wang' },
+  })
   renderCurrentState(() => {
     const render = () => renderToStaticMarkup(createElement(MemoryRouter, { initialEntries: ['/admin/groups/cg_community'] }, createElement(Routes, null, createElement(Route, { path: '/admin/groups/:groupId', element: createElement(ChatGroupDetailPage) }))))
     const readonly = render()
-    assert.match(readonly, /只读：没有实操坐席/)
-    assert.doesNotMatch(readonly, />编辑<|>拉人<|以群主坐席身份/)
-    current().handoverSeat('seat_cs', 'st_admin', '后台群管理', 'st_admin')
+    assert.match(readonly, /只读：需要「管理所有群」权限/)
+    assert.doesNotMatch(readonly, />编辑<|>拉人</)
+    store.setState({ roles: current().roles.map(role => role.id === 'role_group_test' ? { ...role, caps: ['manage_groups'] } : role) })
     const allowed = render()
-    assert.match(allowed, /当前实操坐席：/)
+    assert.match(allowed, /以群主坐席「.*」的身份操作，操作记在你的名下/)
     assert.doesNotMatch(buttonByText(allowed, '编辑'), / disabled=/)
   })
+})
+
+test('后台群管理界面：超级管理员和管理员无坐席时对任意群都有管理入口', () => {
+  const { createElement } = require('react')
+  const { renderToStaticMarkup } = require('react-dom/server')
+  const { MemoryRouter, Routes, Route } = require('react-router-dom')
+  const { ChatGroupDetailPage } = loadSource('src/apps/admin/pages/ChatGroupDetailPage.tsx')
+  store.setState({ staff: current().staff.map(staff => staff.id === 'st_wang' ? { ...staff, roleId: 'role_admin' } : staff) })
+  for (const staffId of ['st_admin', 'st_wang']) {
+    assert.equal(current().seats.some(item => item.operatorStaffId === staffId), false)
+    store.setState({ session: { ...current().session, adminStaffId: staffId } })
+    for (const group of current().chatGroups) {
+      const html = renderCurrentState(() => renderToStaticMarkup(createElement(MemoryRouter, { initialEntries: [`/admin/groups/${group.id}`] }, createElement(Routes, null, createElement(Route, { path: '/admin/groups/:groupId', element: createElement(ChatGroupDetailPage) })))))
+      const ownerName = current().seats.find(item => item.id === group.ownerSeatId).displayName
+      assert.ok(html.includes(`以群主坐席「${ownerName}」的身份操作，操作记在你的名下`))
+      assert.doesNotMatch(html, /只读：|先分配坐席|当前员工没有实操坐席/)
+      assert.doesNotMatch(buttonByText(html, group.announcement ? '编辑' : '发布'), / disabled=/)
+    }
+  }
+})
+
+test('后台群管理界面：即使持有群主坐席，没有管理所有群能力也只能在后台只读', () => {
+  const fixture = groupPermissionFixture(['can_change_info'])
+  const { createElement } = require('react')
+  const { renderToStaticMarkup } = require('react-dom/server')
+  const { MemoryRouter, Routes, Route } = require('react-router-dom')
+  const { ChatGroupDetailPage } = loadSource('src/apps/admin/pages/ChatGroupDetailPage.tsx')
+  store.setState({
+    session: { ...current().session, adminStaffId: fixture.actor.staffId },
+    chatGroups: current().chatGroups.map(group => group.id === fixture.groupId ? { ...group, ownerSeatId: fixture.actor.seatId } : group),
+  })
+  const html = renderCurrentState(() => renderToStaticMarkup(createElement(MemoryRouter, { initialEntries: [`/admin/groups/${fixture.groupId}`] }, createElement(Routes, null, createElement(Route, { path: '/admin/groups/:groupId', element: createElement(ChatGroupDetailPage) })))))
+  assert.match(html, /只读：需要「管理所有群」权限/)
+  assert.doesNotMatch(html, />编辑<|>拉人<|群主（全部权限）/)
+  const before = current()
+  assert.equal(current().setGroupAnnouncement(fixture.groupId, null, { ...fixture.actor, source: 'admin' }).ok, false)
+  assert.equal(current(), before)
+  assert.equal(current().setGroupAnnouncement(fixture.groupId, null, { ...fixture.actor, source: 'workbench' }), undefined)
+})
+
+test('工作台群管理界面：无坐席管理员仍有入口，全部群可选并以群主坐席操作', () => {
+  store.setState({ session: { ...current().session, workbenchStaffId: 'st_admin', workbenchSeatId: null } })
+  const entry = renderCurrentPage('src/apps/workbench/components/group/AllGroupsManager.tsx', 'AllGroupsManager')
+  assert.doesNotMatch(buttonByText(entry, '管理群'), / disabled=/)
+  const panel = renderCurrentPage('src/apps/workbench/components/group/AllGroupsManager.tsx', 'AllGroupsPanel')
+  for (const group of current().chatGroups) assert.ok(panel.includes(`value="${group.id}"`))
+  assert.match(panel, /以群主坐席「.*」的身份操作，操作记在你的名下/)
+  store.setState({ session: { ...current().session, workbenchStaffId: 'st_wang', workbenchSeatId: null } })
+  const denied = renderCurrentPage('src/apps/workbench/components/group/AllGroupsManager.tsx', 'AllGroupsManager')
+  assert.doesNotMatch(denied, />管理群</)
+  assert.match(renderCurrentPage('src/apps/workbench/components/group/AllGroupsManager.tsx', 'AllGroupsPanel'), /需要「管理所有群」权限/)
+})
+
+test('工作台群管理界面：运营主管沿用当前坐席，可管理未加入群和查看置顶', () => {
+  const group = current().chatGroups.find(item => item.id === 'cg_community')
+  store.setState({
+    staff: current().staff.map(staff => staff.id === 'st_lin' ? { ...staff, roleId: 'role_lead' } : staff),
+    chatGroups: [{ ...group, ownerSeatId: 'seat_chen', memberSeatIds: ['seat_chen'], admins: [] }, ...current().chatGroups.filter(item => item.id !== group.id)],
+  })
+  const panel = renderCurrentPage('src/apps/workbench/components/group/AllGroupsManager.tsx', 'AllGroupsPanel')
+  const seatName = current().seats.find(item => item.id === 'seat_lin').displayName
+  assert.ok(panel.includes(`以当前坐席「${seatName}」的身份操作，操作记在你的名下`))
+  assert.doesNotMatch(buttonByText(panel, '编辑'), / disabled=/)
+  assert.doesNotMatch(buttonByText(panel, '取消'), / disabled=/)
+  assert.match(panel, /置顶消息（1）/)
 })
 
 function coverageFixture(change = {}) {

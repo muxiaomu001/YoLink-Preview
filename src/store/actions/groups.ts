@@ -5,7 +5,7 @@ import { messageShadow } from '@/domain/messageRules'
  * 所有动作记管理员日志（groupLogs，48 小时）与审计。
  */
 import { groupWelcomeMessages } from '@/domain/groupWelcome'
-import type { ChatGroup, ChatGroupKind, Conversation, GroupAdminPerm, GroupInviteLink, GroupLog, GroupMemberKind, GroupSettings, Message } from '@/domain/types'
+import type { AuditType, ChatGroup, ChatGroupKind, Conversation, GroupAdminPerm, GroupInviteLink, GroupLog, GroupMemberKind, GroupSettings, Message } from '@/domain/types'
 import { newId } from '@/domain/ids'
 import { groupDefaults } from '@/domain/seed-groups'
 import { groupCapacity, seatGroupPerm } from '../policy'
@@ -15,6 +15,7 @@ import { type Get, type Set, now, withAudit } from './helpers'
 export interface Actor {
   seatId: string
   staffId: string
+  source?: 'admin' | 'workbench'
 }
 
 export interface GroupActionDenied {
@@ -46,7 +47,18 @@ export interface GroupActions {
 }
 
 function log(groupId: string, by: Actor, action: string, detail: string): GroupLog {
-  return { id: newId('glog'), groupId, at: now(), actorKind: 'seat', actorId: by.seatId, action, detail }
+  return { id: newId('glog'), groupId, at: now(), actorKind: 'staff', actorId: by.staffId, actorSeatId: by.seatId, actorSource: by.source ?? 'workbench', action, detail }
+}
+
+function groupAudit(s: ReturnType<Get>, type: AuditType, detail: string, by: Actor) {
+  const seatName = s.seats.find((seat) => seat.id === by.seatId)?.displayName ?? '坐席'
+  const identity = by.source === 'admin' ? `管理员后台，以群主坐席「${seatName}」身份` : `工作台，以坐席「${seatName}」身份`
+  return withAudit(s.audit, type, `${detail}；${identity}`, by.staffId)
+}
+
+function systemMessage(s: ReturnType<Get>, convId: string, by: Actor, text: string, at: string): Message {
+  const seatName = s.seats.find((seat) => seat.id === by.seatId)?.displayName ?? '坐席'
+  return { id: newId('msg'), convId, senderKind: 'system', senderId: '', seatId: by.seatId, kind: 'system', text: `${seatName} ${text}`, at }
 }
 
 const PERM_LABEL: Record<GroupAdminPerm, string> = {
@@ -60,16 +72,19 @@ const PERM_LABEL: Record<GroupAdminPerm, string> = {
   can_post_messages: '频道发布',
 }
 
-function groupActionDenied(s: ReturnType<Get>, groupId: string, by: Actor, perm: GroupAdminPerm): GroupActionDenied | null {
+function authorizeGroupAction(s: ReturnType<Get>, groupId: string, by: Actor, perm: GroupAdminPerm): GroupActionDenied | { ok: true; actor: Actor } {
   const g = s.chatGroups.find((group) => group.id === groupId)
   if (!g) return { ok: false, reason: '群不存在' }
-  const seat = s.seats.find((x) => x.id === by.seatId)
-  if (!seat) return { ok: false, reason: '坐席不存在' }
   const staff = s.staff.find((x) => x.id === by.staffId)
   if (!staff || staff.status !== 'active') return { ok: false, reason: '实操员工不存在或已停用' }
-  if (seat.operatorStaffId !== by.staffId) return { ok: false, reason: '当前员工不是该坐席的实操员工' }
-  if (!seatGroupPerm(s, g, by.seatId, by.staffId, perm)) return { ok: false, reason: `当前坐席没有${PERM_LABEL[perm]}权限` }
-  return null
+  const canManage = s.roles.find((role) => role.id === staff.roleId)?.caps.includes('manage_groups') ?? false
+  if (by.source === 'admin' && !canManage) return { ok: false, reason: '需要「管理所有群」权限' }
+  const seatId = canManage && (by.source === 'admin' || !by.seatId) ? g.ownerSeatId : by.seatId
+  const seat = s.seats.find((candidate) => candidate.id === seatId)
+  if (!seat) return { ok: false, reason: '坐席不存在' }
+  if (!canManage && seat.operatorStaffId !== by.staffId) return { ok: false, reason: '当前员工不是该坐席的实操员工' }
+  if (!seatGroupPerm(s, g, seatId, by.staffId, perm)) return { ok: false, reason: `当前坐席没有${PERM_LABEL[perm]}权限` }
+  return { ok: true, actor: { ...by, seatId } }
 }
 
 function groupCode(): string {
@@ -107,14 +122,15 @@ export function groupActions(set: Set, get: Get): GroupActions {
         chatGroups: [...s.chatGroups, g],
         conversations: [...s.conversations, conv],
         groupLogs: [log(g.id, by, 'create', `创建${input.kind === 'channel' ? '频道' : '群'}「${input.name}」`), ...s.groupLogs],
-        audit: withAudit(s.audit, 'group.create', `以「${owner?.displayName}」身份创建${input.kind === 'channel' ? '频道' : '群'}「${input.name}」`, by.staffId),
+        audit: groupAudit(s, 'group.create', `以「${owner?.displayName}」身份创建${input.kind === 'channel' ? '频道' : '群'}「${input.name}」`, by),
       })
       return g
     },
 
     updateGroupSettings: (groupId, patch, by) => {
-      const denied = groupActionDenied(get(), groupId, by, 'can_change_info')
-      if (denied) return denied
+      const authorization = authorizeGroupAction(get(), groupId, by, 'can_change_info')
+      if (!authorization.ok) return authorization
+      by = authorization.actor
       return set((s) => {
         const g = s.chatGroups.find((x) => x.id === groupId)
         if (!g) return {}
@@ -127,51 +143,54 @@ export function groupActions(set: Set, get: Get): GroupActions {
         return {
           chatGroups: patchGroup(groupId, (x) => ({ ...x, settings: { ...x.settings, ...patch } }))(s.chatGroups),
           groupLogs: [log(groupId, by, 'setting', parts.join('；')), ...s.groupLogs],
-          audit: withAudit(s.audit, 'group.setting', `群「${g.name}」：${parts.join('；')}`, by.staffId),
+          audit: groupAudit(s, 'group.setting', `群「${g.name}」：${parts.join('；')}`, by),
         }
       })
     },
 
     setGroupAnnouncement: (groupId, input, by) => {
-      const denied = groupActionDenied(get(), groupId, by, 'can_change_info')
-      if (denied) return denied
+      const authorization = authorizeGroupAction(get(), groupId, by, 'can_change_info')
+      if (!authorization.ok) return authorization
+      by = authorization.actor
       return set((s) => {
         const g = s.chatGroups.find((x) => x.id === groupId)
         if (!g) return {}
         const conv = s.conversations.find((c) => c.chatGroupId === groupId)
         const at = now()
-        const sys: Message[] = input && input.notify && conv ? [{ id: newId('msg'), convId: conv.id, senderKind: 'system', senderId: '', kind: 'system', text: `群公告已更新：${input.title}`, at, mentionAll: true }] : []
+        const sys: Message[] = input && input.notify && conv ? [{ ...systemMessage(s, conv.id, by, `修改了群公告：${input.title}`, at), mentionAll: true }] : []
         return {
           chatGroups: patchGroup(groupId, (x) => ({ ...x, announcement: input ? { title: input.title, content: input.content, bySeatId: by.seatId, at, notified: input.notify } : null }))(s.chatGroups),
           messages: sys.length ? [...s.messages, ...sys] : s.messages,
           conversations: sys.length ? s.conversations.map((c) => (c.id === conv!.id ? { ...c, lastMessageAt: at } : c)) : s.conversations,
           groupLogs: [log(groupId, by, 'announcement', input ? `发布公告「${input.title}」${input.notify ? '，已通知全体成员' : ''}` : '删除公告'), ...s.groupLogs],
-          audit: withAudit(s.audit, 'group.announcement', `群「${g.name}」${input ? `发布公告「${input.title}」` : '删除公告'}`, by.staffId),
+          audit: groupAudit(s, 'group.announcement', `群「${g.name}」${input ? `发布公告「${input.title}」` : '删除公告'}`, by),
         }
       })
     },
 
     pinMessage: (groupId, messageId, notify, by) => {
-      const denied = groupActionDenied(get(), groupId, by, 'can_pin_messages')
-      if (denied) return denied
+      const authorization = authorizeGroupAction(get(), groupId, by, 'can_pin_messages')
+      if (!authorization.ok) return authorization
+      by = authorization.actor
       return set((s) => {
         const g = s.chatGroups.find((x) => x.id === groupId)
         const m = s.messages.find((x) => x.id === messageId)
         if (!g || !m || g.pinnedMessageIds.includes(messageId)) return {}
         const at = now()
-        const sys: Message[] = notify && !messageShadow(s, m).shadowedAt ? [{ id: newId('msg'), convId: m.convId, senderKind: 'system', senderId: '', kind: 'system', text: `置顶了一条消息：${m.text.slice(0, 30)}`, at, shadowSourceIds: [m.id] }] : []
+        const sys: Message[] = notify && !messageShadow(s, m).shadowedAt ? [{ ...systemMessage(s, m.convId, by, `置顶了一条消息：${m.text.slice(0, 30)}`, at), shadowSourceIds: [m.id] }] : []
         return {
           chatGroups: patchGroup(groupId, (x) => ({ ...x, pinnedMessageIds: [messageId, ...x.pinnedMessageIds] }))(s.chatGroups),
           messages: sys.length ? [...s.messages, ...sys] : s.messages,
           groupLogs: [log(groupId, by, 'pin', `置顶了「${m.text.slice(0, 30)}」`), ...s.groupLogs],
-          audit: withAudit(s.audit, 'group.pin', `群「${g.name}」置顶消息「${m.text.slice(0, 30)}」`, by.staffId),
+          audit: groupAudit(s, 'group.pin', `群「${g.name}」置顶消息「${m.text.slice(0, 30)}」`, by),
         }
       })
     },
 
     unpinMessage: (groupId, messageId, by) => {
-      const denied = groupActionDenied(get(), groupId, by, 'can_pin_messages')
-      if (denied) return denied
+      const authorization = authorizeGroupAction(get(), groupId, by, 'can_pin_messages')
+      if (!authorization.ok) return authorization
+      by = authorization.actor
       return set((s) => {
         const g = s.chatGroups.find((x) => x.id === groupId)
         const m = s.messages.find((x) => x.id === messageId)
@@ -179,7 +198,7 @@ export function groupActions(set: Set, get: Get): GroupActions {
         return {
           chatGroups: patchGroup(groupId, (x) => ({ ...x, pinnedMessageIds: x.pinnedMessageIds.filter((id) => id !== messageId) }))(s.chatGroups),
           groupLogs: [log(groupId, by, 'pin', `取消置顶「${m?.text.slice(0, 30) ?? ''}」`), ...s.groupLogs],
-          audit: withAudit(s.audit, 'group.pin', `群「${g.name}」取消置顶`, by.staffId),
+          audit: groupAudit(s, 'group.pin', `群「${g.name}」取消置顶`, by),
         }
       })
     },
@@ -187,8 +206,9 @@ export function groupActions(set: Set, get: Get): GroupActions {
     addGroupMembers: (groupId, customerIds, by) => {
       const s = get()
       const g = s.chatGroups.find((x) => x.id === groupId)
-      const denied = groupActionDenied(s, groupId, by, 'can_invite_users')
-      if (denied) return { added: 0, skipped: customerIds, ...denied }
+      const authorization = authorizeGroupAction(s, groupId, by, 'can_invite_users')
+      if (!authorization.ok) return { added: 0, skipped: customerIds, ...authorization }
+      by = authorization.actor
       if (!g) return { added: 0, skipped: customerIds }
       const cap = groupCapacity(s, g)
       const skipped: string[] = []
@@ -204,37 +224,41 @@ export function groupActions(set: Set, get: Get): GroupActions {
       const conv = s.conversations.find((c) => c.chatGroupId === groupId)
       const at = now()
       const names = toAdd.map((cid) => s.customers.find((x) => x.id === cid)?.nickname).filter(Boolean)
-      const sys: Message[] = conv ? [{ id: newId('msg'), convId: conv.id, senderKind: 'system', senderId: '', kind: 'system', text: `${names.slice(0, 3).join('、')}${names.length > 3 ? ` 等 ${names.length} 人` : ''} 加入了群聊`, at }] : []
+      const sys: Message[] = conv ? [systemMessage(s, conv.id, by, `邀请 ${names.slice(0, 3).join('、')}${names.length > 3 ? ` 等 ${names.length} 人` : ''} 加入了群聊`, at)] : []
       set({
         chatGroups: patchGroup(groupId, (x) => ({ ...x, memberCustomerIds: [...x.memberCustomerIds, ...toAdd] }))(s.chatGroups),
         messages: [...s.messages, ...sys, ...(conv?groupWelcomeMessages(g,conv.id,s.customers.filter((c)=>toAdd.includes(c.id)),at):[])],
         groupLogs: [log(groupId, by, 'member', `拉入 ${toAdd.length} 位客户${skipped.length ? `，跳过 ${skipped.length} 位（已在群、已满、被禁止再进或不满足头衔条件）` : ''}`), ...s.groupLogs],
-        audit: withAudit(s.audit, 'group.member', `往群「${g.name}」拉入 ${toAdd.length} 位客户`, by.staffId),
+        audit: groupAudit(s, 'group.member', `往群「${g.name}」拉入 ${toAdd.length} 位客户`, by),
       })
       return { added: toAdd.length, skipped }
     },
 
     kickGroupMember: (groupId, customerId, deleteMessages, by) => {
-      const denied = groupActionDenied(get(), groupId, by, 'can_restrict_members')
-      if (denied) return denied
+      const authorization = authorizeGroupAction(get(), groupId, by, 'can_restrict_members')
+      if (!authorization.ok) return authorization
+      by = authorization.actor
       return set((s) => {
         const g = s.chatGroups.find((x) => x.id === groupId)
         const c = s.customers.find((x) => x.id === customerId)
         if (!g || !c) return {}
         const conv = s.conversations.find((x) => x.chatGroupId === groupId)
         const at = now()
+        const messages = deleteMessages && conv ? s.messages.map((message) => (message.convId === conv.id && message.senderKind === 'customer' && message.senderId === customerId && !message.deletedAt ? { ...message, deletedAt: at } : message)) : s.messages
         return {
           chatGroups: patchGroup(groupId, (x) => ({ ...x, memberCustomerIds: x.memberCustomerIds.filter((id) => id !== customerId), admins: x.admins.filter((a) => !(a.memberKind === 'customer' && a.memberId === customerId)) }))(s.chatGroups),
-          messages: deleteMessages && conv ? s.messages.map((m) => (m.convId === conv.id && m.senderKind === 'customer' && m.senderId === customerId && !m.deletedAt ? { ...m, deletedAt: at } : m)) : s.messages,
+          messages: conv ? [...messages, systemMessage(s, conv.id, by, `将「${c.nickname}」移出群聊`, at)] : messages,
+          conversations: conv ? s.conversations.map((item) => item.id === conv.id ? { ...item, lastMessageAt: at } : item) : s.conversations,
           groupLogs: [log(groupId, by, 'member', `移出客户「${c.nickname}」${deleteMessages ? '，并删除其全部消息' : ''}`), ...s.groupLogs],
-          audit: withAudit(s.audit, 'group.member', `把「${c.nickname}」移出群「${g.name}」${deleteMessages ? '，删除其全部消息' : ''}`, by.staffId),
+          audit: groupAudit(s, 'group.member', `把「${c.nickname}」移出群「${g.name}」${deleteMessages ? '，删除其全部消息' : ''}`, by),
         }
       })
     },
 
     addGroupSeat: (groupId, seatId, by) => {
-      const denied = groupActionDenied(get(), groupId, by, 'can_invite_users')
-      if (denied) return denied
+      const authorization = authorizeGroupAction(get(), groupId, by, 'can_invite_users')
+      if (!authorization.ok) return authorization
+      by = authorization.actor
       return set((s) => {
         const g = s.chatGroups.find((x) => x.id === groupId)
         const seat = s.seats.find((x) => x.id === seatId)
@@ -242,14 +266,15 @@ export function groupActions(set: Set, get: Get): GroupActions {
         return {
           chatGroups: patchGroup(groupId, (x) => ({ ...x, memberSeatIds: [...x.memberSeatIds, seatId] }))(s.chatGroups),
           groupLogs: [log(groupId, by, 'member', `加入坐席「${seat.displayName}」`), ...s.groupLogs],
-          audit: withAudit(s.audit, 'group.member', `坐席「${seat.displayName}」加入群「${g.name}」`, by.staffId),
+          audit: groupAudit(s, 'group.member', `坐席「${seat.displayName}」加入群「${g.name}」`, by),
         }
       })
     },
 
     promoteGroupAdmin: (groupId, memberKind, memberId, perms, by) => {
-      const denied = groupActionDenied(get(), groupId, by, 'can_promote_members')
-      if (denied) return denied
+      const authorization = authorizeGroupAction(get(), groupId, by, 'can_promote_members')
+      if (!authorization.ok) return authorization
+      by = authorization.actor
       return set((s) => {
         const g = s.chatGroups.find((x) => x.id === groupId)
         if (!g || (memberKind === 'seat' && g.ownerSeatId === memberId)) return {}
@@ -261,14 +286,15 @@ export function groupActions(set: Set, get: Get): GroupActions {
         return {
           chatGroups: patchGroup(groupId, (x) => ({ ...x, admins: existed ? x.admins.map((a) => (a.memberKind === memberKind && a.memberId === memberId ? { ...a, perms } : a)) : [...x.admins, entry] }))(s.chatGroups),
           groupLogs: [log(groupId, by, 'admin', detail), ...s.groupLogs],
-          audit: withAudit(s.audit, 'group.admin', `群「${g.name}」${detail}`, by.staffId),
+          audit: groupAudit(s, 'group.admin', `群「${g.name}」${detail}`, by),
         }
       })
     },
 
     demoteGroupAdmin: (groupId, memberKind, memberId, by) => {
-      const denied = groupActionDenied(get(), groupId, by, 'can_promote_members')
-      if (denied) return denied
+      const authorization = authorizeGroupAction(get(), groupId, by, 'can_promote_members')
+      if (!authorization.ok) return authorization
+      by = authorization.actor
       return set((s) => {
         const g = s.chatGroups.find((x) => x.id === groupId)
         if (!g) return {}
@@ -276,14 +302,15 @@ export function groupActions(set: Set, get: Get): GroupActions {
         return {
           chatGroups: patchGroup(groupId, (x) => ({ ...x, admins: x.admins.filter((a) => !(a.memberKind === memberKind && a.memberId === memberId)) }))(s.chatGroups),
           groupLogs: [log(groupId, by, 'admin', `撤销管理员「${name}」`), ...s.groupLogs],
-          audit: withAudit(s.audit, 'group.admin', `群「${g.name}」撤销管理员「${name}」`, by.staffId),
+          audit: groupAudit(s, 'group.admin', `群「${g.name}」撤销管理员「${name}」`, by),
         }
       })
     },
 
     restrictGroupMember: (groupId, customerId, kind, hours, reason, by) => {
-      const denied = groupActionDenied(get(), groupId, by, 'can_restrict_members')
-      if (denied) return denied
+      const authorization = authorizeGroupAction(get(), groupId, by, 'can_restrict_members')
+      if (!authorization.ok) return authorization
+      by = authorization.actor
       return set((s) => {
         const g = s.chatGroups.find((x) => x.id === groupId)
         const c = s.customers.find((x) => x.id === customerId)
@@ -291,6 +318,7 @@ export function groupActions(set: Set, get: Get): GroupActions {
         const at = now()
         const until = hours == null ? null : new Date(Date.now() + hours * 3600000).toISOString()
         const detail = `${kind === 'ban' ? '移出并禁止再进' : '禁言'}客户「${c.nickname}」${hours == null ? '（永久）' : `${hours} 小时`}${reason ? `：${reason}` : ''}`
+        const conv = kind === 'ban' ? s.conversations.find((conversation) => conversation.chatGroupId === groupId) : undefined
         return {
           chatGroups: patchGroup(groupId, (x) => ({
             ...x,
@@ -299,15 +327,18 @@ export function groupActions(set: Set, get: Get): GroupActions {
             memberCustomerIds: kind === 'ban' ? x.memberCustomerIds.filter((id) => id !== customerId) : x.memberCustomerIds,
             admins: kind === 'ban' ? x.admins.filter((a) => !(a.memberKind === 'customer' && a.memberId === customerId)) : x.admins,
           }))(s.chatGroups),
+          messages: conv ? [...s.messages, systemMessage(s, conv.id, by, `将「${c.nickname}」移出群聊并禁止再进`, at)] : s.messages,
+          conversations: conv ? s.conversations.map((item) => item.id === conv.id ? { ...item, lastMessageAt: at } : item) : s.conversations,
           groupLogs: [log(groupId, by, 'restrict', detail), ...s.groupLogs],
-          audit: withAudit(s.audit, 'group.restrict', `群「${g.name}」${detail}`, by.staffId),
+          audit: groupAudit(s, 'group.restrict', `群「${g.name}」${detail}`, by),
         }
       })
     },
 
     liftGroupRestriction: (groupId, customerId, by) => {
-      const denied = groupActionDenied(get(), groupId, by, 'can_restrict_members')
-      if (denied) return denied
+      const authorization = authorizeGroupAction(get(), groupId, by, 'can_restrict_members')
+      if (!authorization.ok) return authorization
+      by = authorization.actor
       return set((s) => {
         const g = s.chatGroups.find((x) => x.id === groupId)
         const c = s.customers.find((x) => x.id === customerId)
@@ -316,7 +347,7 @@ export function groupActions(set: Set, get: Get): GroupActions {
         return {
           chatGroups: patchGroup(groupId, (x) => ({ ...x, restrictions: x.restrictions.filter((y) => y.customerId !== customerId) }))(s.chatGroups),
           groupLogs: [log(groupId, by, 'restrict', `${r?.kind === 'ban' ? '解除禁止' : '解除禁言'}：客户「${c.nickname}」${r?.kind === 'ban' ? '（不会自动回群，可通过链接加入）' : ''}`), ...s.groupLogs],
-          audit: withAudit(s.audit, 'group.restrict', `群「${g.name}」${r?.kind === 'ban' ? '解除禁止' : '解除禁言'}：客户「${c.nickname}」`, by.staffId),
+          audit: groupAudit(s, 'group.restrict', `群「${g.name}」${r?.kind === 'ban' ? '解除禁止' : '解除禁言'}：客户「${c.nickname}」`, by),
         }
       })
     },
@@ -324,21 +355,23 @@ export function groupActions(set: Set, get: Get): GroupActions {
     createGroupInviteLink: (groupId, input, by) => {
       const s = get()
       const g = s.chatGroups.find((x) => x.id === groupId)
-      const denied = groupActionDenied(s, groupId, by, 'can_invite_users')
-      if (denied) return denied
+      const authorization = authorizeGroupAction(s, groupId, by, 'can_invite_users')
+      if (!authorization.ok) return authorization
+      by = authorization.actor
       if (!g) return { ok: false, reason: '群不存在' }
       const link: GroupInviteLink = { id: newId('glink'), name: input.name, code: groupCode(), main: false, expiresAt: input.expiresAt, maxUses: input.maxUses, uses: 0, status: 'active', bySeatId: by.seatId, createdAt: now() }
       set({
         chatGroups: patchGroup(groupId, (x) => ({ ...x, inviteLinks: [...x.inviteLinks, link] }))(s.chatGroups),
         groupLogs: [log(groupId, by, 'invite_link', `生成附加链接「${input.name}」`), ...s.groupLogs],
-        audit: withAudit(s.audit, 'group.invite_link', `群「${g.name}」生成附加链接「${input.name}」`, by.staffId),
+        audit: groupAudit(s, 'group.invite_link', `群「${g.name}」生成附加链接「${input.name}」`, by),
       })
       return link
     },
 
     revokeGroupInviteLink: (groupId, linkId, by) => {
-      const denied = groupActionDenied(get(), groupId, by, 'can_invite_users')
-      if (denied) return denied
+      const authorization = authorizeGroupAction(get(), groupId, by, 'can_invite_users')
+      if (!authorization.ok) return authorization
+      by = authorization.actor
       return set((s) => {
         const g = s.chatGroups.find((x) => x.id === groupId)
         const l = g?.inviteLinks.find((x) => x.id === linkId)
@@ -346,14 +379,15 @@ export function groupActions(set: Set, get: Get): GroupActions {
         return {
           chatGroups: patchGroup(groupId, (x) => ({ ...x, inviteLinks: x.inviteLinks.map((y) => (y.id === linkId ? { ...y, status: 'revoked' as const } : y)) }))(s.chatGroups),
           groupLogs: [log(groupId, by, 'invite_link', `撤销链接「${l.name}」`), ...s.groupLogs],
-          audit: withAudit(s.audit, 'group.invite_link', `群「${g.name}」撤销链接「${l.name}」`, by.staffId),
+          audit: groupAudit(s, 'group.invite_link', `群「${g.name}」撤销链接「${l.name}」`, by),
         }
       })
     },
 
     regenerateGroupMainLink: (groupId, by) => {
-      const denied = groupActionDenied(get(), groupId, by, 'can_invite_users')
-      if (denied) return denied
+      const authorization = authorizeGroupAction(get(), groupId, by, 'can_invite_users')
+      if (!authorization.ok) return authorization
+      by = authorization.actor
       return set((s) => {
         const g = s.chatGroups.find((x) => x.id === groupId)
         if (!g) return {}
@@ -361,7 +395,7 @@ export function groupActions(set: Set, get: Get): GroupActions {
         return {
           chatGroups: patchGroup(groupId, (x) => ({ ...x, inviteLinks: [fresh, ...x.inviteLinks.map((y) => (y.main ? { ...y, status: 'revoked' as const, main: false } : y))] }))(s.chatGroups),
           groupLogs: [log(groupId, by, 'invite_link', '撤销并重新生成主链接'), ...s.groupLogs],
-          audit: withAudit(s.audit, 'group.invite_link', `群「${g.name}」重新生成主链接`, by.staffId),
+          audit: groupAudit(s, 'group.invite_link', `群「${g.name}」重新生成主链接`, by),
         }
       })
     },

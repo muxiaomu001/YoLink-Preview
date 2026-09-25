@@ -433,8 +433,10 @@ export interface GroupLog {
   id: string
   groupId: string
   at: ISODate
-  actorKind: GroupMemberKind | 'system'
+  actorKind: GroupMemberKind | 'staff' | 'system'
   actorId: string
+  actorSeatId?: string
+  actorSource?: 'admin' | 'workbench'
   /** 操作类型，如 setting / member / admin / pin / announcement / delete_message / restrict */
   action: string
   detail: string

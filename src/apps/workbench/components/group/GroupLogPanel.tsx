@@ -4,7 +4,7 @@
 import { useMemo, useState } from 'react'
 import { fmtAgo } from '@/domain/time'
 import { useStore } from '@/store/store'
-import { customerById, seatById } from '@/store/selectors'
+import { customerById, seatById, staffById } from '@/store/selectors'
 import { Pill } from '@/ui/display'
 import { Select } from '@/ui/primitives'
 import { Section, type GroupPanelProps } from './shared'
@@ -33,6 +33,11 @@ export function GroupLogPanel({ group: g, compact }: GroupPanelProps) {
   const visible = logs.filter((l) => action === 'all' || l.action === action)
 
   const actorName = (l: (typeof logs)[number]) => {
+    if (l.actorKind === 'staff') {
+      const staffName = staffById(s, l.actorId)?.name ?? '员工'
+      const seatName = seatById(s, l.actorSeatId)?.displayName ?? '坐席'
+      return l.actorSource === 'admin' ? `${staffName}（管理员后台，以群主坐席「${seatName}」身份）` : `${staffName}（工作台，以坐席「${seatName}」身份）`
+    }
     if (l.actorKind === 'seat') return seatById(s, l.actorId)?.displayName ?? '坐席'
     if (l.actorKind === 'customer') return customerById(s, l.actorId)?.nickname ?? '客户'
     return '系统'

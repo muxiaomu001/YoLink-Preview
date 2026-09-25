@@ -131,7 +131,7 @@ function CreateGroupModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
   const submit = () => {
     if (!ok) return
-    const g = s.createChatGroup({ name: name.trim(), desc: desc.trim(), kind, ownerSeatId, requiredTitleId: titleId || null, maxMembers: maxNum }, { seatId: ownerSeatId, staffId: admin })
+    const g = s.createChatGroup({ name: name.trim(), desc: desc.trim(), kind, ownerSeatId, requiredTitleId: titleId || null, maxMembers: maxNum }, { seatId: ownerSeatId, staffId: admin, source: 'admin' })
     toast(`已创建${kind === 'channel' ? '频道' : '群'}「${g.name}」，主链接已生成`)
     onClose()
     onCreated(g.id)

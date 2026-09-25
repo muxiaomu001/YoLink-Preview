@@ -4,7 +4,7 @@ import type { ChatGroup } from '@/domain/types'
 import { fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { seatGroupPerm, senderName, visibleText } from '@/store/policy'
-import { messagesOf } from '@/store/selectors'
+import { messagesOf, staffHasCap } from '@/store/selectors'
 import { Card, Empty, Note, PageHeader, Pill } from '@/ui/display'
 import { GroupCard } from '@/apps/workbench/components/group/GroupCard'
 
@@ -13,8 +13,7 @@ export function ChatGroupDetailPage() {
   const s = useStore()
   const admin = s.session.adminStaffId!
   const group = s.chatGroups.find((g) => g.id === groupId)
-  const ownSeats = s.seats.filter((seat) => seat.operatorStaffId === admin)
-  const actorSeat = ownSeats.find((seat) => seat.id === group?.ownerSeatId) ?? ownSeats.find((seat) => group?.memberSeatIds.includes(seat.id)) ?? ownSeats[0]
+  const canManage = s.staff.some((staff) => staff.id === admin && staff.status === 'active') && staffHasCap(s, admin, 'manage_groups')
 
   if (!group) {
     return (
@@ -24,15 +23,17 @@ export function ChatGroupDetailPage() {
       </div>
     )
   }
+  const ownerName = s.seats.find((seat) => seat.id === group.ownerSeatId)?.displayName ?? '群主坐席'
+  const identityNote = canManage ? `以群主坐席「${ownerName}」的身份操作，操作记在你的名下` : '只读：需要「管理所有群」权限'
   return (
     <div>
       <BackLink />
-      <PageHeader title={`群管理：${group.name}`} desc="群管理按当前实操员工与坐席权限判断。" />
+      <PageHeader title={`群管理：${group.name}`} desc="有「管理所有群」权限的员工可管理任何群，不需要持有坐席。" />
       <Note>
-        {actorSeat ? `当前以自己实操的坐席「${actorSeat.displayName}」操作；员工角色有「管理所有群」时，不受群内角色限制。` : '当前员工没有实操坐席，群管理只读。请先分配坐席或通过交接接手坐席。'}
+        {identityNote}
       </Note>
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-        <GroupCard key={group.id} group={group} actor={{ seatId: actorSeat?.id ?? '', staffId: admin }} perm={(permission) => seatGroupPerm(s, group, actorSeat?.id ?? '', admin, permission)} officialEditable canViewAllCustomers identityNote={actorSeat ? `当前实操坐席：${actorSeat.displayName}` : '只读：没有实操坐席'} />
+        <GroupCard key={group.id} group={group} actor={{ seatId: group.ownerSeatId, staffId: admin, source: 'admin' }} perm={(permission) => canManage && seatGroupPerm(s, group, group.ownerSeatId, admin, permission)} officialEditable={canManage} canViewAllCustomers identityNote={identityNote} />
         <div className="xl:sticky xl:top-4 xl:self-start">
           <RecentMessagesCard group={group} />
         </div>

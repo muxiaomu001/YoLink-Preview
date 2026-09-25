@@ -33,7 +33,7 @@ function GroupFullCard({ group, actor, perm, officialEditable = false, canViewAl
   const role = groupRoleOf(group, 'seat', actor.seatId)
   const granted = PERM_META.filter((p) => perm(p.key))
   const allGranted = granted.length === PERM_META.length
-  const roleText = role === 'owner' ? '群主（全部权限）' : role === 'admin' ? `管理员（权限：${granted.map((p) => p.label).join('、') || '无'}）` : role === 'member' ? (allGranted ? '成员，但员工角色有「管理所有群」，拥有全部权限' : '成员（没有管理权限）') : allGranted ? '不在群里，以管理身份操作（全部权限）' : '不在群里'
+  const roleText = !granted.length ? '只读（没有管理权限）' : role === 'owner' ? '群主（全部权限）' : role === 'admin' ? `管理员（权限：${granted.map((p) => p.label).join('、') || '无'}）` : role === 'member' ? (allGranted ? '成员，但员工角色有「管理所有群」，拥有全部权限' : '成员（没有管理权限）') : allGranted ? '不在群里，以管理身份操作（全部权限）' : '不在群里'
   const panel = { group, actor, perm, compact: false }
 
   return (
