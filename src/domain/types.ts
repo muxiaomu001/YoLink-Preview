@@ -17,6 +17,7 @@ export type ISODate = string
 /** 员工角色能力键（工作台与管理后台功能，作用在员工上） */
 export type Capability =
   | 'manage_messages'
+  | 'moderate_customers'
   | 'view_all_conversations'
   | 'view_all_customers'
   | 'create_invite'
@@ -452,8 +453,10 @@ export interface GroupLog {
   id: string
   groupId: string
   at: ISODate
-  actorKind: GroupMemberKind | 'system'
+  actorKind: GroupMemberKind | 'staff' | 'system'
   actorId: string
+  actorSeatId?: string
+  actorSource?: 'admin' | 'workbench'
   /** 操作类型，如 setting / member / admin / pin / announcement / delete_message / restrict */
   action: string
   detail: string
@@ -1195,6 +1198,7 @@ export interface DemoState {
   chatDrafts?: Record<string, ChatDraft>
   failNextSend?: boolean
   chatRulesVersion?: number
+  customerModerationVersion?: number
   enterprise: Enterprise
   roles: Role[]
   staff: Staff[]

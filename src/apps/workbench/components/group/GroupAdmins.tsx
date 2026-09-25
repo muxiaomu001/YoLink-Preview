@@ -34,7 +34,8 @@ export function GroupAdmins({ group: g, actor, perm, compact }: GroupPanelProps)
     .filter((x) => !!x)
 
   const demote = (t: Target) => {
-    s.demoteGroupAdmin(g.id, t.kind, t.id, actor)
+    const result = s.demoteGroupAdmin(g.id, t.kind, t.id, actor)
+    if (result) return toast(result.reason, 'warn')
     toast(`已撤销「${t.name}」的管理员`)
   }
 

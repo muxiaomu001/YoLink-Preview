@@ -17,6 +17,7 @@ import { ChatArea, type ChatAreaHandle } from '../components/ChatArea'
 import { sendBlockReason } from '../components/ChatArea.shared'
 import { CustomerCard } from '../components/CustomerCard'
 import { GroupCard } from '../components/group/GroupCard'
+import { AllGroupsManager } from '../components/group/AllGroupsManager'
 import { ResizeHandle } from '../components/layout/ResizeHandle'
 import { QuickReplyPanel } from '../components/quick-replies/QuickReplyPanel'
 import type { QuickReplyTarget } from '../components/quick-replies/shared'
@@ -97,7 +98,7 @@ export function ChatPage() {
   }, [setRightOpen, setRightTab])
 
   if (!seat || !staff) {
-    return <Empty className="h-full" text="当前员工没有持有任何坐席。让管理员在「坐席」页把一个坐席交接给他，这里就会出现会话。" />
+    return <div className="p-5"><AllGroupsManager /><Empty text="当前员工没有持有任何坐席。让管理员在「坐席」页把一个坐席交接给他，这里就会出现会话。" /></div>
   }
   const currentGroup = current && current.conv.kind !== 'dm' ? s.chatGroups.find((g) => g.id === current.conv.chatGroupId) : undefined
   const noFilter = activeFilterCount(filters) === 0 && !filters.q.trim()
@@ -115,6 +116,7 @@ export function ChatPage() {
     <div className="flex h-full">
       {/* 左：会话列表 */}
       <aside className="flex shrink-0 flex-col border-r border-zinc-200 bg-white" style={{ width: leftW }}>
+        {can('manage_groups') && <div className="border-b border-zinc-200 px-3 py-2"><AllGroupsManager /></div>}
         <div className="grid grid-cols-3 border-b border-zinc-200">
           {VIEWS.map((v) => (
             <button

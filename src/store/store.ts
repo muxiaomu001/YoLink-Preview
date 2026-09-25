@@ -125,8 +125,8 @@ export interface CoreActions {
   revokeInviteLink: (id: string, byStaffId: string) => void
   // 管理后台
   createSeat: (input: Omit<Seat, 'id' | 'createdAt' | 'avatarText' | 'avatarColor'> & { avatarColor?: string }, byStaffId: string) => Seat | null
-  updateSeat: (id: string, patch: Partial<Seat>, byStaffId: string) => void
-  handoverSeat: (seatId: string, toStaffId: string, reason: string, byStaffId: string) => void
+  updateSeat: (id: string, patch: Partial<Seat>, byStaffId: string) => string | null
+  handoverSeat: (seatId: string, toStaffId: string, reason: string, byStaffId: string) => string | null
   createStaff: (input: { name: string; username: string; email?: string; roleId: string; withSeat: boolean; roleDesc?: string; assignSeatIds?: string[]; mustChangePassword?: boolean }, byStaffId: string) => Staff
   updateRoleCaps: (roleId: string, caps: Capability[]) => void
   /** code 留空则随机生成 */
@@ -409,7 +409,7 @@ export const useStore = create<DemoStore>()(
           if (!conv) {
             skip('left')
           } else {
-            const block = seatBroadcastSkipReason(s, conv.id, input.seatId, input.operatorId, input.contentKind !== 'text')
+            const block = seatBroadcastSkipReason(s, conv.id, input.seatId, input.operatorId, (input.contentKind ?? 'text') !== 'text', at)
             if (block) {
               skip(block)
             } else {
@@ -421,13 +421,9 @@ export const useStore = create<DemoStore>()(
           // 频控二：每客户每天最多收到的群发条数，跨坐席、跨任务合并
           input.customerIds.forEach((cid) => {
             const conv = convs.find((x) => x.kind === 'dm' && x.customerId === cid && x.seatId === input.seatId)
-            if (!conv) {
-              skip('left')
-              return
-            }
-            const block = seatBroadcastSkipReason(s, conv.id, input.seatId, input.operatorId, input.contentKind !== 'text')
-            if (block) {
-              skip(block)
+            const block = seatBroadcastSkipReason(s, conv?.id ?? '', input.seatId, input.operatorId, (input.contentKind ?? 'text') !== 'text', at)
+            if (block || !conv) {
+              skip(block ?? 'left')
               return
             }
             const receivedToday = s.messages.filter((m) => m.senderKind === 'seat' && m.at.slice(0, 10) === today && m.isBroadcast && s.conversations.find((x) => x.id === m.convId)?.customerId === cid).length
@@ -571,6 +567,7 @@ export const useStore = create<DemoStore>()(
 
       createSeat: (input, byStaffId) => {
         if (input.status !== 'accepting' && input.status !== 'paused') return null
+        if (!get().staff.some((x) => x.id === input.operatorStaffId && x.status === 'active')) return null
         const colors = ['#1f3b73', '#2f56ad', '#0f766e', '#b45309', '#7e22ce', '#be123c', '#0369a1']
         const seat: Seat = { ...input, id: newId('seat'), avatarText: input.displayName.slice(0, 1), avatarColor: input.avatarColor ?? colors[get().seats.length % colors.length], createdAt: now() }
         set((s) => ({ seats: [...s.seats, seat], audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'seat.create', detail: `创建坐席「${seat.displayName}」，实操员工：${s.staff.find((x) => x.id === seat.operatorStaffId)?.name ?? '无'}` }, ...s.audit] }))
@@ -580,21 +577,26 @@ export const useStore = create<DemoStore>()(
       updateSeat: (id, patch, byStaffId) => {
         const s = get()
         const seat = s.seats.find((x) => x.id === id)
-        if (!seat) return
-        if (patch.status !== undefined && patch.status !== 'accepting' && patch.status !== 'paused') return
+        if (!seat) return '坐席不存在'
+        if (Object.hasOwn(patch, 'operatorStaffId')) return '实操员工只能通过交接改变'
+        if (patch.status !== undefined && patch.status !== 'accepting' && patch.status !== 'paused') return '坐席状态只能是接新中或暂停接新'
         const type: AuditType = patch.status === 'paused' ? 'seat.pause' : 'seat.update'
         set({
           seats: s.seats.map((x) => (x.id === id ? { ...x, ...patch } : x)),
           audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type, detail: `修改坐席「${seat.displayName}」：${Object.keys(patch).join('、')}` }, ...s.audit],
         })
+        return null
       },
 
       handoverSeat: (seatId, toStaffId, reason, byStaffId) => {
         const s = get()
         const seat = s.seats.find((x) => x.id === seatId)
-        if (!seat) return
+        if (!seat) return '坐席不存在'
+        if (seat.operatorStaffId === toStaffId) return '不能交接给当前实操员工'
         const from = s.staff.find((x) => x.id === seat.operatorStaffId)
         const to = s.staff.find((x) => x.id === toStaffId)
+        if (!to) return '目标员工不存在'
+        if (to.status !== 'active') return '目标员工已停用，不能接手'
         const at = now()
         const workbenchStaffId = s.session.workbenchStaffId
         // 旧人正在以该坐席身份工作时，工作台立即失去该坐席
@@ -606,6 +608,7 @@ export const useStore = create<DemoStore>()(
           audit: [{ id: newId('au'), at, actorStaffId: byStaffId, type: 'seat.handover', detail: `坐席「${seat.displayName}」由 ${from?.name ?? '无'} 交接给 ${to?.name}；原因：${reason}` }, ...s.audit],
           session: loseSeat ? { ...s.session, workbenchSeatId: otherSeat?.id ?? null } : s.session,
         })
+        return null
       },
 
       createStaff: (input, byStaffId) => {
@@ -619,22 +622,16 @@ export const useStore = create<DemoStore>()(
           seats = [...seats, seat]
           notes.push(`同时创建同名坐席「${seat.displayName}」并指派`)
         }
-        // 指派已有坐席：等同一次交接，记入交接记录
-        const assign = (input.assignSeatIds ?? []).filter((id) => seats.some((x) => x.id === id))
-        const handovers = assign.map((seatId) => {
-          const seat = seats.find((x) => x.id === seatId)!
-          return { id: newId('ho'), seatId, fromStaffId: seat.operatorStaffId, toStaffId: staff.id, at: now(), byStaffId, reason: `创建员工 ${staff.name} 时指派` }
-        })
-        if (assign.length) {
-          seats = seats.map((x) => (assign.includes(x.id) ? { ...x, operatorStaffId: staff.id } : x))
-          notes.push(`指派已有坐席：${assign.map((id) => seats.find((x) => x.id === id)?.displayName).join('、')}`)
-        }
+        const assign = (input.assignSeatIds ?? []).filter((id) => seats.some((x) => x.id === id && x.operatorStaffId !== staff.id))
+        if (assign.length) notes.push(`指派已有坐席：${assign.map((id) => seats.find((x) => x.id === id)?.displayName).join('、')}`)
         if (!notes.length) notes.push('未创建同名坐席')
         set({
           staff: [...s.staff, staff],
           seats,
-          handovers: [...s.handovers, ...handovers],
           audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'staff.create', detail: `创建员工 ${staff.name}（角色：${s.roles.find((r) => r.id === input.roleId)?.name}），${notes.join('；')}`, ip: DEMO_IP }, ...s.audit],
+        })
+        assign.forEach((seatId) => {
+          get().handoverSeat(seatId, staff.id, `创建员工 ${staff.name} 时指派`, byStaffId)
         })
         return staff
       },
@@ -761,6 +758,8 @@ export const useStore = create<DemoStore>()(
         return {
           ...current,
           ...saved,
+          customerModerationVersion: 1,
+          roles: (saved.roles ?? current.roles).map((role) => !saved.customerModerationVersion && (role.id === 'role_super' || role.id === 'role_admin') && !role.caps.includes('moderate_customers') ? { ...role, caps: [...role.caps, 'moderate_customers' as const] } : role),
           enterprise: {
             ...current.enterprise,
             ...saved.enterprise,

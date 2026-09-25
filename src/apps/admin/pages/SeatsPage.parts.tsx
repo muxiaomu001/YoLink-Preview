@@ -20,7 +20,8 @@ export function HandoverModal({ seat, onClose }: { seat: Seat; onClose: () => vo
   const reasonOk = reason.trim().length >= 1 && reason.trim().length <= 128
   const submit = () => {
     if (!to || !reasonOk) return
-    s.handoverSeat(seat.id, to, reason.trim(), s.session.adminStaffId!)
+    const error = s.handoverSeat(seat.id, to, reason.trim(), s.session.adminStaffId!)
+    if (error) return toast(error, 'warn')
     toast(`「${seat.displayName}」已交接给 ${staffById(s, to)?.name}，客户侧无任何变化`)
     onClose()
   }
@@ -88,7 +89,7 @@ function validate(f: SeatForm): string | null {
   return null
 }
 
-export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => void }) {
+export function SeatEditModal({ seat, onClose, onHandover }: { seat?: Seat; onClose: () => void; onHandover?: () => void }) {
   const s = useStore()
   const admin = s.session.adminStaffId!
   const [form, setForm] = useState<SeatForm>({
@@ -105,16 +106,19 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
     const patch = {
       displayName: form.displayName.trim(),
       roleDesc: form.roleDesc.trim(),
-      operatorStaffId: form.operatorStaffId,
       welcome: form.welcome,
       customerDeletable: form.customerDeletable,
     }
     if (seat) {
-      s.updateSeat(seat.id, patch, admin)
+      const updateError = s.updateSeat(seat.id, patch, admin)
+      if (updateError) {
+        toast(updateError, 'warn')
+        return
+      }
       toast('坐席已更新')
     } else {
-      if (!s.createSeat({ ...patch, status: 'accepting' }, admin)) {
-        toast('坐席状态只能是接新中或暂停接新', 'warn')
+      if (!s.createSeat({ ...patch, operatorStaffId: form.operatorStaffId, status: 'accepting' }, admin)) {
+        toast('坐席必须由在职员工实操', 'warn')
         return
       }
       toast('坐席已创建。记得把它放进邀请组，否则新客户不会加到它')
@@ -143,18 +147,27 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
         <Field label="职能说明" hint="0 到 64 字，多个坐席时客户靠它判断该找谁">
           <Input value={form.roleDesc} maxLength={64} onChange={(e) => set('roleDesc', e.target.value)} placeholder="如：资深客户服务 · 全球资产配置" />
         </Field>
-        <Field label="实操员工" required hint="坐席必须有人实操">
-          <Select value={form.operatorStaffId} onChange={(e) => set('operatorStaffId', e.target.value)}>
-            <option value="">请选择实操员工</option>
-            {s.staff
-              .filter((x) => x.status === 'active')
-              .map((st) => (
-                <option key={st.id} value={st.id}>
-                  {st.name}
-                </option>
-              ))}
-          </Select>
-        </Field>
+        {seat ? (
+          <Field label="实操员工" hint="需要换人时请走交接，客户侧身份不变">
+            <div className="flex items-center justify-between rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+              <span className="text-sm text-zinc-800">{staffById(s, seat.operatorStaffId)?.name ?? '无'}</span>
+              <Button size="sm" variant="secondary" onClick={() => onHandover?.()}>交接</Button>
+            </div>
+          </Field>
+        ) : (
+          <Field label="实操员工" required hint="坐席必须有人实操">
+            <Select value={form.operatorStaffId} onChange={(e) => set('operatorStaffId', e.target.value)}>
+              <option value="">请选择实操员工</option>
+              {s.staff
+                .filter((x) => x.status === 'active')
+                .map((st) => (
+                  <option key={st.id} value={st.id}>
+                    {st.name}
+                  </option>
+                ))}
+            </Select>
+          </Field>
+        )}
         <Field label="欢迎语" hint="支持 {{customer.nickname}}、{{seat.name}}；留空则不发欢迎语">
           <Textarea rows={3} value={form.welcome} onChange={(e) => set('welcome', e.target.value)} />
         </Field>

@@ -7,6 +7,7 @@ import { Pin } from 'lucide-react'
 import { fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { senderName, visibleText } from '@/store/policy'
+import { staffHasCap } from '@/store/selectors'
 import { Button } from '@/ui/primitives'
 import { toast } from '@/ui/overlay'
 import { jumpToMessage } from './groupRules'
@@ -16,14 +17,15 @@ export function GroupPinned({ group: g, actor, perm, compact }: GroupPanelProps)
   const s = useStore()
   const canPin = perm('can_pin_messages')
   const manager=s.staff.find((x)=>x.id===actor.staffId)
-  const managementView=manager?.roleId==='role_super'||manager?.roleId==='role_admin'
+  const managementView=manager?.status==='active' && staffHasCap(s, actor.staffId, 'manage_groups')
   const list = g.pinnedMessageIds.map((id) => s.messages.find((m) => m.id === id)).filter((m):m is Message => !!m&&(managementView?!m.deletedAt:messageVisibleFor(s,m,{kind:'seat',id:actor.seatId,staffId:actor.staffId})))
 
   const jump = (id: string) => {
     if (!jumpToMessage(id)) toast('该消息不在当前聊天视图里', 'info')
   }
   const unpin = (id: string) => {
-    s.unpinMessage(g.id, id, actor)
+    const result = s.unpinMessage(g.id, id, actor)
+    if (result) return toast(result.reason, 'warn')
     toast('已取消置顶')
   }
 

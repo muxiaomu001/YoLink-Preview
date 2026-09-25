@@ -38,7 +38,8 @@ export function GroupsSection({ c, ctl }: SectionProps) {
   const kick = async (g: ChatGroup) => {
     const ok = await confirm({ title: `把「${c.nickname}」移出「${g.name}」？`, body: '群里会出现系统提示；之后可以再拉回来。', okText: '移出', danger: true })
     if (!ok) return
-    s.kickGroupMember(g.id, c.id, false, by)
+    const result = s.kickGroupMember(g.id, c.id, false, by)
+    if (result) return toast(result.reason, 'warn')
     toast(`已把「${c.nickname}」移出「${g.name}」`)
   }
 

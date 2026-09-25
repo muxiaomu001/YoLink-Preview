@@ -19,7 +19,8 @@ export function RestrictModal({ group: g, actor, customer: c, kind, onClose }: P
   const dur = RESTRICT_DURATIONS[idx]
   const isBan = kind === 'ban'
   const submit = () => {
-    s.restrictGroupMember(g.id, c.id, kind, dur.hours, reason.trim(), actor)
+    const result = s.restrictGroupMember(g.id, c.id, kind, dur.hours, reason.trim(), actor)
+    if (result) return toast(result.reason, 'warn')
     toast(isBan ? `已移出「${c.nickname}」并禁止再进（${dur.label}）；期间无法通过链接返回` : `已禁言「${c.nickname}」（${dur.label}）`, 'warn')
     onClose()
   }
@@ -46,7 +47,8 @@ export function KickModal({ group: g, actor, customer: c, onClose }: Pick<GroupP
   const s = useStore()
   const [purge, setPurge] = useState(false)
   const submit = () => {
-    s.kickGroupMember(g.id, c.id, purge, actor)
+    const result = s.kickGroupMember(g.id, c.id, purge, actor)
+    if (result) return toast(result.reason, 'warn')
     toast(`已把「${c.nickname}」移出「${g.name}」${purge ? '，并删除其全部消息' : ''}`, 'warn')
     onClose()
   }

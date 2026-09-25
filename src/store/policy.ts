@@ -99,8 +99,10 @@ export function groupPerm(g: ChatGroup, memberKind: GroupMemberKind, memberId: s
  */
 export function seatGroupPerm(s: DemoState, g: ChatGroup, seatId: string, staffId: string | null, perm: GroupAdminPerm): boolean {
   const st = s.staff.find((x) => x.id === staffId)
+  if (st?.status !== 'active') return false
   const role = s.roles.find((r) => r.id === st?.roleId)
   if (role?.caps.includes('manage_groups')) return true
+  if (!s.seats.some((seat) => seat.id === seatId && seat.operatorStaffId === staffId)) return false
   return groupPerm(g, 'seat', seatId, perm)
 }
 

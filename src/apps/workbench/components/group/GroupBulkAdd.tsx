@@ -65,6 +65,7 @@ export function GroupBulkAddModal({ group: g, actor, canViewAll, onClose }: Pick
       else seatsLeft -= 1
     })
     const res = s.addGroupMembers(g.id, ids, actor)
+    if ('reason' in res) return toast(res.reason, 'warn')
     const skipText = Object.entries(reasons).map(([k, v]) => `${k} ${v}`).join('、')
     toast(`拉入 ${res.added} 人${res.skipped.length ? `，跳过 ${res.skipped.length} 人（${skipText}）` : ''}`, res.added ? 'ok' : 'warn')
     onClose()

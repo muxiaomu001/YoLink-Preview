@@ -34,7 +34,7 @@ export function seatConversationAllowed(s: DemoState, convId: string, seatId: st
  * 坐席发送被拦的原因。聊天入口只需要真假值，群发还要把原因记到任务详情，
  * 因此两边都从这里取，不能各自再判断一套。
  */
-export function seatBroadcastSkipReason(s: DemoState, convId: string, seatId: string, staffId: string, media = false): SkipReason | undefined {
+export function seatBroadcastSkipReason(s: DemoState, convId: string, seatId: string, staffId: string, media = false, at = new Date().toISOString()): SkipReason | undefined {
   const seat = s.seats.find((x) => x.id === seatId && x.operatorStaffId === staffId)
   const staff = s.staff.find((x) => x.id === staffId && x.status === 'active')
   const conv = s.conversations.find((c) => c.id === convId)
@@ -45,7 +45,7 @@ export function seatBroadcastSkipReason(s: DemoState, convId: string, seatId: st
     if (!c) return 'left'
     if (c.deletedAt) return 'deleted'
     if (c.bannedAt) return 'banned'
-    if (isGlobalMutedNow(c)) return 'globalMuted'
+    if (isGlobalMutedNow(c, at)) return 'globalMuted'
     if (c.blockedSeatIds.includes(seatId)) return 'blocked'
     if (conv.seatId !== seatId) return 'left'
     return seatCan(s, seatId, media ? 'dm.send_media' : 'dm.send') ? undefined : 'muted'

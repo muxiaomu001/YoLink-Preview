@@ -25,7 +25,8 @@ export function GroupAnnouncementPanel({ group: g, actor, perm, compact }: Group
   const remove = async () => {
     const ok = await confirm({ title: '删除群公告？', body: '删除后新成员入群不再看到公告弹窗；已发出的系统消息不撤回。', okText: '删除', danger: true })
     if (!ok) return
-    s.setGroupAnnouncement(g.id, null, actor)
+    const result = s.setGroupAnnouncement(g.id, null, actor)
+    if (result) return toast(result.reason, 'warn')
     toast('群公告已删除')
   }
 
@@ -65,7 +66,8 @@ function AnnouncementModal({ group: g, actor, onClose }: Pick<GroupPanelProps, '
   const titleOk = title.trim().length > 0 && title.trim().length <= TITLE_MAX
   const contentOk = content.trim().length > 0 && content.trim().length <= CONTENT_MAX
   const save = () => {
-    s.setGroupAnnouncement(g.id, { title: title.trim(), content: content.trim(), notify }, actor)
+    const result = s.setGroupAnnouncement(g.id, { title: title.trim(), content: content.trim(), notify }, actor)
+    if (result) return toast(result.reason, 'warn')
     toast(notify ? '公告已发布，并向全体成员发出系统消息与推送' : '公告已发布')
     onClose()
   }

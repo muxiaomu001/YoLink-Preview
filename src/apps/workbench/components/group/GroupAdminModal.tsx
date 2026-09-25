@@ -25,7 +25,8 @@ export function GroupAdminModal({
   const toggle = (k: GroupAdminPerm, v: boolean) => setPerms((p) => (v ? Array.from(new Set([...p, k])) : p.filter((x) => x !== k)))
 
   const save = () => {
-    s.promoteGroupAdmin(g.id, target.kind, target.id, perms, actor)
+    const result = s.promoteGroupAdmin(g.id, target.kind, target.id, perms, actor)
+    if (result) return toast(result.reason, 'warn')
     toast(existing ? `已更新「${target.name}」的管理员权限` : `已把「${target.name}」设为管理员`)
     onClose()
   }

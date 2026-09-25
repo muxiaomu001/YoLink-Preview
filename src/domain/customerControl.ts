@@ -6,6 +6,26 @@
  * 演示时就会出现"后台说会移出所有群、工作台说不会"这种自相矛盾。
  */
 
+import type { DemoState } from './types'
+
+export function customerModerationBlocker(state: DemoState, customerId: string, staffId: string): string | null {
+  if (!state.customers.some((customer) => customer.id === customerId)) return '客户不存在'
+  const staff = state.staff.find((member) => member.id === staffId && member.status === 'active')
+  if (!staff) return '员工不存在或已停用'
+  if (!state.roles.find((role) => role.id === staff.roleId)?.caps.includes('moderate_customers')) return '当前员工没有客户处置权限'
+  return null
+}
+
+export function customerPasswordResetBlocker(state: DemoState, customerId: string, staffId: string): string | null {
+  if (!state.customers.some((customer) => customer.id === customerId)) return '客户不存在'
+  const staff = state.staff.find((member) => member.id === staffId && member.status === 'active')
+  if (!staff) return '员工不存在或已停用'
+  if (staff.roleId === 'role_super' || staff.roleId === 'role_admin') return null
+  const primarySeatId = state.customerSeats.find((link) => link.customerId === customerId && link.primary)?.seatId
+  if (!state.seats.some((seat) => seat.id === primarySeatId && seat.operatorStaffId === staffId)) return '只有管理员或主归属坐席的实操员工可以重置密码'
+  return null
+}
+
 export const MUTE_OPTIONS: { label: string; hours: number | null }[] = [
   { label: '1 小时', hours: 1 },
   { label: '24 小时', hours: 24 },

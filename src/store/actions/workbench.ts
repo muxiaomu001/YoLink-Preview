@@ -4,6 +4,7 @@ import { runSensitiveGate } from '../sensitiveGate'
  * 客户操作（重置密码、封禁、群聊禁言 / 全部禁言）、个人设置、客户手机端的社交动作。话术库见 quickReplies.ts。
  */
 import type { MessageMedia, StaffPrefs } from '@/domain/types'
+import { customerModerationBlocker, customerPasswordResetBlocker } from '@/domain/customerControl'
 import { messageLimitSeconds, messageVisibleFor, mentionsIn, seatConversationAllowed, seatMessageSendAllowed } from '@/domain/messageRules'
 import { customerCan } from '../policy'
 import { seatCan } from '../policy'
@@ -23,14 +24,14 @@ export interface WorkbenchActions {
   togglePinConversation: (convId: string, seatId: string) => void
   toggleMuteConversation: (convId: string, seatId: string) => void
   /** 客户忘记密码：主归属坐席的实操员工重置，返回一次性新密码 */
-  resetCustomerPassword: (customerId: string, byStaffId: string) => string
-  setCustomerBan: (customerId: string, on: boolean, byStaffId: string) => void
+  resetCustomerPassword: (customerId: string, byStaffId: string) => { ok: true; password: string } | { ok: false; reason: string }
+  setCustomerBan: (customerId: string, on: boolean, byStaffId: string) => string | null
   /** 群聊禁言；hours 为 null 表示永久，0 表示解除 */
-  muteCustomerAllGroups: (customerId: string, hours: number | null, byStaffId: string) => void
+  muteCustomerAllGroups: (customerId: string, hours: number | null, byStaffId: string) => string | null
   /** 全部禁言；hours 为 null 表示永久，0 表示解除 */
-  muteCustomerGlobally: (customerId: string, hours: number | null, byStaffId: string) => void
+  muteCustomerGlobally: (customerId: string, hours: number | null, byStaffId: string) => string | null
   /** 强制下线：让客户所有已登录设备退出，账号可重新登录 */
-  forceLogoutCustomer: (customerId: string, byStaffId: string) => void
+  forceLogoutCustomer: (customerId: string, byStaffId: string) => string | null
   /** 客户级影子模式：开了之后他发的每条群消息只有他自己和坐席看得见 */
   setCustomerShadowMode: (customerId: string, on: boolean, reason: string, byStaffId: string) => { ok: true } | { ok: false; error: string }
   updateStaffPrefs: (staffId: string, patch: Partial<StaffPrefs>) => void
@@ -119,17 +120,21 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
 
     resetCustomerPassword: (customerId, byStaffId) => {
       const s = get()
+      const denied = customerPasswordResetBlocker(s, customerId, byStaffId)
+      if (denied) return { ok: false, reason: denied }
       const c = s.customers.find((x) => x.id === customerId)
+      if (!c) return { ok: false, reason: '客户不存在' }
       const pwd = randomPassword()
-      if (!c) return pwd
       set({
         customers: s.customers.map((x) => (x.id === customerId ? { ...x, mustChangePassword: true } : x)),
         audit: withAudit(s.audit, 'customer.reset_password', `重置客户「${c.nickname}」的密码，一次性密码已告知，首次登录强制修改`, byStaffId),
       })
-      return pwd
+      return { ok: true, password: pwd }
     },
 
-    setCustomerBan: (customerId, on, byStaffId) =>
+    setCustomerBan: (customerId, on, byStaffId) => {
+      const denied = customerModerationBlocker(get(), customerId, byStaffId)
+      if (denied) return denied
       set((s) => {
         const c = s.customers.find((x) => x.id === customerId)
         if (!c) return {}
@@ -138,9 +143,13 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
           customers: s.customers.map((x) => (x.id === customerId ? { ...x, bannedAt: on ? at : null, sessionsRevokedAt: on ? at : x.sessionsRevokedAt } : x)),
           audit: withAudit(s.audit, 'customer.ban', `${on ? '封禁' : '解除封禁'}客户「${c.nickname}」${on ? '，账号无法登录，已登录设备退出' : ''}`, byStaffId),
         }
-      }),
+      })
+      return null
+    },
 
-    muteCustomerAllGroups: (customerId, hours, byStaffId) =>
+    muteCustomerAllGroups: (customerId, hours, byStaffId) => {
+      const denied = customerModerationBlocker(get(), customerId, byStaffId)
+      if (denied) return denied
       set((s) => {
         const c = s.customers.find((x) => x.id === customerId)
         if (!c) return {}
@@ -149,9 +158,13 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
           customers: s.customers.map((x) => (x.id === customerId ? { ...x, mutedAllUntil: until } : x)),
           audit: withAudit(s.audit, hours === 0 ? 'customer.group_unmute' : 'customer.group_mute', hours === 0 ? `解除客户「${c.nickname}」的群聊禁言` : `群聊禁言客户「${c.nickname}」${hours == null ? '永久' : `${hours} 小时`}`, byStaffId),
         }
-      }),
+      })
+      return null
+    },
 
-    muteCustomerGlobally: (customerId, hours, byStaffId) =>
+    muteCustomerGlobally: (customerId, hours, byStaffId) => {
+      const denied = customerModerationBlocker(get(), customerId, byStaffId)
+      if (denied) return denied
       set((s) => {
         const c = s.customers.find((x) => x.id === customerId)
         if (!c) return {}
@@ -160,9 +173,13 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
           customers: s.customers.map((x) => (x.id === customerId ? { ...x, globalMutedUntil: until } : x)),
           audit: withAudit(s.audit, hours === 0 ? 'customer.unmute' : 'customer.mute', hours === 0 ? `解除客户「${c.nickname}」的全部禁言` : `全部禁言客户「${c.nickname}」${hours == null ? '永久' : `${hours} 小时`}`, byStaffId),
         }
-      }),
+      })
+      return null
+    },
 
-    forceLogoutCustomer: (customerId, byStaffId) =>
+    forceLogoutCustomer: (customerId, byStaffId) => {
+      const denied = customerModerationBlocker(get(), customerId, byStaffId)
+      if (denied) return denied
       set((s) => {
         const c = s.customers.find((x) => x.id === customerId)
         if (!c) return {}
@@ -170,7 +187,9 @@ export function workbenchActions(set: Set, get: Get): WorkbenchActions {
           customers: s.customers.map((x) => (x.id === customerId ? { ...x, sessionsRevokedAt: now() } : x)),
           audit: withAudit(s.audit, 'customer.force_logout', `强制下线客户「${c.nickname}」：所有已登录设备退出，账号可重新登录`, byStaffId),
         }
-      }),
+      })
+      return null
+    },
 
     setCustomerShadowMode: (customerId, on, reason, byStaffId) => {
       const reasonText = reason.trim()
