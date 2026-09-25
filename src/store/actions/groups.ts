@@ -5,10 +5,10 @@ import { messageShadow } from '@/domain/messageRules'
  * 所有动作记管理员日志（groupLogs，48 小时）与审计。
  */
 import { groupWelcomeMessages } from '@/domain/groupWelcome'
+import { checkCustomerGroupJoin } from '@/domain/groupMembership'
 import type { ChatGroup, ChatGroupKind, Conversation, GroupAdminPerm, GroupInviteLink, GroupLog, GroupMemberKind, GroupSettings, Message } from '@/domain/types'
 import { newId } from '@/domain/ids'
 import { groupDefaults } from '@/domain/seed-groups'
-import { groupCapacity } from '../policy'
 import { type Get, type Set, now, withAudit } from './helpers'
 
 /** 谁在操作：坐席身份 + 实操员工（审计记员工） */
@@ -159,14 +159,13 @@ export function groupActions(set: Set, get: Get): GroupActions {
       const s = get()
       const g = s.chatGroups.find((x) => x.id === groupId)
       if (!g) return { added: 0, skipped: customerIds }
-      const cap = groupCapacity(s, g)
       const skipped: string[] = []
       const toAdd: string[] = []
       customerIds.forEach((cid) => {
         const c = s.customers.find((x) => x.id === cid)
         const banned = g.restrictions.some((r) => r.customerId === cid && r.kind === 'ban' && (r.until === null || r.until > now()))
-        const needTitle = g.requiredTitleId && !c?.titleIds.includes(g.requiredTitleId)
-        if (!c || c.deletedAt || g.memberCustomerIds.includes(cid) || banned || needTitle || g.memberCustomerIds.length + toAdd.length >= cap) skipped.push(cid)
+        const joinCheck = checkCustomerGroupJoin(g, c, s.policyNumbers.groupMaxMembers, toAdd.length)
+        if (!c || c.deletedAt || banned || !joinCheck.allowed) skipped.push(cid)
         else toAdd.push(cid)
       })
       if (!toAdd.length) return { added: 0, skipped }

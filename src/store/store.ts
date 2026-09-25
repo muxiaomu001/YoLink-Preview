@@ -30,6 +30,7 @@ import { buildSeed } from '@/domain/seed'
 import { newId } from '@/domain/ids'
 import { allocateSeats } from '@/domain/allocation'
 import { NICKNAME_MAX, NICKNAME_MIN, deviceRegisterCount, resolveRegisterNickname, watchUntilOf } from '@/domain/register'
+import { checkCustomerGroupJoin } from '@/domain/groupMembership'
 import { planCoverage, type SkipReason } from '@/domain/broadcastCoverage'
 import { inviteCodeError, newInviteCode, normalizeInviteCode } from '@/domain/inviteCode'
 import { iso } from '@/domain/time'
@@ -171,14 +172,24 @@ export const useStore = create<DemoStore>()(
 
       registerCustomer: (input) => {
         const s = get()
+        const at = now()
         const code = input.inviteCode.trim().toUpperCase()
         let group: InviteGroup | undefined
         let link: InviteLink | undefined
         if (code) {
-          group = s.inviteGroups.find((g) => g.code === code && g.enabled)
-          if (!group) {
-            link = s.inviteLinks.find((l) => l.code === code && l.status === 'active')
-            if (link) group = s.inviteGroups.find((g) => g.id === link!.inviteGroupId && g.enabled)
+          group = s.inviteGroups.find((g) => g.code === code)
+          if (group) {
+            if (!group.enabled) return { ok: false, error: '邀请码无效或已失效' }
+          } else {
+            link = s.inviteLinks.find((l) => l.code === code)
+            if (!link) return { ok: false, error: '邀请码无效或已失效' }
+            if (link.status === 'expired' || (link.status === 'active' && link.expiresAt !== null && link.expiresAt <= at)) {
+              return { ok: false, error: '这个邀请链接已过期' }
+            }
+            if (link.status === 'revoked') return { ok: false, error: '这个邀请链接已停用' }
+            if (link.status !== 'active') return { ok: false, error: '这个邀请链接已停用' }
+            if (link.maxUses !== null && link.uses >= link.maxUses) return { ok: false, error: '这个邀请链接的名额已用完' }
+            group = s.inviteGroups.find((g) => g.id === link!.inviteGroupId && g.enabled)
           }
           if (!group) return { ok: false, error: '邀请码无效或已失效' }
         } else {
@@ -186,7 +197,6 @@ export const useStore = create<DemoStore>()(
           group = s.inviteGroups.find((g) => g.isDefault)
           if (!group) return { ok: false, error: '企业未配置默认邀请组' }
         }
-        const at = now()
         const deviceId = input.deviceId ?? DEMO_DEVICE_ID
         // 同设备注册风控：先拦，再看别的。批量注册的号进来之后每一步都要占资源
         // （轮询坐席被吃掉、群人数被撑满），所以这一刀必须落在建号之前。
@@ -259,21 +269,20 @@ export const useStore = create<DemoStore>()(
           }
         })
         const fullGroupNames: string[] = []
+        const missingTitleGroupNames: string[] = []
         const joinGroupIds = Array.from(new Set([...group.chatGroupIds, ...(link?.chatGroupIds ?? [])])).filter((groupId) => {
           const chatGroup = s.chatGroups.find((item) => item.id === groupId)
-          if (!chatGroup) return false
-          const memberCount = chatGroup.memberCustomerIds.length + chatGroup.memberSeatIds.length
-          if (memberCount >= (chatGroup.maxMembers ?? s.policyNumbers.groupMaxMembers)) {
-            fullGroupNames.push(chatGroup.name)
-            return false
-          }
-          return true
+          const check = checkCustomerGroupJoin(chatGroup, customer, s.policyNumbers.groupMaxMembers)
+          if (check.allowed) return true
+          if (chatGroup && check.reason === 'full') fullGroupNames.push(chatGroup.name)
+          if (chatGroup && check.reason === 'missing_title') missingTitleGroupNames.push(chatGroup.name)
+          return false
         })
         const chatGroups = s.chatGroups.map((g) => (joinGroupIds.includes(g.id) ? { ...g, memberCustomerIds: [...g.memberCustomerIds, customer.id] } : g))
         for(const gid of joinGroupIds){const g=s.chatGroups.find((x)=>x.id===gid),conv=s.conversations.find((x)=>x.chatGroupId===gid);if(g&&conv)messages.push(...groupWelcomeMessages(g,conv.id,[customer],at))}
         const inviteLinks = link ? s.inviteLinks.map((l) => (l.id === link!.id ? { ...l, uses: l.uses + 1 } : l)) : s.inviteLinks
         const auditEntries = [
-          { id: newId('au'), at, actorStaffId: null, type: 'customer.register' as AuditType, detail: `客户「${customer.nickname}」通过${link ? `邀请链接「${link.name}」（${group.name}）` : `邀请组「${group.name}」`}注册，轮询分配轮询坐席：${primarySeatId ? seatById[primarySeatId]?.displayName : '无'}；自动添加：${usable.map((id) => seatById[id]?.displayName).join('、')}${skipped.length ? `；跳过（暂停接新）：${skipped.map((id) => seatById[id]?.displayName).join('、')}` : ''}${joinGroupIds.length ? `；自动入群：${joinGroupIds.map((gid) => s.chatGroups.find((g) => g.id === gid)?.name).join('、')}` : ''}${nick.auto ? '；昵称未填，发默认昵称' : ''}${watchUntil ? `；新号观察期至 ${watchUntil.slice(0, 16).replace('T', ' ')}` : ''}${fullGroupNames.length ? `；因满员未加入：${fullGroupNames.join('、')}` : ''}` },
+          { id: newId('au'), at, actorStaffId: null, type: 'customer.register' as AuditType, detail: `客户「${customer.nickname}」通过${link ? `邀请链接「${link.name}」（${group.name}）` : `邀请组「${group.name}」`}注册，轮询分配轮询坐席：${primarySeatId ? seatById[primarySeatId]?.displayName : '无'}；自动添加：${usable.map((id) => seatById[id]?.displayName).join('、')}${skipped.length ? `；跳过（暂停接新）：${skipped.map((id) => seatById[id]?.displayName).join('、')}` : ''}${joinGroupIds.length ? `；自动入群：${joinGroupIds.map((gid) => s.chatGroups.find((g) => g.id === gid)?.name).join('、')}` : ''}${nick.auto ? '；昵称未填，发默认昵称' : ''}${watchUntil ? `；新号观察期至 ${watchUntil.slice(0, 16).replace('T', ' ')}` : ''}${fullGroupNames.length ? `；因满员未加入：${fullGroupNames.join('、')}` : ''}${missingTitleGroupNames.length ? `；缺少头衔未加入：${missingTitleGroupNames.join('、')}` : ''}` },
         ]
         set({
           customers: [customer, ...s.customers],
