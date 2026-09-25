@@ -4,7 +4,7 @@
  * 两种都先算计划再发，发送前预览与真正发送走的是同一份 planCoverage / friendsOfSeat。
  * 实操一律记当前后台管理员：全覆盖只占他一个任务额度，不去扣各坐席实操员工的额度。
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Send, Users } from 'lucide-react'
 import type { Broadcast, DemoState } from '@/domain/types'
 import { fmtDateTime } from '@/domain/time'
@@ -16,7 +16,7 @@ import { KV, Note, Pill, SeatAvatar, Table } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 import { ContentKindPill, MediaPreview, StatusPill } from '@/apps/workbench/pages/BroadcastPage.parts'
-import { CONTENT_KIND_LABEL, PREVIEW_LEN, TARGET_LABEL } from '@/apps/workbench/pages/BroadcastPage.shared'
+import { CONTENT_KIND_LABEL, PREVIEW_LEN, TARGET_LABEL, broadcastPreviewFingerprint, isBroadcastPreviewStale } from '@/apps/workbench/pages/BroadcastPage.shared'
 
 type SendMode = 'now' | 'scheduled'
 /** 发送方式：一个坐席发给自己的好友，或多个坐席合起来覆盖到人 */
@@ -30,6 +30,7 @@ type BroadcastPreview = {
   skipReasons?: Record<string, number>
   targetDesc: string
   scheduledAt: string | null
+  conditionFingerprint: string
 }
 
 function skipLabel(key: string): string {
@@ -216,9 +217,8 @@ export function BroadcastCreateModal({ s, onClose }: { s: DemoStore; onClose: ()
           : ''
   const formError = error || (!name.trim() ? '填任务名称' : !text.trim() ? '填内容' : !scheduleOk ? '定时时间要晚于现在' : '')
 
-  useEffect(() => {
-    if (preview) setPreview(null)
-  }, [reach, seatId, coverIds, name, text, mode, scheduledAt])
+  const currentPreviewFingerprint = broadcastPreviewFingerprint([reach, seatId, coverIds, name, text, mode, scheduledAt])
+  const previewStale = !!preview && isBroadcastPreviewStale(preview.conditionFingerprint, currentPreviewFingerprint)
 
   const toggleCover = (id: string, on: boolean) => setCoverIds(on ? [...coverIds, id] : coverIds.filter((x) => x !== id))
 
@@ -234,11 +234,13 @@ export function BroadcastCreateModal({ s, onClose }: { s: DemoStore; onClose: ()
       skipReasons: plan?.skipReasons,
       targetDesc: reach === 'single' ? `全部好友（${seat!.displayName}）` : `多坐席覆盖（${coverIds.length} 个坐席）`,
       scheduledAt: mode === 'scheduled' ? new Date(scheduledAt).toISOString() : null,
+      conditionFingerprint: currentPreviewFingerprint,
     })
   }
 
   const submit = () => {
     if (!preview || !operatorId) return
+    if (previewStale) return toast('条件变了，请重新预览', 'warn')
     const r =
       preview.reach === 'single'
         ? s.sendBroadcast({ name: name.trim(), seatId: preview.seatIds[0], operatorId, targetKind: 'friends', targetDesc: preview.targetDesc, text: text.trim(), customerIds: preview.customerIds, scheduledAt: preview.scheduledAt })
@@ -373,7 +375,7 @@ export function BroadcastCreateModal({ s, onClose }: { s: DemoStore; onClose: ()
             footer={
               <>
                 <Button onClick={() => setPreview(null)}>返回修改</Button>
-                <Button variant="primary" onClick={submit}>
+                <Button variant="primary" disabled={previewStale} title={previewStale ? '条件变了，请重新预览' : undefined} onClick={submit}>
                   {preview.scheduledAt ? '确认创建定时任务' : `确认发送给 ${preview.reachCount} 人`}
                 </Button>
               </>
@@ -384,6 +386,7 @@ export function BroadcastCreateModal({ s, onClose }: { s: DemoStore; onClose: ()
                 名单已锁定，共 <b className="tabular-nums">{preview.reachCount}</b> 人。
               </div>
               <div className="text-[12px] text-zinc-600">目标：{preview.targetDesc}</div>
+              {previewStale && <div className="text-[12px] text-amber-700">条件变了，请重新预览</div>}
               {preview.skipCount > 0 && <div className="text-[12px] text-amber-700">按当前状态预计跳过 {preview.skipCount} 人（{skipSummary(preview.skipReasons)}），发送时仍会再次校验。</div>}
               <div className="text-[12px] leading-relaxed text-zinc-500">名单在预览时锁定，之后新加的客户不在这次名单里。</div>
               {preview.scheduledAt && <DemoNote compact>定时群发在演示里不实际投递。</DemoNote>}

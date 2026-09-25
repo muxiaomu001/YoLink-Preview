@@ -1,7 +1,7 @@
 /**
  * 聊天页（私聊 / 群 / 频道）：所有"能不能"走 customerCan / customerCanSpeakIn，发送走 customerSendIn。
  */
-import { useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { ArrowDown, MoreHorizontal } from 'lucide-react'
 import type { Message } from '@/domain/types'
 import { actorKey, draftKey, messageVisibleFor, sendFailure } from '@/domain/messageRules'
@@ -28,8 +28,8 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
   const s = useStore.getState()
   const conv = s.conversations.find((c) => c.id === convId)
   const customer = customerById(s, customerId)
-  const actor=useMemo(()=>({kind:'customer' as const,id:customerId}),[customerId])
-  const msgs = useMemo(() => messagesOf(s, convId).filter((m)=>messageVisibleFor(s,m,actor)), [s, convId,actor])
+  const actor = { kind: 'customer' as const, id: customerId }
+  const msgs = messagesOf(s, convId).filter((m) => messageVisibleFor(s, m, actor))
   const key=draftKey(actor,convId),draft=s.chatDrafts?.[key]??{text:''}
   const setText=(text:string)=>s.saveChatDraft(convId,actor,{...(useStore.getState().chatDrafts?.[key]??{text:''}),text})
   const setReplyTo=(m?:Message)=>s.saveChatDraft(convId,actor,{...(useStore.getState().chatDrafts?.[key]??{text:''}),replyToId:m?.id})

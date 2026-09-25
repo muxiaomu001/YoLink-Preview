@@ -515,6 +515,15 @@ test('第十批任务 05：清空本方历史后使用明确空状态文案', ()
   assert.match(html, /已清空本方历史，新消息会显示在这里/)
   assert.doesNotMatch(html, /暂无可见消息/)
 })
+test('第十批任务 05：预览后改变条件，确认发送被判定为失效', () => {
+  const { broadcastPreviewFingerprint, isBroadcastPreviewStale } = loadSource('src/apps/workbench/pages/BroadcastPage.shared.ts')
+  const previewFingerprint = broadcastPreviewFingerprint(['friends', ['seat_lin'], ['tag_vip']])
+  const unchangedFingerprint = broadcastPreviewFingerprint(['friends', ['seat_lin'], ['tag_vip']])
+  const changedFingerprint = broadcastPreviewFingerprint(['tag', ['seat_lin'], ['tag_vip']])
+
+  assert.equal(isBroadcastPreviewStale(previewFingerprint, unchangedFingerprint), false)
+  assert.equal(isBroadcastPreviewStale(previewFingerprint, changedFingerprint), true)
+})
 test('频道没有发布权限时，群发跳过且不影响其他任务', () => {
   // 种子里林晓明在「恒信官方通知」就没有发布权，不用再改状态
   const channel = current().chatGroups.find(g => g.kind === 'channel' && g.memberSeatIds.includes(seat.id))

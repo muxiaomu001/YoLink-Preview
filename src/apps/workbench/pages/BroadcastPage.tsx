@@ -19,7 +19,7 @@ import { FileCard, ImageThumb, readFileAsMedia } from '@/ui/media'
 import { useWorkbench } from '../useWorkbench'
 import { isGlobalMutedNow } from '@/domain/customerStatus'
 import { BroadcastDetailModal, BroadcastRecords, QuickReplyPickerModal } from './BroadcastPage.parts'
-import { DELIVERY_RULES, TARGET_LABEL } from './BroadcastPage.shared'
+import { DELIVERY_RULES, TARGET_LABEL, broadcastPreviewFingerprint, isBroadcastPreviewStale } from './BroadcastPage.shared'
 
 type ContentKind = Broadcast['contentKind']
 type SendMode = 'now' | 'scheduled'
@@ -29,6 +29,7 @@ type BroadcastPreview = {
   chatGroupId?: string
   skipCount: number
   scheduledAt: string | null
+  conditionFingerprint: string
 }
 
 const TARGET_KINDS: BroadcastTargetKind[] = ['friends', 'mine', 'tag', 'purchase', 'role', 'group']
@@ -123,9 +124,21 @@ export function BroadcastPage() {
   const canSend = !overLimit && !!name.trim() && contentOk && targetOk && scheduleOk
   const reason = overLimit ? `今日群发任务已达上限（${perStaff} 个）` : !name.trim() ? '填任务名称' : needMedia && !media ? (contentKind === 'image' ? '选一张图片' : '选一个文件') : !needMedia && !text.trim() ? '填内容' : targetKind === 'group' && groupBlockText ? groupBlockText : !targetOk ? '目标没有命中任何人' : !scheduleOk ? '定时时间要晚于现在' : ''
 
-  useEffect(() => {
-    if (preview) setPreview(null)
-  }, [name, targetKind, tagIds, product, role, groupId, contentKind, text, media, mode, scheduledAt])
+  const currentPreviewFingerprint = broadcastPreviewFingerprint([
+    seat?.id ?? '',
+    name,
+    targetKind,
+    tagIds,
+    product,
+    role,
+    groupId,
+    contentKind,
+    text,
+    media,
+    mode,
+    scheduledAt,
+  ])
+  const previewStale = !!preview && isBroadcastPreviewStale(preview.conditionFingerprint, currentPreviewFingerprint)
 
   const pickTarget = (k: BroadcastTargetKind) => {
     setTargetKind(k)
@@ -171,11 +184,13 @@ export function BroadcastPage() {
       chatGroupId: targetKind === 'group' ? groupId : undefined,
       skipCount: targetKind === 'group' ? 0 : willSkip,
       scheduledAt: mode === 'scheduled' ? new Date(scheduledAt).toISOString() : null,
+      conditionFingerprint: currentPreviewFingerprint,
     })
   }
 
   const send = () => {
     if (!seat || !staff || !preview) return
+    if (previewStale) return toast('条件变了，请重新预览', 'warn')
     const r = s.sendBroadcast({ name: name.trim(), seatId: seat.id, operatorId: staff.id, targetKind, targetDesc: preview.targetDesc, contentKind, media: needMedia ? media : undefined, text: text.trim(), customerIds: preview.customerIds, chatGroupId: preview.chatGroupId, scheduledAt: preview.scheduledAt })
     if (!r) return toast(`超过频控：每个实操员工每天 ${perStaff} 个任务，明天再发`, 'warn')
     if (r.reason) return toast(r.reason, 'warn')
@@ -369,7 +384,7 @@ export function BroadcastPage() {
           footer={
             <>
               <Button onClick={() => setPreview(null)}>返回修改</Button>
-              <Button variant="primary" onClick={send}>
+              <Button variant="primary" disabled={previewStale} title={previewStale ? '条件变了，请重新预览' : undefined} onClick={send}>
                 {preview.scheduledAt ? '确认创建定时任务' : `确认发送给 ${preview.customerIds.length} 人`}
               </Button>
             </>
@@ -380,6 +395,7 @@ export function BroadcastPage() {
               名单已锁定，共 <b className="tabular-nums">{preview.customerIds.length}</b> 人。
             </div>
             <div className="text-[12px] text-zinc-600">目标：{preview.targetDesc}</div>
+            {previewStale && <div className="text-[12px] text-amber-700">条件变了，请重新预览</div>}
             {preview.skipCount > 0 && <div className="text-[12px] text-amber-700">按当前状态预计跳过 {preview.skipCount} 人，发送时仍会再次校验。</div>}
             <div className="text-[12px] leading-relaxed text-zinc-500">名单在预览时锁定，之后新加的客户不在这次名单里。</div>
             {preview.scheduledAt && <DemoNote compact>定时群发在演示里不实际投递。</DemoNote>}
