@@ -7,7 +7,7 @@
  * - 头衔与内部标签分表（预留 34）
  *
  * 管理后台完整版（docs/prd/05）用到的模型也在这里：企业设置各分页、策略矩阵与数值、
- * 举报与敏感词、钱包/签到/推荐奖励、横幅与公告、AI 模块、客户画像、日报、插件与开放 API、系统。
+ * 举报与敏感词、钱包/签到/推荐奖励、横幅与公告、客户画像、日报、插件与开放 API、系统。
  */
 
 import type { NicknamePolicy } from './register'
@@ -38,7 +38,6 @@ export type Capability =
   | 'manage_settings'
   | 'view_audit_logs'
   | 'export_data'
-  | 'manage_bots'
   | 'manage_automation'
 
 // ---------- 企业设置 ----------
@@ -134,8 +133,6 @@ export interface StaffPrefs {
   desktopNotify: boolean
   sound: boolean
   language: Language
-  /** AI 推荐是否在客户来消息后自动弹出草稿；关时只能点输入栏的「AI 推荐」按钮 */
-  aiSuggest: boolean
   /** 打字时全文匹配话术并浮出候选（标题 / 正文 / 文件名）；关了只能用 `/` 或话术面板 */
   quickMatch: boolean
 }
@@ -415,8 +412,6 @@ export interface ChatGroup {
   /** 坐席成员（含群主）；是否管理员看 admins */
   memberSeatIds: string[]
   memberCustomerIds: string[]
-  /** 机器人账号成员（群活跃助手） */
-  memberBotIds: string[]
   admins: GroupAdmin[]
   settings: GroupSettings
   announcement: GroupAnnouncement | null
@@ -469,7 +464,7 @@ export interface Conversation {
   hiddenAtByViewer?: Record<string, ISODate>
 }
 
-export type SenderKind = 'customer' | 'seat' | 'bot' | 'system'
+export type SenderKind = 'customer' | 'seat' | 'system'
 export type MessageKind = 'text' | 'image' | 'file' | 'video' | 'voice' | 'system'
 
 /** 图片 / 文件消息的附件：演示里 url 是 public 下的静态文件或本机上传后的 data URL */
@@ -489,11 +484,11 @@ export interface Message {
   id: string
   convId: string
   senderKind: SenderKind
-  /** customer：客户 ID；seat：坐席 ID；bot：机器人账号 ID；system：空 */
+  /** customer：客户 ID；seat：坐席 ID；system：空 */
   senderId: string
   /** 坐席发的消息：署名坐席 */
   seatId?: string
-  /** 坐席发的消息：当时真正打字的员工；机器人手动发言时也记 */
+  /** 坐席发的消息：当时真正打字的员工 */
   operatorId?: string
   kind: MessageKind
   /** 文字消息的正文；图片 / 文件消息里是说明文字（可空） */
@@ -507,7 +502,6 @@ export interface Message {
   receiptMemberSeatIds?: string[]
   receiptMemberCustomerIds?: string[]
   mentionAll?: boolean
-  aiDraftUsed?: boolean
   isWelcome?: boolean
   /** 为所有人删除：普通聊天中直接消失、不留占位；原文与操作人保留在审计 */
   deletedAt?: ISODate
@@ -521,8 +515,6 @@ export interface Message {
   quoteText?: string
   /** 转发来源 */
   forwardedFrom?: { convId: string; messageId: string; name?: string }
-  /** 机器人消息：来自哪条规则；空为员工手动触发 */
-  botRuleId?: string | null
   /** 群发任务产生的消息（频控按它统计） */
   isBroadcast?: boolean
   hiddenFor?: string[]
@@ -605,8 +597,6 @@ export type AuditType =
   | 'referral.cancel'
   | 'banner.update'
   | 'announcement.update'
-  | 'ai.settings'
-  | 'knowledge.update'
   | 'profile.sync'
   | 'profile.import'
   | 'automation.update'
@@ -633,8 +623,6 @@ export type AuditType =
   | 'customer.mute_all'
   | 'customer.reset_password'
   | 'customer.force_logout'
-  | 'bot.update'
-  | 'bot.run'
   | 'quick_reply.update'
   | 'staff.prefs'
 
@@ -711,7 +699,7 @@ export interface SensitiveHit {
   result: 'blocked' | 'shadowed' | 'replaced' | 'logged'
 }
 
-// ---------- 群发、快捷回复、知识库 ----------
+// ---------- 群发、快捷回复 ----------
 
 /** friends：本坐席全部好友（所有把它加为官方联系人的客户），一键群发的默认目标；mine：只算主归属 */
 export type BroadcastTargetKind = 'friends' | 'mine' | 'tag' | 'title' | 'purchase' | 'role' | 'group' | 'coverage'
@@ -777,79 +765,6 @@ export interface QuickReply {
   enabled: boolean
   useCount: number
   lastUsedAt?: ISODate
-}
-
-export interface KnowledgeItem {
-  /** 兼容已有演示数据：缺省时按 enabled 判断发布状态。 */
-  status?: 'draft' | 'published' | 'offline'
-  version?: number
-  id: string
-  title: string
-  body: string
-  tags: string[]
-  enabled: boolean
-}
-
-// ---------- 群活跃助手（炒群，14 文档模块 D） ----------
-
-/** 机器人账号：客户看不出区别，员工与管理员看到标记 */
-export interface BotAccount {
-  id: string
-  nickname: string
-  avatarColor: string
-  /** 人设：性格、口吻、身份 */
-  persona: string
-  groupIds: string[]
-  enabled: boolean
-  /** 审核模式下谁来过目；手动发言记真实操作者 */
-  operatorStaffId: string | null
-  createdAt: ISODate
-}
-
-export type BotScriptSource = 'fixed' | 'ai' | 'mixed'
-
-export interface BotScript {
-  id: string
-  name: string
-  source: BotScriptSource
-  /** 固定台词或混合模式的开场 */
-  lines: string[]
-  /** 全局或指定群 */
-  groupId: string | null
-  /** AI 生成时的主题提示 */
-  topic?: string
-}
-
-export type BotTrigger = 'silence' | 'schedule' | 'after_staff' | 'manual'
-
-export interface BotRule {
-  id: string
-  name: string
-  trigger: BotTrigger
-  silenceMinutes?: number
-  scheduleTimes?: string[]
-  hourlyLimit: number
-  reviewMode: 'auto' | 'review'
-  groupIds: string[]
-  scriptId: string
-  botIds: string[]
-  enabled: boolean
-}
-
-export type BotRunStatus = 'sent' | 'pending_review' | 'skipped' | 'rejected'
-
-/** 规则运行记录：发了、待审、跳过（禁言 / 限流 / 已暂停）*/
-export interface BotRun {
-  id: string
-  at: ISODate
-  ruleId: string | null
-  botId: string
-  groupId: string
-  text: string
-  status: BotRunStatus
-  reason?: string
-  /** 手动触发或审核放行的员工 */
-  operatorStaffId?: string
 }
 
 // ---------- 策略 ----------
@@ -1037,43 +952,12 @@ export interface Announcement {
   impressions: number
 }
 
-// ---------- AI 模块 ----------
-
-export interface AiSettings {
-  endpoint: string
-  keyConfigured: boolean
-  shareProfile: boolean
-  lastTestAt: ISODate | null
-  lastTestOk: boolean | null
-  contextCount: number
-  tone: 'professional' | 'warm' | 'concise'
-  dailyLimitPerStaff: number
-  group: {
-    botLimit: number
-    botUsed: number
-    defaultRule: string
-    reviewMode: 'auto' | 'review'
-  }
-}
-
-/** 一次 AI 处理记录（用量与采纳统计） */
-export interface AiEvent {
-  id: string
-  at: ISODate
-  staffId: string
-  convId: string
-  result: 'adopted' | 'edited' | 'ignored'
-  tokens: number
-  module?: 'reply' | 'group' | 'knowledge'
-}
-
 // ---------- 客户画像 ----------
 
 export interface ProfileSyncSettings {
   apiKeyConfigured: boolean
   apiKeyPrefix: string
   amountVisibleRoleIds: string[]
-  shareWithAi: boolean
   /** P1 */
   scheduledPull: boolean
   /** P1 */
@@ -1205,11 +1089,9 @@ export interface AppVersion {
 }
 
 export interface LicenseModule {
-  key: ModuleKey | 'ai'
+  key: ModuleKey
   name: string
   enabled: boolean
-  botLimit: number
-  botUsed: number
   expiresAt: ISODate
 }
 
@@ -1309,7 +1191,6 @@ export interface DemoState {
   broadcasts: Broadcast[]
   quickReplyCategories: QuickReplyCategory[]
   quickReplies: QuickReply[]
-  knowledge: KnowledgeItem[]
   policyItems: PolicyItem[]
   policyPresets: PolicyPreset[]
   activePresetId: string
@@ -1327,8 +1208,6 @@ export interface DemoState {
   referralAnomalies: ReferralAnomaly[]
   banners: Banner[]
   announcements: Announcement[]
-  aiSettings: AiSettings
-  aiEvents: AiEvent[]
   profileSync: ProfileSyncSettings
   syncRecords: SyncRecord[]
   customFields: CustomField[]
@@ -1347,12 +1226,6 @@ export interface DemoState {
   health: HealthStatus
   dailyStats: DailyStat[]
   groupLogs: GroupLog[]
-  bots: BotAccount[]
-  botScripts: BotScript[]
-  botRules: BotRule[]
-  botRuns: BotRun[]
-  /** 一键暂停全部群活跃助手 */
-  botsPausedAll: boolean
   session: Session
   seededAt: ISODate
 }

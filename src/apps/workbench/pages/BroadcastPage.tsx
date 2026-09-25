@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { BookOpenText, Send, Sparkles, Upload, Users } from 'lucide-react'
+import { BookOpenText, Send, Upload, Users } from 'lucide-react'
 import type { Broadcast, BroadcastTargetKind, MessageMedia, QuickReply } from '@/domain/types'
 import { SKIP_REASON_LABEL } from '@/domain/broadcastCoverage'
 import { seatBroadcastSkipReason } from '@/domain/messageRules'
@@ -24,7 +24,6 @@ type ContentKind = Broadcast['contentKind']
 type SendMode = 'now' | 'scheduled'
 
 const TARGET_KINDS: BroadcastTargetKind[] = ['friends', 'mine', 'tag', 'purchase', 'role', 'group']
-const AI_SAMPLE = '各位好，本周观点已整理：美元短端仍有吸引力，港股科技反弹属修复，黄金维持区间配置。周五晚 8 点线上复盘，欢迎参加。\n\n以上仅为信息分享，不构成投资建议。'
 
 export function BroadcastPage() {
   const [openedAt] = useState(Date.now)
@@ -308,16 +307,6 @@ export function BroadcastPage() {
                       <BookOpenText size={13} /> 从话术库选
                     </Button>
                   )}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setText(AI_SAMPLE)
-                      toast('AI 已按「本周观点、稳健语气、中等长度」写好文案', 'info')
-                    }}
-                  >
-                    <Sparkles size={13} /> AI 写文案
-                  </Button>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-[12px] text-zinc-500">

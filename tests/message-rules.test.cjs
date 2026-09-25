@@ -4,6 +4,23 @@ const { reset, flush, store, rules, customerStatus, policy } = require('./source
 const current = () => store.getState()
 const seat = { kind: 'seat', id: 'seat_lin', staffId: 'st_lin' }
 beforeEach(reset)
+test('AI 与群活跃助手只保留占位，不生成业务数据或群成员', () => {
+  const state = current()
+  for (const field of ['bots', 'botScripts', 'botRules', 'botRuns', 'botsPausedAll', 'knowledge', 'aiSettings', 'aiEvents']) {
+    assert.equal(Object.hasOwn(state, field), false, `不应保留 ${field}`)
+  }
+  for (const group of state.chatGroups) {
+    assert.equal(Object.hasOwn(group, 'memberBotIds'), false)
+    assert.ok(group.memberSeatIds.every(memberId => state.seats.some(member => member.id === memberId)))
+    assert.ok(group.memberCustomerIds.every(memberId => state.customers.some(member => member.id === memberId)))
+  }
+  assert.ok(state.messages.every(message => message.senderKind !== 'bot'))
+  assert.ok(state.messages.every(message => !Object.hasOwn(message, 'aiDraftUsed') && !Object.hasOwn(message, 'botRuleId')))
+  assert.ok(state.roles.every(role => !role.caps.includes('manage_bots')))
+  assert.ok(state.staff.every(staff => !Object.hasOwn(staff.prefs, 'aiSuggest')))
+  assert.ok(state.license.modules.every(module => module.key !== 'ai' && !Object.hasOwn(module, 'botLimit') && !Object.hasOwn(module, 'botUsed')))
+  assert.equal(Object.hasOwn(state.profileSync, 'shareWithAi'), false)
+})
 function send(convId, actor, text, extra = {}) {
   const result = current().queueChatMessage({ convId, actor, text, ...extra })
   assert.equal(result.ok, true, result.reason)
@@ -169,46 +186,6 @@ test('频道没有发布权限时，群发跳过且不影响其他任务', () =>
   assert.equal(result.skipped, 1)
   assert.equal(current().messages.length, before)
   assert.equal(current().broadcasts.at(0).skipReasons.noPostingPermission, 1)
-})
-test('暂停后不能放行或手动发言，恢复后只发一次', () => {
-  const run = current().botRuns.find(r => r.status === 'pending_review'), n = current().messages.length, count = current().botRuns.length
-  current().setBotsPausedAll(true, 'st_zhao')
-  const refusal = current().reviewBotRun(run.id, true, 'st_zhao')
-  assert.equal(current().messages.length, n)
-  assert.equal(current().botRuns.find(r => r.id === run.id).status, 'pending_review')
-  assert.match(refusal ?? '', /已暂停/)
-  assert.match(current().botManualSend(run.botId, run.groupId, '测试发言', 'st_zhao') ?? '', /已暂停/)
-  assert.equal(current().botRuns.length, count)
-  assert.equal(current().messages.length, n)
-  current().setBotsPausedAll(false, 'st_zhao')
-  assert.equal(current().reviewBotRun(run.id, true, 'st_zhao'), null)
-  assert.equal(current().messages.length, n + 1)
-  assert.match(current().reviewBotRun(run.id, true, 'st_zhao'), /已处理/)
-  assert.equal(current().messages.length, n + 1)
-})
-for (const kind of ['mute', 'license', 'disabled', 'left']) test(`活跃角色 ${kind} 状态约束自动、审核和手动三个入口`, () => {
-  const run = current().botRuns.find(r => r.status === 'pending_review')
-  if (kind === 'mute') store.setState({ chatGroups: current().chatGroups.map(g => g.id === run.groupId ? { ...g, settings: { ...g.settings, allMuted: true } } : g) })
-  if (kind === 'license') store.setState({ license: { ...current().license, modules: current().license.modules.map(m => m.key === 'ai' ? { ...m, enabled: false } : m) } })
-  if (kind === 'disabled') store.setState({ bots: current().bots.map(b => b.id === run.botId ? { ...b, enabled: false } : b) })
-  if (kind === 'left') store.setState({ chatGroups: current().chatGroups.map(g => g.id === run.groupId ? { ...g, memberBotIds: g.memberBotIds.filter(id => id !== run.botId) } : g) })
-  const n = current().messages.length
-  assert.ok(current().reviewBotRun(run.id, true, 'st_zhao'))
-  assert.ok(current().botManualSend(run.botId, run.groupId, '测试', 'st_zhao'))
-  const rule = current().botRules.find(r => r.botIds.includes(run.botId) && r.groupIds.includes(run.groupId))
-  if (rule) {
-    // 自动触发当前只取规则首个角色，夹具明确选择本项被禁用/移出的角色。
-    store.setState({ botRules: current().botRules.map(r => r.id === rule.id ? { ...r, botIds: [run.botId], groupIds: [run.groupId] } : r) })
-    assert.equal(current().simulateBotRule(rule.id, 'st_zhao').status, 'skipped')
-  }
-  assert.equal(current().messages.length, n)
-  assert.equal(current().botRuns.find(r => r.id === run.id).status, 'pending_review')
-})
-test('暂停期间仍可驳回待审内容', () => {
-  const run = current().botRuns.find(r => r.status === 'pending_review')
-  current().setBotsPausedAll(true, 'st_zhao')
-  assert.equal(current().reviewBotRun(run.id, false, 'st_zhao', '内容不合适'), null)
-  assert.equal(current().botRuns.find(r => r.id === run.id).status, 'rejected')
 })
 test('整号影子模式关闭后，历史消息及其回复仍保持隐藏', () => {
   const { conv, actor, other } = groupContext()

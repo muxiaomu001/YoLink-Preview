@@ -104,9 +104,6 @@ export function PrefsCard() {
             <option value="en">English</option>
           </Select>
         </PrefRow>
-        <PrefRow title="AI 推荐自动弹出" desc="关闭后只在点输入栏的 AI 推荐按钮时生成">
-          <Switch checked={prefs.aiSuggest} onChange={(v) => set({ aiSuggest: v }, v ? '已开启 AI 推荐自动弹出' : '已关闭自动弹出，可手动点输入栏的 AI 推荐')} />
-        </PrefRow>
         <PrefRow title="打字自动匹配话术" desc="输入满 2 个字就在标题、正文、文件名里全文查找，浮在输入框上方，Tab 选中；关闭后只能用「/」或右栏话术页签">
           <Switch checked={prefs.quickMatch} onChange={(v) => set({ quickMatch: v }, v ? '已开启打字自动匹配话术' : '已关闭自动匹配，仍可输「/」或用右栏话术页签')} />
         </PrefRow>

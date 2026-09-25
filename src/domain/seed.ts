@@ -3,7 +3,6 @@
  * 所有人名、对话、金额均为虚构。
  */
 import type {
-  AiEvent,
   AuditEvent,
   Broadcast,
   ChatGroup,
@@ -14,7 +13,6 @@ import type {
   Enterprise,
   InviteGroup,
   InviteLink,
-  KnowledgeItem,
   Message,
   MessageMedia,
   Role,
@@ -30,7 +28,7 @@ import { allocateSeats } from './allocation'
 import { DEFAULT_NICKNAME_TEMPLATE, watchUntilOf } from './register'
 import { buildAdminSeed } from './seed-admin'
 import { MEDIA, QUICK_REPLIES, QUICK_REPLY_CATEGORIES } from './seed-quick-replies'
-import { BOTS, BOT_RULES, BOT_SCRIPTS, DEFAULT_STAFF_PREFS, GROUP_EXTRAS, botMessagesFor, buildBotRuns, buildGroupLogs, groupDefaults } from './seed-groups'
+import { DEFAULT_STAFF_PREFS, GROUP_EXTRAS, buildGroupLogs, groupDefaults } from './seed-groups'
 
 /** 确定性伪随机，保证每次重置出来的数据一样 */
 function mulberry32(seed: number) {
@@ -123,7 +121,6 @@ export const ALL_CAPS: Role['caps'] = [
   'manage_settings',
   'view_audit_logs',
   'export_data',
-  'manage_bots',
   'manage_automation',
 ]
 
@@ -139,13 +136,12 @@ export const ROLES: Role[] = [
   {
     id: 'role_lead',
     name: '运营主管',
-    desc: '看全部会话与客户，管群与群活跃助手，查消息审计与实操员工，审提现',
+    desc: '看全部会话与客户，管群，查消息审计与实操员工，审提现',
     builtin: false,
     caps: [
       'review_withdrawal',
       'mark_paid',
       'export_customers',
-      'manage_bots',
       'manage_automation',
       'view_all_conversations',
       'view_all_customers',
@@ -778,7 +774,6 @@ function buildCustomers() {
           text: line.text,
           media: line.media,
           at: iso(t),
-          aiDraftUsed: !isC && !line.kind && chance(0.5),
         })
         conv.lastMessageAt = iso(t)
         lastActivity = Math.max(lastActivity, t)
@@ -852,8 +847,6 @@ function buildGroupMessages(customers: Customer[], chatGroups: ChatGroup[]) {
     }
     convCommunity.lastMessageAt = iso(t)
   })
-  // 机器人（群活跃助手）已发出的发言混在社群消息里，客户看不出区别
-  messages.push(...botMessagesFor(convCommunity.id))
   // 置顶：策略会报名那条
   const pinned = messages.find((m) => m.convId === convCommunity.id && m.text.startsWith('10 月 12 日'))
   if (pinned) community.pinnedMessageIds = [pinned.id]
@@ -873,16 +866,6 @@ function buildGroupMessages(customers: Customer[], chatGroups: ChatGroup[]) {
 
 // ---------- 其他 ----------
 
-
-export const KNOWLEDGE: KnowledgeItem[] = [
-  { id: 'kb_1', title: '开户流程与材料', body: '身份证正反面、近三个月地址证明、资金来源说明；线上提交，一个工作日审核；审核通过后开通托管账户。', tags: ['开户'], enabled: true },
-  { id: 'kb_2', title: '入金与到账时效', body: '支持电汇入金；跨境 1 到 2 个工作日到账；到账后系统推送通知；入金只能来自客户本人名下账户。', tags: ['入金'], enabled: true },
-  { id: 'kb_3', title: '风险测评与配置区间', body: '保守型权益上限 20%；稳健型 40%；平衡型 60%；进取型 80%。测评每年复评一次。', tags: ['风险', '配置'], enabled: true },
-  { id: 'kb_4', title: '产品费率', body: '全球均衡组合管理费 0.8%/年；美元货币基金 0.2%/年；无申购费、无赎回费。', tags: ['费率'], enabled: true },
-  { id: 'kb_5', title: '合规口径', body: '不承诺收益、不预测短期涨跌、不建议客户借贷投资；任何回复末尾可附合规声明。顾问不得要求客户向个人账户转账。', tags: ['合规'], enabled: true },
-  { id: 'kb_6', title: '赎回规则', body: '随时可提交赎回，T+3 个工作日到账；部分赎回按份额比例。', tags: ['赎回'], enabled: true },
-  { id: 'kb_7', title: '私享会员权益', body: '每季度组合复盘、线下策略会优先、专属顾问响应；年费 1,200 美元；到期前两周提醒续费。', tags: ['会员'], enabled: true },
-]
 
 function buildBroadcasts(): Broadcast[] {
   return [
@@ -912,31 +895,6 @@ function buildAudit(): AuditEvent[] {
   ]
   const ips = ['10.0.8.21', '10.0.8.35', '192.0.2.190', '198.51.100.8']
   return list.map((e, i) => ({ ...e, ip: ips[i % ips.length] }))
-}
-
-function buildAiEvents(convs: Conversation[]): AiEvent[] {
-  const list: AiEvent[] = []
-  const dmConvs = convs.filter((c) => c.kind === 'dm')
-  for (let d = 0; d < 7; d += 1) {
-    const n = between(6, 14)
-    for (let i = 0; i < n; i += 1) {
-      const r = rand()
-      list.push({
-        id: sid('ai'),
-        at: iso(agoMs(d, between(0, 12), between(0, 59))),
-        staffId: chance(0.55) ? 'st_lin' : 'st_chen',
-        convId: pick(dmConvs).id,
-        result: r < 0.5 ? 'adopted' : r < 0.75 ? 'edited' : 'ignored',
-        tokens: between(600, 1800),
-        module: 'reply',
-      })
-    }
-    // 群活跃助手：赵磊持有的机器人账号每天发起几个话题
-    for (let i = 0; i < between(1, 3); i += 1) {
-      list.push({ id: sid('ai'), at: iso(agoMs(d, between(9, 18), between(0, 59))), staffId: 'st_zhao', convId: dmConvs[0].id, result: chance(0.7) ? 'adopted' : 'ignored', tokens: between(300, 900), module: 'group' })
-    }
-  }
-  return list
 }
 
 /** 生成整份演示状态 */
@@ -978,15 +936,8 @@ export function buildSeed(): DemoState {
     broadcasts: buildBroadcasts(),
     quickReplyCategories: QUICK_REPLY_CATEGORIES,
     quickReplies: QUICK_REPLIES,
-    knowledge: KNOWLEDGE,
-    aiEvents: buildAiEvents(conversations),
     ...buildAdminSeed({ customers: c.customers, conversations, messages }),
     groupLogs: buildGroupLogs(),
-    bots: BOTS,
-    botScripts: BOT_SCRIPTS,
-    botRules: BOT_RULES,
-    botRuns: buildBotRuns(),
-    botsPausedAll: false,
     session: { adminStaffId: 'st_admin', workbenchStaffId: 'st_lin', workbenchSeatId: 'seat_lin', phoneCustomerId: null },
     seededAt: iso(Date.now()),
   }

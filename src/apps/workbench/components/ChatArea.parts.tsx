@@ -1,10 +1,9 @@
 /**
- * 聊天区的零件：顶栏（客户在线状态 / 群成员数 / 搜索 / 右栏开关）、群置顶条、会话内搜索栏、转发弹窗、置顶弹窗、AI 回复推荐面板。
+ * 聊天区的零件：顶栏（客户在线状态 / 群成员数 / 搜索 / 右栏开关）、群置顶条、会话内搜索栏、转发弹窗、置顶弹窗。
  */
 import { useState } from 'react'
 import { clsx } from 'clsx'
-import { ChevronDown, ChevronUp, PanelRightClose, PanelRightOpen, Pin, Search, Sparkles, X } from 'lucide-react'
-import type { AiDraft } from '@/domain/ai'
+import { ChevronDown, ChevronUp, PanelRightClose, PanelRightOpen, Pin, Search, X } from 'lucide-react'
 import type { ChatGroup, Message, Seat } from '@/domain/types'
 import { messageShadow, messageVisibleFor, seatMessageSendAllowed } from '@/domain/messageRules'
 import { fmtAgo } from '@/domain/time'
@@ -13,10 +12,8 @@ import { conversationsForSeat, type ConvRow } from '@/store/selectors'
 import { FileCard, ImageThumb } from '@/ui/media'
 import { PlayableMedia } from '@/ui/PlayableMedia'
 import { Avatar, Pill, TitleChip } from '@/ui/display'
-import { HelpTip } from '@/ui/help'
 import { Button, Checkbox, Input } from '@/ui/primitives'
 import { Modal, toast } from '@/ui/overlay'
-import { DemoNote } from '@/ui/DemoNote'
 import { useWorkbench } from '../useWorkbench'
 import { jumpToMessage, memberTotal } from './group/groupRules'
 
@@ -191,35 +188,5 @@ export function PinModal({ message, group, onClose }: { message: Message; group:
       {shadowed && <p className="mt-2 text-xs text-purple-700">此消息处于影子屏蔽状态，置顶不会向群成员发送通知。</p>}
       <div className="mt-2 text-[11px] text-zinc-400">置顶数量不限；群顶部显示最新一条，展开可看全部。</div>
     </Modal>
-  )
-}
-
-export function AiPanel({ drafts, onSend, onEdit, onClose }: { drafts: AiDraft[]; onSend: (d: AiDraft) => void; onEdit: (d: AiDraft) => void; onClose: () => void }) {
-  const [source, setSource] = useState<AiDraft | null>(null)
-  if (!drafts.length) return null
-  return (
-    <div className="border-t border-violet-100 bg-violet-50/60 px-4 py-2">
-      <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-medium text-violet-700">
-        <Sparkles size={13} /> AI 回复推荐
-        <HelpTip text="按客户最后一句在已发布知识里找，返回原文供你核对后再发。默认手动触发，个人设置里可以改成自动弹出。" />
-        <button type="button" onClick={onClose} className="ml-auto rounded p-0.5 text-violet-400 hover:bg-violet-100 hover:text-violet-800" aria-label="关闭 AI 推荐" title="关闭">
-          <X size={14} />
-        </button>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        {drafts.map((d, i) => (
-          <div key={i} className="flex items-start gap-2 rounded-md border border-violet-100 bg-white px-2.5 py-1.5">
-            <div className="min-w-0 flex-1">
-              <div className="text-[13px] leading-relaxed text-zinc-800">{d.text}</div>
-              <button type="button" onClick={() => setSource(d)} className="mt-0.5 text-left text-[11px] text-violet-700 hover:underline">依据：{d.basis} · 查看原文</button>
-            </div>
-            <Button size="sm" variant="primary" onClick={() => onSend(d)}>一键发出</Button>
-            <Button size="sm" onClick={() => onEdit(d)}>改后发</Button>
-          </div>
-        ))}
-      </div>
-      <DemoNote compact className="mt-1.5">演示里按关键词匹配已发布的知识条目，不调用真实模型。</DemoNote>
-      {source && <Modal open title={source.basis} onClose={() => setSource(null)} width={560}><p className="whitespace-pre-wrap text-sm leading-relaxed">{source.sourceBody}</p></Modal>}
-    </div>
   )
 }

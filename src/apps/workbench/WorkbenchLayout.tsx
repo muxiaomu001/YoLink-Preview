@@ -13,7 +13,7 @@ import { DemoBar } from './components/layout/DemoBar'
 import { IconRail, type RailItem } from './components/layout/IconRail'
 import { SeatSwitcher } from './components/layout/SeatSwitcher'
 import { notifyPermission, sendDesktopNotification } from './components/layout/notify'
-import { DemoNote } from '@/ui/DemoNote'
+import { DemoNote, useDemoNotes } from '@/ui/DemoNote'
 
 const TITLE_BASE = 'YoLink 工作台'
 
@@ -26,7 +26,7 @@ export function WorkbenchLayout() {
   const mySeats = seatsOfStaff(s, s.session.workbenchStaffId)
   const activeSeat = mySeats.find((x) => x.id === s.session.workbenchSeatId) ?? mySeats[0]
   const can = (cap: string) => staffHasCap(s, staff?.id ?? null, cap)
-  const aiLicensed = s.license.modules.some((m) => m.key === 'ai' && m.enabled)
+  const demoNotes = useDemoNotes()
 
   // 当前坐席被交接走了，或没选：自动落到第一个持有的坐席
   useEffect(() => {
@@ -51,7 +51,7 @@ export function WorkbenchLayout() {
     { to: '/workbench/customers', label: '客户', icon: Users, show: true },
     { to: '/workbench/broadcast', label: '群发', icon: Send, show: can('broadcast') && s.enterprise.modules.broadcast },
     { to: '/workbench/invites', label: '邀请链接', icon: Link2, show: can('create_invite') },
-    { to: '/workbench/bots', label: '群活跃助手', icon: Bot, show: can('manage_bots') && aiLicensed },
+    { to: '/workbench/bots', label: '群活跃助手', icon: Bot, show: demoNotes },
     { to: '/workbench/withdrawals', label: '提现审核', icon: Wallet, show: s.enterprise.modules.wallet && can('review_withdrawal') },
     { to: '/workbench/settings', label: '设置', icon: Settings, show: true },
   ]
@@ -110,7 +110,6 @@ export function WorkbenchLayout() {
           </div>
         </header>
         {location.pathname === '/workbench/withdrawals' && <DemoNote className="mx-4 mt-3">提现审核属于后续版本的讨论稿，不在第一版交付范围内。</DemoNote>}
-        {location.pathname === '/workbench/bots' && <DemoNote className="mx-4 mt-3">群活跃助手保留在演示里供讨论，首版的触发、节奏与审核细节待确认。</DemoNote>}
         <main className="min-h-0 flex-1">
           <Outlet />
         </main>

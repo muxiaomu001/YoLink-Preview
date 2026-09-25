@@ -12,7 +12,7 @@ import { type Get, type Set, now, randomPassword, withAudit } from './helpers'
 
 export interface WorkbenchActions {
   /** 坐席发消息（带回复 / @ / 群发标记之外的扩展参数） */
-  seatSendRich: (input: { convId: string; seatId: string; operatorId: string; text: string; replyToId?: string; mentionAll?: boolean; selectedMentions?: { mentionSeatIds: string[]; mentionCustomerIds: string[] }; kind?: 'text' | 'image' | 'file'; media?: MessageMedia; aiDraftUsed?: boolean }) => void
+  seatSendRich: (input: { convId: string; seatId: string; operatorId: string; text: string; replyToId?: string; mentionAll?: boolean; selectedMentions?: { mentionSeatIds: string[]; mentionCustomerIds: string[] }; kind?: 'text' | 'image' | 'file'; media?: MessageMedia }) => void
   editMessage: (messageId: string, text: string, byStaffId: string, expectedText: string) => string | null
   /** 坐席（群主或有 can_delete_messages 的管理员）删除群里别人的消息 */
   seatDeleteMessage: (messageId: string, seatId: string, byStaffId: string) => void

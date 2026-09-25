@@ -47,7 +47,6 @@ function SyncSettingsTab() {
   const admin = s.session.adminStaffId!
   const ps = s.profileSync
   const [roleIds, setRoleIds] = useState<string[]>(ps.amountVisibleRoleIds)
-  const [shareWithAi, setShareWithAi] = useState(ps.shareWithAi)
   const [scheduledPull, setScheduledPull] = useState(ps.scheduledPull)
   const [webhookUrl, setWebhookUrl] = useState(ps.webhookUrl)
   const [fullKey, setFullKey] = useState<string | null>(null)
@@ -61,7 +60,7 @@ function SyncSettingsTab() {
   }
   const save = () => {
     if (error) return
-    s.updateProfileSync({ amountVisibleRoleIds: roleIds, shareWithAi, scheduledPull, webhookUrl: webhookUrl.trim() }, admin)
+    s.updateProfileSync({ amountVisibleRoleIds: roleIds, scheduledPull, webhookUrl: webhookUrl.trim() }, admin)
     toast('画像同步设置已保存')
   }
 
@@ -95,13 +94,6 @@ function SyncSettingsTab() {
                 ))}
               </div>
             </Field>
-            <div className="flex items-center justify-between rounded-md border border-zinc-200 px-3 py-2">
-              <div className="text-xs">
-                <div className="font-medium text-zinc-800">画像数据传给 AI</div>
-                <div className="text-zinc-500">开启后回复推荐会带上购买记录摘要；受 AI 模块「客户资料传给 AI」总开关约束</div>
-              </div>
-              <Switch checked={shareWithAi} onChange={setShareWithAi} />
-            </div>
             <div className="rounded-md border border-dashed border-zinc-200 p-3">
               <div className="mb-2 flex items-center gap-2 text-xs font-medium text-zinc-800">
                 进阶同步<DemoLevelTag level="P1" />

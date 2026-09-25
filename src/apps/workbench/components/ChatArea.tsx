@@ -1,7 +1,6 @@
 /**
- * 聊天区：顶栏（在线状态 / 群成员数 / 会话内搜索 / 右栏收起）→ 群置顶条 → 会话内搜索（⌘F）→ 消息列表 → AI 推荐 → 输入区。
+ * 聊天区：顶栏（在线状态 / 群成员数 / 会话内搜索 / 右栏收起）→ 群置顶条 → 会话内搜索（⌘F）→ 消息列表 → 输入区。
  * 发送走 seatSendRich（回复、@所有人、图片 / 文件）；频道要有「频道发布」权限才能发；拉黑的私聊发不出去。
- * AI 推荐两种触发：员工偏好「自动弹出」开着时客户来消息自动弹；或点输入栏的「AI 推荐」按钮手动生成。
  * 通过 ref 暴露 ChatAreaHandle（填入输入框 / 发文字 / 发附件），给右栏话术面板用。
  */
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
@@ -15,13 +14,12 @@ import { ChatTyping } from '@/ui/ChatTyping'
 import { ChatMediaLibrary } from '@/ui/ChatMediaLibrary'
 import { DeleteMessagesModal } from '@/ui/DeleteMessagesModal'
 import { Button, Checkbox } from '@/ui/primitives'
-import { draftsFor, type AiDraft } from '@/domain/ai'
 import type { Message, MessageMedia, Seat } from '@/domain/types'
-import { seatCan, seatGroupPerm, senderName } from '@/store/policy'
-import { customerById, messagesOf, type ConvRow } from '@/store/selectors'
+import { seatGroupPerm, senderName } from '@/store/policy'
+import { messagesOf, type ConvRow } from '@/store/selectors'
 import { toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
-import { AiPanel, ChatHeader, ForwardModal, MessageSearchBar, PinModal, PinnedBar } from './ChatArea.parts'
+import { ChatHeader, ForwardModal, MessageSearchBar, PinModal, PinnedBar } from './ChatArea.parts'
 import { sendBlockReason } from './ChatArea.shared'
 import { ChatInput } from './ChatInput'
 import { useMessageRead } from '@/ui/useMessageRead'
@@ -67,16 +65,11 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
   const [signature,setSignature]=useState(false)
   const [firstUnreadId]=useState(()=>msgs.find((m)=>m.senderId!==actor.id&&m.at>(row.conv.readAtBySeat?.[seat.id]??'')&&(!m.delivery||m.delivery==='sent'))?.id)
   const timeline=useMessageTimeline('wb-msg-list',actorKey(actor)+':'+row.conv.id,msgs.map((m)=>m.id).join(','),firstUnreadId)
-  const [draftFrom, setDraftFrom] = useState<'ai' | null>(null)
-  const aiDraftText = useRef('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [hitIdx, setHitIdx] = useState(0)
   const [forwardMsg, setForwardMsg] = useState<Message | null>(null)
   const [pinMsg, setPinMsg] = useState<Message | null>(null)
-  // 手动生成的 AI 草稿；自动弹出被关掉时记住是针对哪条客户消息关的，下一条再弹
-  const [manualDrafts, setManualDrafts] = useState<{ items: AiDraft[]; context: string } | null>(null)
-  const [dismissedFor, setDismissedFor] = useState<string | null>(null)
   const isDm = row.conv.kind === 'dm'
   const customer = row.customer
   const group = !isDm ? s.chatGroups.find((g) => g.id === row.conv.chatGroupId) : undefined
@@ -110,37 +103,13 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
     if (hits[hitIdx]) jumpToResult(`msg-${hits[hitIdx]}`)
   }, [hits, hitIdx, jumpToResult])
 
-  // AI 推荐：策略允许才有入口；自动弹出要求私聊、客户在等、员工偏好开着
-  const canAi = seatCan(s, seat.id, 'ai.suggest') && s.license.modules.some((m) => m.key === 'ai' && m.enabled)
-  const lastCustomerMsg = [...msgs].reverse().find((m) => m.senderKind === 'customer')
-  const aiAuto = canAi && isDm && !!customer && !!row.waitingSince && !!lastCustomerMsg && !!staff?.prefs?.aiSuggest && dismissedFor !== lastCustomerMsg.id
-  const autoDrafts = aiAuto && customer && lastCustomerMsg ? draftsFor({ lastCustomerText: lastCustomerMsg.text, customer, seat, knowledge: s.knowledge }) : []
-  const aiContext = JSON.stringify([msgs.at(-1)?.id, s.knowledge])
-  const drafts = canAi && !disabledReason ? (manualDrafts?.context === aiContext ? manualDrafts.items : autoDrafts) : []
-
-  const aiSuggest = () => {
-    if (!lastCustomerMsg) return toast('还没有客户消息可参考', 'info')
-    const from = isDm ? customer : customerById(s, lastCustomerMsg.senderId)
-    if (!from) return toast('还没有客户消息可参考', 'info')
-    const items = draftsFor({ lastCustomerText: lastCustomerMsg.text, customer: from, seat, knowledge: s.knowledge })
-    setManualDrafts({ items, context: aiContext })
-    if (!items.length) toast('未找到已发布的相关知识，请人工核对后回复', 'info')
-  }
-  const closeAi = () => {
-    setManualDrafts(null)
-    if (lastCustomerMsg) setDismissedFor(lastCustomerMsg.id)
-  }
-
   const send = (body: string, _mentionAll: boolean, selected: { mentionSeatIds: string[]; mentionCustomerIds: string[] }) => {
     if (!staff || disabledReason) return
-    const result=s.queueChatMessage({ convId: row.conv.id, actor, signature, text: body, selectedMentions: selected, replyToId: replyTo?.id, quoteText: draft.quoteText,  aiDraftUsed: draftFrom === 'ai' || undefined })
+    const result=s.queueChatMessage({ convId: row.conv.id, actor, signature, text: body, selectedMentions: selected, replyToId: replyTo?.id, quoteText: draft.quoteText })
     if(!result.ok)return toast(result.reason??'发送失败','warn')
     timeline.jumpLatest()
-    if (draftFrom === 'ai') s.recordAi(staff.id, row.conv.id, body.trim() === aiDraftText.current.trim() ? 'adopted' : 'edited')
     setText('')
-    setDraftFrom(null)
     setReplyTo(undefined)
-    setManualDrafts(null)
   }
   /** 图片 / 文件消息：工具栏选本机文件、话术里的附件都走这里 */
   const sendMedia = (kind: ChatMediaKind, media: MessageMedia, body: string) => {
@@ -149,13 +118,11 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
     if(!result.ok){toast(result.reason??'发送失败','warn');return false}
     timeline.jumpLatest()
     setReplyTo(undefined)
-    closeAi()
     return true
   }
   /** 右栏面板「填入」：追加到输入框并聚焦 */
   const insertText = (body: string) => {
     setText((prev) => (prev.trim() ? `${prev.replace(/\s+$/, '')}\n${body}` : body))
-    setDraftFrom(null)
     window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('#wb-chat-input textarea')?.focus(), 0)
   }
   useImperativeHandle(ref, () => ({
@@ -166,24 +133,9 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
       if(!result.ok)return toast(result.reason??'发送失败','warn')
       timeline.jumpLatest()
       setReplyTo(undefined)
-      closeAi()
     },
     sendMedia,
   }))
-  const aiSend = (d: AiDraft) => {
-    if (!staff || disabledReason) return
-    const result=s.queueChatMessage({ convId: row.conv.id, actor, signature, text: d.text, aiDraftUsed: true })
-    if(!result.ok)return toast(result.reason??'发送失败','warn')
-    timeline.jumpLatest()
-    s.recordAi(staff.id, row.conv.id, 'adopted')
-    setManualDrafts(null)
-  }
-  const aiEdit = (d: AiDraft) => {
-    aiDraftText.current = d.text
-    setText(d.text)
-    setDraftFrom('ai')
-  }
-
   return (
     <>
       <ChatHeader row={row} group={group} onGroupInfo={onGroupInfo} onSearch={() => setSearchOpen(true)} onMedia={()=>setLibraryOpen(true)} rightOpen={rightOpen} onToggleRight={onToggleRight} />
@@ -218,7 +170,7 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
             group={group}
             highlight={query.trim() || undefined}
             current={hits[hitIdx] === m.id}
-            onReply={(x,quote) => { setReplyTo(x,quote); setDraftFrom(null) }}
+            onReply={setReplyTo}
             onForward={setForwardMsg}
             onPin={setPinMsg}
             selected={selected.includes(m.id)}
@@ -234,7 +186,6 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
       </div>
       {(!timeline.atBottom||timeline.hasReturn)&&<div className="flex justify-end gap-2 px-4 py-1"><button className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs text-brand-700" onClick={timeline.jumpLatest}><ArrowDown size={14}/>{timeline.newCount?`${timeline.newCount} 条新消息`:'回到最新'}</button>{timeline.hasReturn&&<button className="text-xs text-brand-700" onClick={timeline.goBack}><CornerUpLeft size={14}/>返回阅读位置</button>}</div>}
 
-      {drafts.length > 0 && <AiPanel drafts={drafts} onSend={aiSend} onEdit={aiEdit} onClose={closeAi} />}
       {group?.kind==='channel'&&<div className="flex items-center justify-between border-t border-zinc-200 bg-white px-4 py-2 text-xs text-zinc-600"><span>发布为「{group.name}」</span><Checkbox label={`署名：${seat.displayName}`} checked={signature} onChange={setSignature}/></div>}
       <ChatInput
         draftId={key}
@@ -242,14 +193,13 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
         group={group}
         customer={customer}
         text={text}
-        setText={(v) => { setText(v); if (draftFrom && !v) setDraftFrom(null) }}
+        setText={setText}
         replyTo={replyTo}
         quoteText={draft.quoteText}
         onClearReply={() => setReplyTo(undefined)}
         disabledReason={disabledReason}
         onSend={send}
         onSendMedia={sendMedia}
-        onAiSuggest={canAi ? aiSuggest : undefined}
         onBlurText={flushDraft}
       />
 

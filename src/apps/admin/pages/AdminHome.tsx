@@ -17,7 +17,6 @@ function useTodos() {
     { n: s.seats.filter((x) => x.status === 'paused').length, label: '暂停接新的坐席', to: '/admin/seats' },
     { n: s.webhookLogs.filter((l) => l.httpStatus >= 400 && now - new Date(l.at).getTime() < 86400000).length, label: '24 小时内 Webhook 失败', to: '/admin/webhooks' },
     { n: licenseDays <= 30 ? 1 : 0, label: `许可 ${licenseDays} 天后到期`, to: '/admin/license' },
-    { n: s.botRuns.filter((r) => r.status === 'pending_review').length, label: '群活跃助手待审发言', to: '/admin/ai' },
     { n: s.broadcasts.filter((b) => b.status === 'scheduled').length, label: '待发送的定时群发', to: '/admin/broadcasts' },
   ]
   return items.filter((it) => it.n > 0)
@@ -33,8 +32,7 @@ export function AdminHome() {
       const today = new Date().toDateString()
       const msgs = s.messages.filter((m) => m.operatorId === st.id && m.senderKind === 'seat' && !m.isWelcome && new Date(m.at).toDateString() === today)
       const customers = new Set(msgs.map((m) => s.conversations.find((c) => c.id === m.convId)?.customerId).filter(Boolean)).size
-      const ai = s.aiEvents.filter((e) => e.staffId === st.id && new Date(e.at).toDateString() === today)
-      return { st, customers, ai: ai.filter((e) => e.result !== 'ignored').length, seats: s.seats.filter((x) => x.operatorStaffId === st.id).map((x) => x.displayName) }
+      return { st, customers, seats: s.seats.filter((x) => x.operatorStaffId === st.id).map((x) => x.displayName) }
     })
   const recent = s.audit.slice(0, 8)
 
@@ -51,13 +49,12 @@ export function AdminHome() {
           ))}
         </div>
       )}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
         <Stat label="客户总数 · 本周新增" value={n.customersTotal} sub={`本周 +${n.newThisWeek}`} />
         <Stat label="7 日活跃客户" value={n.active7} sub={`占 ${n.active7Pct}%`} />
         <Stat label="最近一次群发" value={n.lastBc ? `${n.lastBc.readCount}/${n.lastBc.sentCount}` : '-'} sub={n.lastBc ? `${n.lastBc.name} · 已读/送达 · ${fmtAgo(n.lastBc.sentAt)}` : '尚未群发'} />
         <Stat label="客服接待（今日）" value={n.repliedCustomers} sub={`有回复的客户数 · 在线员工 ${n.onlineStaff} 人 · 人均 ${n.perStaff}`} />
         <Stat label="首次响应中位数（今日）" value={`${n.medianMin} 分钟`} tone={n.medianMin > 10 ? 'warn' : 'default'} sub={n.medianMin > 10 ? '超过 10 分钟，日报会提醒' : '客户消息到坐席第一条人工回复'} />
-        <Stat label="AI 今日" value={`${n.aiAdopted}/${n.aiDrafts}`} sub={`采纳/起草 · 采纳率 ${n.aiPct}%`} />
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-4">
@@ -68,7 +65,6 @@ export function AdminHome() {
                 <th className="px-3 py-2 text-left font-medium">员工</th>
                 <th className="px-3 py-2 text-left font-medium">实操的坐席</th>
                 <th className="px-3 py-2 text-right font-medium">今日接待</th>
-                <th className="px-3 py-2 text-right font-medium">AI 采纳</th>
               </tr>
             </thead>
             <tbody>
@@ -77,7 +73,6 @@ export function AdminHome() {
                   <td className="px-3 py-2 font-medium">{r.st.name}</td>
                   <td className="px-3 py-2 text-zinc-500">{r.seats.join('、') || '无'}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{r.customers}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{r.ai}</td>
                 </tr>
               ))}
             </tbody>

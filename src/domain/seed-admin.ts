@@ -1,10 +1,9 @@
 /**
  * 管理后台完整版的种子数据：策略矩阵与数值、举报、敏感词、安全日志、钱包、签到、
- * 推荐奖励、横幅公告、AI、客户画像同步、日报、插件与开放 API、系统。
+ * 推荐奖励、横幅公告、客户画像同步、日报、插件与开放 API、系统。
  * 与 seed.ts 分开放，避免单文件过长。所有数据均为虚构。
  */
 import type {
-  AiSettings,
   Announcement,
   ApiKey,
   AppVersion,
@@ -117,10 +116,6 @@ export const POLICY_ITEMS: PolicyItem[] = [
   { key: 'referral.invite', label: '邀请好友得奖励', group: '模块 · 推荐', desc: '客户 App 显示邀请入口', level: 'P2', module: 'referral' },
   { key: 'appearance.change_theme', label: '切换主题', group: '模块 · 外观', desc: '在企业允许的主题里选', level: 'P0' },
   { key: 'appearance.dark_mode', label: '暗色模式', group: '模块 · 外观', desc: '明暗切换', level: 'P0' },
-  { key: 'ai.suggest', label: 'AI 回复推荐', group: '模块 · AI', desc: '工作台输入框上方的草稿', level: 'P0', staffOnly: true },
-  { key: 'ai.knowledge', label: 'AI 知识库', group: '模块 · AI', desc: '草稿引用企业知识库', level: 'P0', staffOnly: true },
-  { key: 'ai.copywriting', label: 'AI 写文案', group: '模块 · AI', desc: '群发与横幅编辑器里的按钮', level: 'P0', staffOnly: true },
-  { key: 'ai.group_warmup', label: '群活跃助手', group: '模块 · AI', desc: '活跃角色按人设与剧本参与群聊', level: 'P0', staffOnly: true },
 ]
 
 /** 客服预设下客户关闭的键：其余默认开 */
@@ -250,32 +245,12 @@ export const ANNOUNCEMENTS: Announcement[] = [
   { id: 'an_2', title: '合规提示：谨防冒充顾问收款', body: '恒信财富所有资金往来均通过您本人名下的托管账户，顾问不会要求您向个人账户转账。', buttonText: '查看详情', buttonAction: 'link', url: 'https://hxwm.example/compliance', kind: 'bar', startAt: ago(20), endAt: iso(agoMs(-30)), showMode: 'every', impressions: 4380 },
 ]
 
-// ---------- AI ----------
-
-export const AI_SETTINGS: AiSettings = {
-  endpoint: 'https://ai-gateway.hxwm.example/v1',
-  keyConfigured: true,
-  shareProfile: false,
-  lastTestAt: ago(1),
-  lastTestOk: true,
-  contextCount: 10,
-  tone: 'professional',
-  dailyLimitPerStaff: 200,
-  group: {
-    botLimit: 3,
-    botUsed: 1,
-    defaultRule: '群里超过 30 分钟无人发言时，用当天策略要点发起一个话题；不回答具体买卖建议；涉及金额与收益一律转顾问。',
-    reviewMode: 'review',
-  },
-}
-
 // ---------- 客户画像 ----------
 
 export const PROFILE_SYNC: ProfileSyncSettings = {
   apiKeyConfigured: true,
   apiKeyPrefix: 'hxp_7f3a',
   amountVisibleRoleIds: ['role_admin', 'role_lead'],
-  shareWithAi: false,
   scheduledPull: false,
   webhookUrl: '',
 }
@@ -320,7 +295,7 @@ function buildDailyReportRecords(): DailyReportRecord[] {
       date: dateStr(ms),
       sentTo: failed ? ['周敏'] : ['周敏', '李总（经营者）'],
       status: failed ? 'failed' : 'sent',
-      summary: failed ? '企微机器人 webhook 超时，已重试 3 次' : `客户 ${36 + between(-3, 3)} 位 · 7 日活跃 ${between(14, 24)} · 首响中位 ${between(3, 14)} 分钟 · AI 采纳 ${between(55, 80)}%`,
+      summary: failed ? '企微机器人 webhook 超时，已重试 3 次' : `客户 ${36 + between(-3, 3)} 位 · 7 日活跃 ${between(14, 24)} · 首响中位 ${between(3, 14)} 分钟`,
     })
   }
   return list
@@ -397,7 +372,7 @@ function buildWebhookLogs(): WebhookLog[] {
 export const APP_VERSIONS: AppVersion[] = [
   { platform: 'android', latest: '1.4.2', downloadUrl: 'https://dl.hxwm.example/app/android/1.4.2.apk', notes: '新增头衔展示；修复群消息偶发不同步', minVersion: '1.3.0' },
   { platform: 'ios', latest: '1.4.2', downloadUrl: 'https://apps.apple.com/app/id0000000000', notes: '新增头衔展示；修复群消息偶发不同步', minVersion: '1.3.0' },
-  { platform: 'windows', latest: '1.2.0', downloadUrl: 'https://dl.hxwm.example/workbench/1.2.0.exe', notes: '工作台：AI 回复推荐、话术库与打字匹配', minVersion: '1.1.0' },
+  { platform: 'windows', latest: '1.2.0', downloadUrl: 'https://dl.hxwm.example/workbench/1.2.0.exe', notes: '工作台：话术库与打字匹配', minVersion: '1.1.0' },
 ]
 
 export const LICENSE: License = {
@@ -406,15 +381,14 @@ export const LICENSE: License = {
   type: 'private',
   expiresAt: iso(agoMs(-200)),
   modules: [
-    { key: 'customers', name: '客户管理', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-200)) },
-    { key: 'invite', name: '邀请与分配', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-200)) },
-    { key: 'broadcast', name: '群发', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-200)) },
-    { key: 'banner', name: '公告与横幅', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-200)) },
-    { key: 'content', name: '内容管控', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-200)) },
-    { key: 'ai', name: 'AI 模块', enabled: true, botLimit: 3, botUsed: 1, expiresAt: iso(agoMs(-200)) },
-    { key: 'wallet', name: '钱包', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-110)) },
-    { key: 'checkin', name: '签到', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-110)) },
-    { key: 'referral', name: '推荐奖励', enabled: true, botLimit: 0, botUsed: 0, expiresAt: iso(agoMs(-110)) },
+    { key: 'customers', name: '客户管理', enabled: true, expiresAt: iso(agoMs(-200)) },
+    { key: 'invite', name: '邀请与分配', enabled: true, expiresAt: iso(agoMs(-200)) },
+    { key: 'broadcast', name: '群发', enabled: true, expiresAt: iso(agoMs(-200)) },
+    { key: 'banner', name: '公告与横幅', enabled: true, expiresAt: iso(agoMs(-200)) },
+    { key: 'content', name: '内容管控', enabled: true, expiresAt: iso(agoMs(-200)) },
+    { key: 'wallet', name: '钱包', enabled: true, expiresAt: iso(agoMs(-110)) },
+    { key: 'checkin', name: '签到', enabled: true, expiresAt: iso(agoMs(-110)) },
+    { key: 'referral', name: '推荐奖励', enabled: true, expiresAt: iso(agoMs(-110)) },
   ],
 }
 
@@ -631,7 +605,6 @@ export function buildAdminSeed(ctx: AdminSeedContext) {
     referralAnomalies,
     banners: BANNERS,
     announcements: ANNOUNCEMENTS,
-    aiSettings: AI_SETTINGS,
     profileSync: PROFILE_SYNC,
     syncRecords: SYNC_RECORDS,
     customFields: CUSTOM_FIELDS,

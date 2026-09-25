@@ -43,7 +43,6 @@ import { integrationActions, type IntegrationActions } from './actions/integrati
 import { groupActions, type GroupActions } from './actions/groups'
 import { chatExperienceActions, type ChatExperienceActions } from './actions/chatExperience'
 import { workbenchActions, type WorkbenchActions } from './actions/workbench'
-import { botActions, type BotActions } from './actions/bots'
 import { aExtraActions, type AExtraActions } from './actions/A-extra'
 import { dExtraActions, type DExtraActions } from './actions/D-extra'
 import { quickReplyActions, type QuickReplyActions } from './actions/quickReplies'
@@ -103,8 +102,7 @@ export interface CoreActions {
   /** 最后上线时间只控制对外可见范围，不影响企业侧已读数据 */
   setCustomerLastSeenVisibility: (customerId: string, visibility: LastSeenVisibility) => void
   // 工作台
-  seatSend: (convId: string, seatId: string, operatorId: string, text: string, aiDraftUsed?: boolean) => void
-  recordAi: (staffId: string, convId: string, result: 'adopted' | 'edited' | 'ignored') => void
+  seatSend: (convId: string, seatId: string, operatorId: string, text: string) => void
   assignTitle: (customerId: string, titleId: string, byStaffId: string) => void
   removeTitle: (customerId: string, titleId: string, byStaffId: string) => void
   setPrimaryTitle: (customerId: string, titleId: string) => void
@@ -138,7 +136,7 @@ export interface CoreActions {
   updateTitle: (id: string, patch: Partial<Title>, byStaffId: string) => void
 }
 
-export type DemoActions = ChatExperienceActions & CoreActions & SettingsActions & PeopleActions & PolicyActions & ContentActions & ModuleActions & IntegrationActions & GroupActions & WorkbenchActions & BotActions & AExtraActions & DExtraActions & QuickReplyActions & ProviderLicensingActions
+export type DemoActions = ChatExperienceActions & CoreActions & SettingsActions & PeopleActions & PolicyActions & ContentActions & ModuleActions & IntegrationActions & GroupActions & WorkbenchActions & AExtraActions & DExtraActions & QuickReplyActions & ProviderLicensingActions
 
 export type DemoStore = DemoState & DemoActions
 
@@ -327,16 +325,13 @@ export const useStore = create<DemoStore>()(
       dismissProfileGuide: (customerId) =>
         set((s) => ({ customers: s.customers.map((c) => (c.id === customerId ? { ...c, profileGuideDismissedAt: now() } : c)) })),
 
-      seatSend: (convId, seatId, operatorId, text, aiDraftUsed) => {
+      seatSend: (convId, seatId, operatorId, text) => {
         const at = now()
         set((s) => ({
-          messages: [...s.messages, { id: newId('msg'), convId, senderKind: 'seat', senderId: seatId, seatId, operatorId, kind: 'text', text, at, aiDraftUsed }],
+          messages: [...s.messages, { id: newId('msg'), convId, senderKind: 'seat', senderId: seatId, seatId, operatorId, kind: 'text', text, at }],
           conversations: s.conversations.map((c) => (c.id === convId ? { ...c, lastMessageAt: at } : c)),
         }))
       },
-
-      recordAi: (staffId, convId, result) =>
-        set((s) => ({ aiEvents: [{ id: newId('ai'), at: now(), staffId, convId, result, tokens: 900 }, ...s.aiEvents] })),
 
       assignTitle: (customerId, titleId, byStaffId) => {
         const s = get()
@@ -733,7 +728,6 @@ export const useStore = create<DemoStore>()(
       ...groupActions(set, get),
       ...workbenchActions(set, get),
       ...chatExperienceActions(set, get),
-      ...botActions(set, get),
       ...aExtraActions(set, get),
       ...dExtraActions(set, get),
       ...quickReplyActions(set, get),

@@ -7,7 +7,7 @@ import { type Get, type Set, now, withAudit } from './helpers'
 
 export interface ChatSendInput {
   convId: string; actor: ChatActor; text: string; kind?: Exclude<MessageKind, 'system'>; media?: MessageMedia
-  replyToId?: string; quoteText?: string; signature?: boolean; aiDraftUsed?: boolean
+  replyToId?: string; quoteText?: string; signature?: boolean
   selectedMentions?: { mentionSeatIds: string[]; mentionCustomerIds: string[] }
   forwardedFrom?: Message['forwardedFrom']
 }
@@ -97,7 +97,7 @@ export function chatExperienceActions(set: Set, get: Get): ChatExperienceActions
       const sender=input.actor.kind==='customer'?s.customers.find((c)=>c.id===input.actor.id):undefined
       const shadowReason:Message['shadowReason']|undefined=scan.shadowByWord?'word':sender?.shadowModeAt?'customer':undefined
       const sendText=scan.text
-      const m:Message={id,convId:input.convId,senderKind:input.actor.kind,senderId:input.actor.id,seatId:input.actor.kind==='seat'?input.actor.id:undefined,operatorId:input.actor.staffId,kind:input.kind??'text',text:sendText,media:input.media,at,replyToId:input.replyToId,quoteText:input.quoteText,...mentions,delivery:'pending',attemptId,aiDraftUsed:input.aiDraftUsed,forwardedFrom:input.forwardedFrom,shadowedAt:shadowReason?at:undefined,shadowReason,
+      const m:Message={id,convId:input.convId,senderKind:input.actor.kind,senderId:input.actor.id,seatId:input.actor.kind==='seat'?input.actor.id:undefined,operatorId:input.actor.staffId,kind:input.kind??'text',text:sendText,media:input.media,at,replyToId:input.replyToId,quoteText:input.quoteText,...mentions,delivery:'pending',attemptId,forwardedFrom:input.forwardedFrom,shadowedAt:shadowReason?at:undefined,shadowReason,
         channelId:group?.kind==='channel'?group.id:undefined,channelSignature:group?.kind==='channel'&&input.signature?s.seats.find((x)=>x.id===input.actor.id)?.displayName:undefined,receiptMemberSeatIds:group?.memberSeatIds,receiptMemberCustomerIds:group?.memberCustomerIds}
       const inheritedShadow = messageShadow(s, m)
       if (inheritedShadow.shadowedAt) Object.assign(m, inheritedShadow, { shadowedAt: at })

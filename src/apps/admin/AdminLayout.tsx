@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import { NavLink, Outlet, Link, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, Link, useLocation, useMatch } from 'react-router-dom'
 import { ExternalLink, FileSearch } from 'lucide-react'
 import { useStore } from '@/store/store'
 import { staffById } from '@/store/selectors'
@@ -9,6 +9,7 @@ import { DemoLevelTag, DemoNote, DemoNoteToggle, useDemoNotes } from '@/ui/DemoN
 
 export function AdminLayout() {
   const location = useLocation()
+  const pendingModule = useMatch('/admin/ai')
   const currentItem = ADMIN_NAV.flatMap((g) => g.items).find((it) => it.to === location.pathname)
   const enterprise = useStore((s) => s.enterprise)
   const admin = useStore((s) => staffById(s, s.session.adminStaffId))
@@ -84,13 +85,13 @@ export function AdminLayout() {
           </div>
         </header>
         <main className="thin-scroll flex-1 overflow-y-auto p-5">
-          <DemoNote className="mb-4">
+          {!pendingModule && <DemoNote className="mb-4">
             {currentItem?.level === 'P1'
               ? '这一页排在第二版，方案还在讨论，不在第一版交付范围内。'
               : currentItem?.level === 'P2'
                 ? '这一页排在后续版本，只演示大致形态，具体规则未定。'
-                : '数据为虚构样例；AI、外部连接与发送结果均为模拟。标题旁的 P1、P2 是排期标记，P0 不标。'}
-          </DemoNote>
+                : '数据为虚构样例；外部连接与发送结果均为模拟。标题旁的 P1、P2 是排期标记，P0 不标。'}
+          </DemoNote>}
           <Outlet />
         </main>
       </div>

@@ -43,7 +43,7 @@ export function GroupSummary({ group: g, actor, perm, officialEditable = false, 
             {GROUP_KIND_TEXT[g.kind]} · {memberTotal(g)} 人
           </div>
           <div className="text-[11px] text-zinc-400">
-            客户 {g.memberCustomerIds.length} · 坐席 {g.memberSeatIds.length} · 活跃角色 {g.memberBotIds.length}
+            客户 {g.memberCustomerIds.length} · 坐席 {g.memberSeatIds.length}
           </div>
         </div>
       </div>
