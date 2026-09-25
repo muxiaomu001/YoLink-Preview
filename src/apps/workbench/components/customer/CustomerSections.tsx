@@ -1,5 +1,5 @@
 /**
- * 客户资料卡的基础分区：基础信息、官方联系人与归属、头衔、内部标签、备注、购买与邀请。
+ * 客户资料卡的基础分区：基础信息、坐席与归属、头衔、内部标签、备注、购买与邀请。
  * 增删头衔 / 标签在顶部快捷动作里做，这里只展示与摘掉。
  */
 import { useState } from 'react'
@@ -61,7 +61,7 @@ export function OfficialsSection({ c, ctl }: SectionProps) {
   const nav = useNavigate()
   const officials = seatsOfCustomer(s, c.id)
   return (
-    <CollapsibleSection title="官方联系人与归属" ctl={ctl} summary={`${officials.length} 个坐席`} help="客户只看得到官方联系人，看不到实操员工。★ 为主归属。更换实操员工请在管理后台办理坐席交接。">
+    <CollapsibleSection title="坐席与归属" ctl={ctl} summary={`${officials.length} 个坐席`} help="客户只看得到坐席，看不到实操员工。★ 为主归属。更换实操员工请在管理后台办理坐席交接。">
       <ul className="space-y-1">
         {officials.map((o) => {
           const op = staffById(s, o.seat.operatorStaffId)

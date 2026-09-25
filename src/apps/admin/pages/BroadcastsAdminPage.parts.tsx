@@ -152,7 +152,7 @@ export function BroadcastAdminDetailModal({ s, b, onClose }: { s: DemoState; b: 
 /** 新建群发：选发送方式 → 选坐席 → 名称与文本 → 发送前预览 → 立即 / 定时 */
 export function BroadcastCreateModal({ s, onClose }: { s: DemoStore; onClose: () => void }) {
   const [openedAt] = useState(Date.now)
-  const seats = useMemo(() => s.seats.filter((x) => x.status !== 'disabled'), [s.seats])
+  const seats = useMemo(() => s.seats, [s.seats])
   const [reach, setReach] = useState<Reach>('single')
   const [seatId, setSeatId] = useState(seats[0]?.id ?? '')
   const [coverIds, setCoverIds] = useState<string[]>(seats.map((x) => x.id))
@@ -273,7 +273,7 @@ export function BroadcastCreateModal({ s, onClose }: { s: DemoStore; onClose: ()
                 ))}
               </Select>
             </Field>
-            <Field label="目标" hint="所有把该坐席加为官方联系人的在册客户">
+            <Field label="目标" hint="所有把该坐席加为坐席的在册客户">
               <div className="flex h-8 items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] text-zinc-800">
                 {seat && <SeatAvatar seat={seat} size={18} />}
                 全部好友 · <b className="tabular-nums">{friends.length}</b> 人

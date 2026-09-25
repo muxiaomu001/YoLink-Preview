@@ -1,5 +1,5 @@
 /**
- * 派生数据：会话视图、未读、等待时长、客户的官方号等。
+ * 派生数据：会话视图、未读、等待时长、客户的坐席等。
  * 全部是纯函数，输入是 DemoState，方便页面和测试复用。
  */
 import type { Conversation, Customer, DemoState, Message, QuickReply, QuickReplyCategory, Seat, Staff } from '@/domain/types'
@@ -24,7 +24,7 @@ export function customerById(s: DemoState, id: string | null | undefined): Custo
 /** 某员工当前持有的坐席 */
 export function seatsOfStaff(s: DemoState, staffId: string | null): Seat[] {
   if (!staffId) return []
-  return s.seats.filter((x) => x.operatorStaffId === staffId && x.status !== 'disabled')
+  return s.seats.filter((x) => x.operatorStaffId === staffId)
 }
 
 export function messagesOf(s: DemoState, convId: string): Message[] {
@@ -142,7 +142,7 @@ export function isIdle(row: ConvRow, idleDays: number = LONG_IDLE_DAYS): boolean
   return row.conv.kind === 'dm' && row.idleDays >= idleDays
 }
 
-/** 客户的全部官方号（按邀请组顺序），带主归属 */
+/** 客户的全部坐席（按邀请组顺序），带主归属 */
 export function seatsOfCustomer(s: DemoState, customerId: string) {
   return s.customerSeats
     .filter((cs) => cs.customerId === customerId)
@@ -174,13 +174,13 @@ export function holdsPrimary(s: DemoState, seatId: string): boolean {
   return s.inviteGroups.some((g) => g.rotatingSeatIds.includes(seatId)) || s.customerSeats.some((cs) => cs.seatId === seatId && cs.primary)
 }
 
-/** 某坐席的全部好友：所有把它加为官方联系人的在册客户（含非主归属），一键群发的范围 */
+/** 某坐席的全部好友：所有添加了该坐席的在册客户（含非主归属），一键群发的范围 */
 export function friendsOfSeat(s: DemoState, seatId: string): Customer[] {
   const ids = new Set(s.customerSeats.filter((cs) => cs.seatId === seatId).map((cs) => cs.customerId))
   return s.customers.filter((c) => ids.has(c.id) && !c.deletedAt)
 }
 
-/** 客户屏视角：客户的会话列表（官方号私聊 + 群 + 频道） */
+/** 客户屏视角：客户的会话列表（坐席私聊 + 群 + 频道） */
 export function conversationsForCustomer(s: DemoState, customerId: string) {
   const c = customerById(s, customerId)
   if (!c) return []
@@ -217,7 +217,7 @@ export function staffHasCap(s: DemoState, staffId: string | null, cap: string): 
   return !!role?.caps.includes(cap as never)
 }
 
-/** 老板看板六个数 */
+/** 管理看板六个数 */
 export function dashboardNumbers(s: DemoState) {
   const today = new Date().toDateString()
   const isToday = (x: string) => new Date(x).toDateString() === today

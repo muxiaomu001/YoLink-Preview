@@ -3,22 +3,22 @@
  *
  * 邀请组里的坐席分两类：
  * - 固定坐席：从这个码进来的客户全部添加，顺序照配置；
- * - 轮询坐席（接待员）：排成一队，客户按顺序轮流分，一人一个。
+ * - 轮询坐席：排成一队，客户按顺序轮流分，一人一个。
  *
  * 轮询是严格的「下一个」，不做客户数均衡、不看上限——多劳多得由 KPI 兜着，
- * 这里只保证队列公平。唯一的例外是停用与暂停接新的坐席要跳过，
+ * 这里只保证队列公平。唯一的例外是暂停接新的坐席要跳过，
  * 否则客户进来就对着一个死号；被跳过的那一轮不补差额。
  */
 import type { InviteGroup, Seat } from './types'
 
 export interface SeatAllocation {
-  /** 客户通讯录里的顺序：接待员在前，固定坐席按配置顺序在后 */
+  /** 客户通讯录里的顺序：轮询坐席在前，固定坐席按配置顺序在后 */
   seatIds: string[]
   /** 主归属；整组都不可用时为 undefined */
   primarySeatId?: string
   /** 分配后的新游标，回写到邀请组 */
   rotationIndex: number
-  /** 因停用或暂停接新被跳过的坐席 */
+  /** 因暂停接新被跳过的坐席 */
   skippedSeatIds: string[]
 }
 
@@ -26,7 +26,7 @@ type SeatLookup = Record<string, Seat | undefined>
 
 const isOpen = (seat: Seat | undefined): boolean => !!seat && seat.status === 'accepting'
 
-/** 取下一位可接客的接待员，并给出推进后的游标 */
+/** 取下一位可接客的轮询坐席，并给出推进后的游标 */
 function nextRotating(queue: string[], from: number, seatById: SeatLookup): { seatId?: string; index: number; skipped: string[] } {
   if (!queue.length) return { index: 0, skipped: [] }
   const start = ((from % queue.length) + queue.length) % queue.length

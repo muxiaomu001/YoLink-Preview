@@ -22,7 +22,7 @@ export function timeLimitLabel(seconds: number) {
 }
 
 export function seatConversationAllowed(s: DemoState, convId: string, seatId: string, staffId: string) {
-  const seat = s.seats.find((x) => x.id === seatId && x.operatorStaffId === staffId && x.status !== 'disabled')
+  const seat = s.seats.find((x) => x.id === seatId && x.operatorStaffId === staffId)
   const staff = s.staff.find((x) => x.id === staffId && x.status === 'active')
   const conv = s.conversations.find((x) => x.id === convId)
   if (!seat || !staff || !conv) return false
@@ -35,7 +35,7 @@ export function seatConversationAllowed(s: DemoState, convId: string, seatId: st
  * 因此两边都从这里取，不能各自再判断一套。
  */
 export function seatBroadcastSkipReason(s: DemoState, convId: string, seatId: string, staffId: string, media = false): SkipReason | undefined {
-  const seat = s.seats.find((x) => x.id === seatId && x.operatorStaffId === staffId && x.status !== 'disabled')
+  const seat = s.seats.find((x) => x.id === seatId && x.operatorStaffId === staffId)
   const staff = s.staff.find((x) => x.id === staffId && x.status === 'active')
   const conv = s.conversations.find((c) => c.id === convId)
   if (!seat || !staff) return 'senderUnavailable'
@@ -61,7 +61,7 @@ export function seatMessageSendAllowed(s: DemoState, convId: string, seatId: str
   return !seatBroadcastSkipReason(s, convId, seatId, staffId, media)
 }
 
-/** 只将本会话成员的完整名字视为提及，避免 @林 匹配到 @林顾问。 */
+/** 只将本会话成员的完整名字视为提及，避免 @林 匹配到 @林晓明。 */
 export function mentionsIn(s: DemoState, convId: string, text: string, selected?: { mentionSeatIds: string[]; mentionCustomerIds: string[] }) {
   const conv = s.conversations.find((c) => c.id === convId)
   const g = s.chatGroups.find((x) => x.id === conv?.chatGroupId)
@@ -151,7 +151,7 @@ export function canManageDelete(s: DemoState, m: Message, actor: ChatActor) {
   if (actor.kind === 'seat') {
     const staff = s.staff.find((x) => x.id === actor.staffId)
     const caps = s.roles.find((x) => x.id === staff?.roleId)?.caps ?? []
-    if (staff?.roleId === 'role_admin' || caps.includes('manage_messages')) return true
+    if (caps.includes('manage_messages')) return true
     return !!group && seatGroupPerm(s, group, actor.id, actor.staffId ?? null, 'can_delete_messages')
   }
   return !!group && groupPerm(group, 'customer', actor.id, 'can_delete_messages')
@@ -177,7 +177,7 @@ export function sendFailure(s: DemoState, convId: string, actor: ChatActor, medi
   const globalMute = globalMuteReason(customer)
   if (globalMute) return globalMute
   if (conv.kind === 'dm') {
-    if (customer.blockedSeatIds.includes(conv.seatId!)) return '请先解除对该官方联系人的拉黑'
+    if (customer.blockedSeatIds.includes(conv.seatId!)) return '请先解除拉黑'
     if (media && !customerCan(s, actor.id, 'dm.send_media')) return '当前不允许发送附件'
   } else {
     const group = s.chatGroups.find((g) => g.id === conv.chatGroupId)!

@@ -2,6 +2,7 @@
  * 员工页的弹窗：创建员工、编辑员工、重置密码。
  */
 import { useState } from 'react'
+import { staffRoleChangeBlocker } from '@/domain/staffRoles'
 import type { ReactNode } from 'react'
 import type { Staff } from '@/domain/types'
 import { useStore } from '@/store/store'
@@ -25,10 +26,10 @@ function validateProfile(name: string, email: string): string | null {
 export function CreateStaffModal({ onClose }: { onClose: () => void }) {
   const s = useStore()
   const admin = s.session.adminStaffId!
-  const [form, setForm] = useState({ name: '', username: '', email: '', password: '', mustChange: true, roleId: 'role_seat', withSeat: true, roleDesc: '投资顾问' })
+  const [form, setForm] = useState({ name: '', username: '', email: '', password: '', mustChange: true, roleId: 'role_cs', withSeat: true, roleDesc: '客户服务' })
   const [assignSeatIds, setAssignSeatIds] = useState<string[]>([])
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }))
-  const seats = s.seats.filter((x) => x.status !== 'disabled')
+  const seats = s.seats
 
   const error = (() => {
     const p = validateProfile(form.name, form.email)
@@ -136,7 +137,8 @@ export function EditStaffModal({ staff, onClose }: { staff: Staff; onClose: () =
   const error = validateProfile(form.name, form.email)
   const submit = () => {
     if (error) return
-    s.updateStaff(staff.id, { name: form.name.trim(), email: form.email.trim() || undefined, roleId: form.roleId }, s.session.adminStaffId!)
+    const blocker = s.updateStaff(staff.id, { name: form.name.trim(), email: form.email.trim() || undefined, roleId: form.roleId }, s.session.adminStaffId!)
+    if (blocker) { toast(blocker, 'warn'); return }
     toast(`已更新员工 ${form.name.trim()}`)
     onClose()
   }
@@ -164,8 +166,8 @@ export function EditStaffModal({ staff, onClose }: { staff: Staff; onClose: () =
         <Field label="邮箱" hint="可选">
           <Input value={form.email} onChange={(e) => set('email', e.target.value)} />
         </Field>
-        <Field label="员工角色" required>
-          <Select value={form.roleId} disabled={staff.id === s.session.adminStaffId} onChange={(e) => set('roleId', e.target.value)}>
+        <Field label="员工角色" required hint={staffRoleChangeBlocker(s, staff.id) ?? (staff.id === s.session.adminStaffId ? '不能修改自己的角色' : undefined)}>
+          <Select value={form.roleId} disabled={!!staffRoleChangeBlocker(s, staff.id) || staff.id === s.session.adminStaffId} onChange={(e) => set('roleId', e.target.value)}>
             {s.roles.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}

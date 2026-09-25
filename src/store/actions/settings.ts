@@ -3,6 +3,7 @@
  */
 import type { AppPlatform, AppVersion, Backup, DailyReportSettings, DemoState, ModuleKey } from '@/domain/types'
 import { MODULE_LABEL } from '@/domain/labels'
+import { dailyReportRecipients } from '@/domain/dailyReport'
 import { newId } from '@/domain/ids'
 import { type Get, type Set, now, withAudit } from './helpers'
 
@@ -86,18 +87,27 @@ export function settingsActions(set: Set, get: Get): SettingsActions {
       set((s) => ({ health: { ...s.health, db: 'ok', redis: 'ok', storage: s.enterprise.storage.lastTestOk === false ? 'error' : 'ok', connections: 120 + Math.floor(Math.random() * 60), latencyMs: 30 + Math.floor(Math.random() * 25), checkedAt: now() } })),
 
     updateDailyReportSettings: (patch, byStaffId) =>
-      set((s) => ({
-        dailyReport: { ...s.dailyReport, ...patch },
-        audit: withAudit(s.audit, 'daily_report.settings', `修改日报设置：${Object.keys(patch).join('、')}`, byStaffId),
-      })),
+      set((s) => {
+        const dailyReport = { ...s.dailyReport, ...patch }
+        const recipients = dailyReportRecipients({ ...s, dailyReport })
+        if (recipients.length !== dailyReport.recipients.length || recipients.some((recipient, index) => recipient.channels.length !== dailyReport.recipients[index].channels.length)) return {}
+        return {
+          dailyReport: { ...dailyReport, recipients },
+          audit: withAudit(s.audit, 'daily_report.settings', `修改日报设置：${Object.keys(patch).join('、')}`, byStaffId),
+        }
+      }),
 
     sendDailyReportNow: () =>
-      set((s) => ({
-        dailyReportRecords: [
-          { id: newId('dr'), date: now().slice(0, 10), sentTo: s.dailyReport.recipients.map((r) => r.name), status: 'sent', summary: `手动触发 · 客户 ${s.customers.length} 位 · 7 日活跃 ${s.customers.filter((c) => Date.now() - new Date(c.lastActiveAt).getTime() < 7 * 86400000).length}` },
-          ...s.dailyReportRecords,
-        ],
-      })),
+      set((s) => {
+        const recipients = dailyReportRecipients(s)
+        if (!recipients.length) return {}
+        return {
+          dailyReportRecords: [
+            { id: newId('dr'), date: now().slice(0, 10), sentTo: recipients.map((recipient) => recipient.name), status: 'sent', summary: `手动触发 · 客户 ${s.customers.length} 位 · 7 日活跃 ${s.customers.filter((c) => Date.now() - new Date(c.lastActiveAt).getTime() < 7 * 86400000).length}` },
+            ...s.dailyReportRecords,
+          ],
+        }
+      }),
 
     clearDemoCustomers: (byStaffId) =>
       set((s) => ({

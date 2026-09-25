@@ -1,8 +1,8 @@
 /**
- * 邀请组：客户注册完成那一刻，官方联系人已经在通讯录里了。
+ * 邀请组：客户注册完成那一刻，坐席已经在通讯录里了。
  *
- * 组里的坐席分两类——固定坐席人人都加，轮询坐席（接待员）按队列轮流分一个。
- * 分到的那位接待员就是主归属，决定业绩归属与群发的默认发送身份。
+ * 组里的坐席分两类——固定坐席人人都加，轮询坐席按队列轮流分一个。
+ * 分到的那位轮询坐席就是主归属，决定业绩归属与群发的默认发送身份。
  */
 import { useState } from 'react'
 import { Copy, Plus, RefreshCw, Star } from 'lucide-react'
@@ -32,7 +32,7 @@ export function InviteGroupsPage() {
     <div>
       <PageHeader
         title="邀请组"
-        desc="用这个组的邀请码注册的客户，进来就自动加上组里的坐席：固定坐席人人都加，接待员按队列轮流分一个。"
+        desc="用这个组的邀请码注册的客户，进来就自动加上组里的坐席：固定坐席人人都加，轮询坐席按队列轮流分一个。"
         extra={
           <Button variant="primary" onClick={() => setCreating(true)}>
             <Plus size={14} /> 创建邀请组
@@ -91,7 +91,7 @@ export function InviteGroupsPage() {
             },
             {
               key: 'rotating',
-              title: '接待员（轮流分，一人一个）',
+              title: '轮询坐席（轮流分，一人一个）',
               render: (r) =>
                 r.rotating.length ? (
                   <div className="flex flex-wrap items-center gap-1">
@@ -149,7 +149,7 @@ export function InviteGroupsPage() {
       </Card>
       <p className="mt-2 text-[11px] text-zinc-400">
         <Star size={10} className="mr-0.5 inline fill-gold-500 align-[1px] text-gold-500" />
-        下一个进来的客户分给谁。轮到停用或暂停接新的坐席会顺延到下一位，跳过的那一轮不补。
+        下一个进来的客户分给谁。轮到暂停接新的坐席会顺延到下一位，跳过的那一轮不补。
       </p>
 
       {editing && <GroupEditor group={editing} onClose={() => setEditing(null)} />}
@@ -164,7 +164,7 @@ function SeatChip({ seat, next }: { seat: Seat; next?: boolean }) {
       <SeatAvatar seat={seat} size={18} />
       {seat.displayName}
       {next && <Star size={11} className="fill-gold-500 text-gold-500" />}
-      {seat.status !== 'accepting' && <span className="text-[10px] text-amber-600">{seat.status === 'paused' ? '暂停接新' : '停用'}</span>}
+      {seat.status !== 'accepting' && <span className="text-[10px] text-amber-600">暂停接新</span>}
     </span>
   )
 }
@@ -179,7 +179,7 @@ function GroupEditor({ group, onClose }: { group?: InviteGroup; onClose: () => v
   const [fixedSeatIds, setFixed] = useState<string[]>(group?.fixedSeatIds ?? [])
   const [rotatingSeatIds, setRotating] = useState<string[]>(group?.rotatingSeatIds ?? [])
   const [chatGroupIds, setChatGroupIds] = useState<string[]>(group?.chatGroupIds ?? [])
-  const availableSeats = s.seats.filter((x) => x.status !== 'disabled')
+  const availableSeats = s.seats
 
   const slotOf = (id: string): Slot => (rotatingSeatIds.includes(id) ? 'rotating' : fixedSeatIds.includes(id) ? 'fixed' : 'none')
   // 一个坐席只能占一个槽位：换槽位时先从另一边摘掉
@@ -261,7 +261,7 @@ function GroupEditor({ group, onClose }: { group?: InviteGroup; onClose: () => v
         <div>
           <div className="mb-1 flex items-baseline justify-between">
             <span className="text-xs font-medium text-zinc-600">坐席</span>
-            <span className="text-[11px] text-zinc-400">接待员轮流分，一个客户只分到一位；固定坐席人人都加</span>
+            <span className="text-[11px] text-zinc-400">轮询坐席轮流分，一个客户只分到一位；固定坐席人人都加</span>
           </div>
           <div className="divide-y divide-zinc-100 rounded-md border border-zinc-200">
             {availableSeats.map((seat) => {
@@ -295,9 +295,9 @@ function GroupEditor({ group, onClose }: { group?: InviteGroup; onClose: () => v
               )
             })}
           </div>
-          {noSeat && <p className="mt-1 text-[11px] text-red-600">至少配一个坐席，否则客户注册进来没有任何官方联系人。</p>}
+          {noSeat && <p className="mt-1 text-[11px] text-red-600">至少配一个坐席，否则客户注册进来没有任何坐席。</p>}
           {!noSeat && !rotatingSeatIds.length && (
-            <p className="mt-1 text-[11px] text-amber-600">没有接待员：主归属会落到第一个固定坐席上，这个组不参与轮询。</p>
+            <p className="mt-1 text-[11px] text-amber-600">没有轮询坐席：主归属会落到第一个固定坐席上，这个组不参与轮询。</p>
           )}
         </div>
 
@@ -321,11 +321,11 @@ function GroupEditor({ group, onClose }: { group?: InviteGroup; onClose: () => v
 
 const SLOT_LABEL: { key: Slot; label: string }[] = [
   { key: 'none', label: '不加' },
-  { key: 'rotating', label: '接待员' },
+  { key: 'rotating', label: '轮询坐席' },
   { key: 'fixed', label: '固定' },
 ]
 
-/** 三选一的槽位选择器：不加 / 轮询接待员 / 固定坐席 */
+/** 三选一的槽位选择器：不加 / 轮询坐席 / 固定坐席 */
 function SlotPicker({ value, onChange }: { value: Slot; onChange: (v: Slot) => void }) {
   return (
     <div className="inline-flex overflow-hidden rounded-md border border-zinc-200">

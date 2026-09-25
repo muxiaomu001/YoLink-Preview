@@ -145,7 +145,7 @@ export function InviteLinkCreateModal({ onClose }: { onClose: () => void }) {
         <Field label="链接名称" required hint="1 到 32 字，标明渠道或用途">
           <Input value={name} maxLength={32} onChange={(e) => setName(e.target.value)} placeholder="如：抖音 9 月投放、线下沙龙签到" />
         </Field>
-        <Field label="邀请组" required hint="决定注册后自动添加哪些坐席、由哪位接待员轮到">
+        <Field label="邀请组" required hint="决定注册后自动添加哪些坐席、由哪位轮询坐席轮到">
           <Select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>

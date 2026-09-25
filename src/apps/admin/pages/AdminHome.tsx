@@ -13,7 +13,6 @@ function useTodos() {
   const items = [
     { n: s.reports.filter((r) => r.status === 'pending').length, label: '待处理举报', to: '/admin/reports' },
     { n: s.withdrawals.filter((w) => w.status === 'pending' || w.status === 'approved').length, label: '待审核 / 待打款提现', to: '/admin/wallet' },
-    { n: s.seats.filter((x) => x.status !== 'disabled' && !x.operatorStaffId).length, label: '无人实操的坐席', to: '/admin/seats' },
     { n: s.seats.filter((x) => x.status === 'paused').length, label: '暂停接新的坐席', to: '/admin/seats' },
     { n: s.webhookLogs.filter((l) => l.httpStatus >= 400 && now - new Date(l.at).getTime() < 86400000).length, label: '24 小时内 Webhook 失败', to: '/admin/webhooks' },
     { n: licenseDays <= 30 ? 1 : 0, label: `许可 ${licenseDays} 天后到期`, to: '/admin/license' },
@@ -27,7 +26,7 @@ export function AdminHome() {
   const n = dashboardNumbers(s)
   const todos = useTodos()
   const perStaff = s.staff
-    .filter((st) => st.status === 'active' && st.roleId !== 'role_admin')
+    .filter((st) => st.status === 'active' && !['role_super', 'role_admin'].includes(st.roleId))
     .map((st) => {
       const today = new Date().toDateString()
       const msgs = s.messages.filter((m) => m.operatorId === st.id && m.senderKind === 'seat' && !m.isWelcome && new Date(m.at).toDateString() === today)

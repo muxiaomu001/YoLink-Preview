@@ -123,7 +123,7 @@ export interface Enterprise {
   defaultNicknameTemplate: string
   /** 同一设备 24 小时内最多注册几个账号；0 = 不限 */
   registerPerDevicePerDay: number
-  /** 新号观察期小时数；0 = 关闭。观察期内只能私聊官方联系人，不能在群里发言 */
+  /** 新号观察期小时数；0 = 关闭。观察期内只能私聊坐席，不能在群里发言 */
   newAccountWatchHours: number
 }
 
@@ -166,7 +166,7 @@ export interface Staff {
   prefs?: StaffPrefs
 }
 
-export type SeatStatus = 'accepting' | 'paused' | 'disabled'
+export type SeatStatus = 'accepting' | 'paused'
 
 /** 坐席：客户看到的官方身份，不能登录，由员工实操 */
 export interface Seat {
@@ -219,16 +219,16 @@ export interface Customer {
   referrerId: string | null
   inviteCount: number
   teamCount: number
-  /** 客户系统同步来的角色文本，内部字段 */
+  /** 业务系统同步来的角色文本，内部字段 */
   roleLabel?: string
   blockedSeatIds: string[]
   /** 已注销：保留数据，不再出现在工作台 */
   deletedAt?: ISODate
   /** 企业封禁：账号无法登录 */
   bannedAt?: ISODate | null
-  /** 全群禁言到期时间；群与频道不能发言，私聊不受影响 */
+  /** 群聊禁言到期时间；群与频道不能发言，私聊不受影响 */
   mutedAllUntil?: ISODate | null
-  /** 全局禁言到期时间；官方联系人、群与频道都不能发消息 */
+  /** 全部禁言到期时间；坐席、群与频道都不能发消息 */
   globalMutedUntil?: ISODate | null
   /** 员工重置过密码，首次登录强制修改 */
   mustChangePassword?: boolean
@@ -270,9 +270,9 @@ export interface InviteGroup {
   name: string
   /** 邀请码，可自定义；与邀请链接共用一个命名空间 */
   code: string
-  /** 固定坐席：从这个码进来的客户全部添加，按此顺序排在接待员之后 */
+  /** 固定坐席：从这个码进来的客户全部添加，按此顺序排在轮询坐席之后 */
   fixedSeatIds: string[]
-  /** 轮询坐席（接待员）：排成一队，每个客户按顺序分到其中一位，分到谁谁就是主归属 */
+  /** 轮询坐席：排成一队，每个客户按顺序分到其中一位，分到谁谁就是主归属 */
   rotatingSeatIds: string[]
   /** 轮询游标：下一个客户从队列的第几位开始取 */
   rotationIndex: number
@@ -376,7 +376,7 @@ export interface GroupAnnouncement {
   notified: boolean
 }
 
-/** 单人禁言或封禁 */
+/** 单人禁言或移出并禁止再进 */
 export interface GroupRestriction {
   customerId: string
   kind: 'mute' | 'ban'
@@ -422,7 +422,7 @@ export interface ChatGroup {
   /** 人数上限，null 用数值型策略的单群上限 */
   maxMembers: number | null
   createdAt: ISODate
-  /** 频道帖子可选官方顾问署名 */
+  /** 频道帖子可选坐席署名 */
   showSignature?: boolean
   welcomeText?: string
 }
@@ -620,7 +620,9 @@ export type AuditType =
   | 'message.edit'
   | 'customer.ban'
   | 'customer.mute'
-  | 'customer.mute_all'
+  | 'customer.unmute'
+  | 'customer.group_mute'
+  | 'customer.group_unmute'
   | 'customer.reset_password'
   | 'customer.force_logout'
   | 'quick_reply.update'
@@ -701,7 +703,7 @@ export interface SensitiveHit {
 
 // ---------- 群发、快捷回复 ----------
 
-/** friends：本坐席全部好友（所有把它加为官方联系人的客户），一键群发的默认目标；mine：只算主归属 */
+/** friends：本坐席全部好友（所有添加了该坐席的客户），一键群发的默认目标；mine：只算主归属 */
 export type BroadcastTargetKind = 'friends' | 'mine' | 'tag' | 'title' | 'purchase' | 'role' | 'group' | 'coverage'
 export type BroadcastStatus = 'scheduled' | 'sending' | 'done' | 'failed'
 
@@ -775,7 +777,7 @@ export interface PolicyItem {
   group: string
   desc: string
   level: 'P0' | 'P1' | 'P2'
-  /** 模块能力键：模块停用或未授权时整体不生效 */
+  /** 模块能力键：模块停用时整体不生效 */
   module?: ModuleKey
   /** 只对坐席有意义的键：客户列显示"—" */
   staffOnly?: boolean
@@ -995,14 +997,14 @@ export interface AutomationRule {
   lastRunAt: ISODate | null
 }
 
-// ---------- 老板可感知层 ----------
+// ---------- 经营数据与提醒 ----------
 
-export type ReportChannel = 'app' | 'wecom' | 'feishu' | 'wechat' | 'sms' | 'email'
+export type ReportChannel = 'wecom' | 'feishu' | 'wechat' | 'sms' | 'email'
 
 export interface ReportRecipient {
   id: string
   name: string
-  staffId?: string
+  staffId: string
   channels: ReportChannel[]
 }
 
@@ -1088,19 +1090,11 @@ export interface AppVersion {
   minVersion: string
 }
 
-export interface LicenseModule {
-  key: ModuleKey
-  name: string
-  enabled: boolean
-  expiresAt: ISODate
-}
-
 export interface License {
   version: string
   instanceId: string
   type: 'saas' | 'private'
   expiresAt: ISODate
-  modules: LicenseModule[]
 }
 
 export interface ProviderInstance {

@@ -79,7 +79,7 @@ export function RenewInstanceModal({ instance, onClose }: { instance: ProviderIn
         <Field label="新到期日" required hint={`当前到期日 ${instance.expiresAt.slice(0, 10)}，新日期需更晚`}>
           <Input type="date" min={minExpiry} value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} />
         </Field>
-        {instance.stoppedAt && <Note tone="amber">这个实例目前已人工停用。续期只更新到期日，不会自动恢复。</Note>}
+        {instance.stoppedAt && <Note tone="amber">这个实例目前已暂停服务。续期只更新到期日，不会自动恢复服务。</Note>}
       </div>
     </Modal>
   )
@@ -93,17 +93,17 @@ export function StopInstanceModal({ instance, onClose }: { instance: ProviderIns
     <Modal
       open
       onClose={onClose}
-      title={`人工停用：${instance.enterpriseName}`}
+      title={`暂停服务：${instance.enterpriseName}`}
       footer={
         <>
           <Button onClick={onClose}>取消</Button>
-          <Button variant="danger" disabled={reason.trim().length < 2} onClick={() => { stop(instance.id, reason); toast(`已人工停用「${instance.enterpriseName}」`); onClose() }}>确认停用</Button>
+          <Button variant="danger" disabled={reason.trim().length < 2} onClick={() => { stop(instance.id, reason); toast(`已暂停服务「${instance.enterpriseName}」`); onClose() }}>确认暂停服务</Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Note tone="amber">到期和停用是两种状态。只有在这里确认后，实例才会标记为人工停用。</Note>
-        <Field label="停用原因" required hint="至少 2 个字">
+        <Note tone="amber">到期和暂停服务是两种状态。只有在这里确认后，实例才会标记为暂停服务。</Note>
+        <Field label="暂停服务原因" required hint="至少 2 个字">
           <Textarea rows={3} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="填写客户确认、合同或服务安排等原因" />
         </Field>
       </div>

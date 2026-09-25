@@ -1,6 +1,6 @@
 /**
  * 批量拉人：按范围（我的客户 / 全部客户）、标签多选、注册时间范围、最近活跃范围（P1）筛选，
- * 勾选后一次拉入；跳过原因（已在群 / 已满 / 被封禁 / 头衔不符）在 toast 里说清。走「邀请用户」权限。
+ * 勾选后一次拉入；跳过原因（已在群 / 已满 / 被禁止再进 / 头衔不符）在 toast 里说清。走「邀请用户」权限。
  */
 import { useMemo, useState } from 'react'
 import type { Customer } from '@/domain/types'
@@ -15,7 +15,7 @@ import { isRestrictionActive } from './groupRules'
 import type { GroupPanelProps } from './shared'
 
 type Scope = 'mine' | 'all'
-type SkipReason = '已在群' | '被封禁' | '头衔不符' | '已满'
+type SkipReason = '已在群' | '被禁止再进' | '头衔不符' | '已满'
 
 export function GroupBulkAddModal({ group: g, actor, canViewAll, onClose }: Pick<GroupPanelProps, 'group' | 'actor'> & { canViewAll: boolean; onClose: () => void }) {
   const s = useStore()
@@ -32,7 +32,7 @@ export function GroupBulkAddModal({ group: g, actor, canViewAll, onClose }: Pick
 
   const skipReason = (c: Customer): SkipReason | null => {
     if (g.memberCustomerIds.includes(c.id)) return '已在群'
-    if (g.restrictions.some((r) => r.customerId === c.id && r.kind === 'ban' && isRestrictionActive(r, nowIso))) return '被封禁'
+    if (g.restrictions.some((r) => r.customerId === c.id && r.kind === 'ban' && isRestrictionActive(r, nowIso))) return '被禁止再进'
     if (g.requiredTitleId && !c.titleIds.includes(g.requiredTitleId)) return '头衔不符'
     return null
   }
@@ -116,7 +116,7 @@ export function GroupBulkAddModal({ group: g, actor, canViewAll, onClose }: Pick
               <Input type="date" value={actTo} onChange={(e) => setActTo(e.target.value)} />
             </div>
           </Field>
-          <p className="text-[11px] leading-relaxed text-zinc-400">跳过规则：已在群、被封禁、不满足入群头衔、群已满。{g.requiredTitleId ? `本群要求头衔「${s.titles.find((t) => t.id === g.requiredTitleId)?.name}」。` : ''}</p>
+          <p className="text-[11px] leading-relaxed text-zinc-400">跳过规则：已在群、被禁止再进、不满足入群头衔、群已满。{g.requiredTitleId ? `本群要求头衔「${s.titles.find((t) => t.id === g.requiredTitleId)?.name}」。` : ''}</p>
         </div>
         <div className="min-w-0">
           <div className="mb-1.5 flex items-center justify-between text-[11px] text-zinc-500">

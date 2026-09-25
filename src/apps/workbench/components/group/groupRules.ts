@@ -5,7 +5,7 @@ import { fmtDateTime } from '@/domain/time'
 export const PERM_META: { key: GroupAdminPerm; label: string; desc: string; channelOnly?: boolean }[] = [
   { key: 'can_manage_chat', label: '管理群', desc: '访问管理员日志、查看隐藏成员' },
   { key: 'can_delete_messages', label: '删除消息', desc: '删除他人消息' },
-  { key: 'can_restrict_members', label: '限制成员', desc: '禁言 / 封禁 / 解封 / 移出成员，开关全员禁言' },
+  { key: 'can_restrict_members', label: '限制成员', desc: '禁言 / 移出并禁止再进 / 解除禁止 / 移出成员，开关全员禁言' },
   { key: 'can_promote_members', label: '任免管理员', desc: '添加 / 降级管理员，修改管理员权限' },
   { key: 'can_change_info', label: '修改群信息', desc: '修改群名称、头像、简介与公告' },
   { key: 'can_invite_users', label: '邀请用户', desc: '生成邀请链接、批量拉人、加入坐席' },
@@ -47,7 +47,7 @@ export function memberTotal(g: ChatGroup): number {
 }
 
 export function restrictionLabel(r: GroupRestriction): string {
-  const kind = r.kind === 'ban' ? '已封禁' : '已禁言'
+  const kind = r.kind === 'ban' ? '已禁止再进' : '已禁言'
   return r.until === null ? `${kind}（永久）` : `${kind}至 ${fmtDateTime(r.until)}`
 }
 

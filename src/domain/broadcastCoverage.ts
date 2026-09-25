@@ -3,11 +3,11 @@
  *
  * 后台原来的群发只能选一个坐席，发给它的好友。"给全部客户发一条合规通知"这种事，
  * 管理员得挨个坐席建任务，还会漏掉只加了其中某一个号的客户；更麻烦的是同时加了
- * 林顾问和客服号的客户会收到两条一模一样的话。
+ * 同时添加林晓明和客户服务的客户会收到两条一模一样的话。
  *
  * 全覆盖的做法：先把选中的坐席合起来算出"能被够到的客户"，再给每个客户挑一个发送身份，
  * **一人只发一条**。挑身份的顺序是「主归属优先，其次按坐席在列表里的顺序」——客户看到的
- * 是他最熟的那个号在说话，而不是随机一个官方号。
+ * 是他最熟的那个号在说话，而不是随机一个坐席。
  *
  * 这里只算计划、不写数据，所以发送前的预览和真正发送走的是同一份计算，
  * 预览说"触达 137 人"就一定发 137 条。
@@ -21,7 +21,7 @@ export type SkipReason = 'deleted' | 'banned' | 'globalMuted' | 'blocked' | 'lef
 export const SKIP_REASON_LABEL: Record<SkipReason, string> = {
   deleted: '已注销',
   banned: '已封禁',
-  globalMuted: '全局禁言',
+  globalMuted: '全部禁言',
   blocked: '已屏蔽本坐席',
   left: '已退群',
   muted: '被禁言',
@@ -63,7 +63,7 @@ export function planCoverage(s: DemoState, seatIds: string[], at: string): Cover
   const skips: CoveragePlan['skips'] = []
   const perCustomerCap = s.enterprise.broadcastPerCustomerPerDay
 
-  // 只看真的加过所选坐席之一的客户：没加过任何一个官方号的人本来就够不到
+  // 只看真的加过所选坐席之一的客户：没加过任何一个坐席的人本来就够不到
   const reach = new Map<string, string[]>()
   s.customerSeats.forEach((cs) => {
     if (!seatSet.has(cs.seatId)) return

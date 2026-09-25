@@ -83,7 +83,7 @@ export function BroadcastPage() {
     return []
   }, [friends, mine, targetKind, tagIds, product, role])
 
-  /** 发送前预估会被跳过的人：注销 / 封禁 / 全局禁言 / 屏蔽本坐席 / 今日已达每客户频控 */
+  /** 发送前预估会被跳过的人：注销 / 封禁 / 全部禁言 / 屏蔽本坐席 / 今日已达每客户频控 */
   const willSkip = useMemo(() => {
     if (!seat) return 0
     return targets.filter((c) => {
@@ -222,7 +222,7 @@ export function BroadcastPage() {
                   </Field>
                 )}
                 {targetKind === 'role' && (
-                  <Field label="角色标签">
+                  <Field label="业务系统角色">
                     <Select value={role} onChange={(e) => setRole(e.target.value)}>
                       <option value="">选择…</option>
                       {roles.map((r) => (

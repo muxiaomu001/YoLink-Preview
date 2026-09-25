@@ -26,7 +26,7 @@ export function Avatar({ text, color, size = 32, official, className }: { text: 
     <span className={clsx('relative inline-flex shrink-0 items-center justify-center rounded-full text-white font-medium select-none', className)} style={{ width: size, height: size, background: bg, fontSize: Math.round(size * 0.42) }}>
       {initials(text)}
       {official && (
-        <span className="absolute -right-0.5 -bottom-0.5 flex items-center justify-center rounded-full bg-white" style={{ width: size * 0.42, height: size * 0.42 }} title="企业官方账号">
+        <span className="absolute -right-0.5 -bottom-0.5 flex items-center justify-center rounded-full bg-white" style={{ width: size * 0.42, height: size * 0.42 }} title="官方">
           <BadgeCheck className="text-brand-600" style={{ width: size * 0.38, height: size * 0.38 }} fill="#dbe4f7" />
         </span>
       )}

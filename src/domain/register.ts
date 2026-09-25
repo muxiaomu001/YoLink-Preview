@@ -77,6 +77,6 @@ export function isWatching(c: Customer, nowIso: string): boolean {
 
 /**
  * 观察期里客户被限制成什么样，后台说明、客户端提示、群内发言拦截共用这一句。
- * 只关群内发言：私聊官方联系人必须留着，不然新号连问客服的路都没有，风控就变成了拒客。
+ * 只关群内发言：私聊坐席必须留着，不然新号连问客服的路都没有，风控就变成了拒客。
  */
-export const WATCH_LIMIT_TEXT = '只能和官方联系人私聊，不能在群里发言'
+export const WATCH_LIMIT_TEXT = '观察期间不能在群里发言，私聊不受影响'

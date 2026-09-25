@@ -227,8 +227,8 @@ function AutomationModal({ rule, onClose }: { rule?: AutomationRule; onClose: ()
         <Field label="规则名" required>
           <Input value={form.name} maxLength={48} onChange={(e) => set('name', e.target.value)} placeholder="如：入金后挂「认证投资者」" />
         </Field>
-        <Field label="触发" required hint="示例：购买记录同步 / 每日 10:00 / 客户注册">
-          <Input value={form.trigger} maxLength={64} onChange={(e) => set('trigger', e.target.value)} placeholder="购买记录同步" />
+        <Field label="触发" required hint="示例：业务记录同步 / 每日 10:00 / 客户注册">
+          <Input value={form.trigger} maxLength={64} onChange={(e) => set('trigger', e.target.value)} placeholder="业务记录同步" />
         </Field>
         <Field label="条件" required hint="示例：单笔金额 ≥ 10,000 美元 / 风险等级 = 进取型">
           <Input value={form.condition} maxLength={128} onChange={(e) => set('condition', e.target.value)} placeholder="单笔金额 ≥ 10,000 美元" />

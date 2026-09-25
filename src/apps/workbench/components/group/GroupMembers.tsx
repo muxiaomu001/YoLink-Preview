@@ -1,6 +1,6 @@
 /**
  * 成员列表：坐席（群主 / 管理员 / 成员，标"官方"）、客户（管理员在前），可搜索。
- * 每项操作按 12 文档权限：任免管理员 can_promote_members；移出 / 禁言 / 封禁 / 解除 can_restrict_members；
+ * 每项操作按 12 文档权限：任免管理员 can_promote_members；移出 / 禁言 / 移出并禁止再进 / 解除 can_restrict_members；
  * 加坐席与批量拉人 can_invite_users。客户也可被设为管理员（"助教"）。
  */
 import { useMemo, useState } from 'react'
@@ -107,8 +107,8 @@ export function GroupMembers({ group: g, actor, perm, compact, canViewAll }: Gro
               {canPromote && role === 'admin' && <MenuItem onClick={() => setDialog({ type: 'admin', target: t })}>修改权限</MenuItem>}
               {canPromote && role === 'admin' && <MenuItem danger onClick={() => demote(t)}>撤销管理员</MenuItem>}
               {canRestrict && !r && <MenuItem onClick={() => setDialog({ type: 'mute', customer: c })}>禁言</MenuItem>}
-              {canRestrict && r && <MenuItem onClick={() => lift(c)}>解除{r.kind === 'ban' ? '封禁' : '禁言'}</MenuItem>}
-              {canRestrict && <MenuItem danger onClick={() => setDialog({ type: 'ban', customer: c })}>封禁</MenuItem>}
+              {canRestrict && r && <MenuItem onClick={() => lift(c)}>{r.kind === 'ban' ? '解除禁止' : '解除禁言'}</MenuItem>}
+              {canRestrict && <MenuItem danger onClick={() => setDialog({ type: 'ban', customer: c })}>移出并禁止再进</MenuItem>}
               {canRestrict && <MenuItem danger onClick={() => setDialog({ type: 'kick', customer: c })}>移出</MenuItem>}
             </>
           ) : undefined
@@ -127,14 +127,14 @@ export function GroupMembers({ group: g, actor, perm, compact, canViewAll }: Gro
       </ul>
       {banned.length > 0 && (
         <div className="mt-3">
-          <div className="mb-1 text-[11px] font-medium text-zinc-500">已封禁（不在群，时限内无法通过链接返回）</div>
+          <div className="mb-1 text-[11px] font-medium text-zinc-500">已禁止再进（不在群，时限内无法通过链接返回）</div>
           <ul className="space-y-1">
             {banned.map(({ r, c }) => (
               <li key={c!.id} className="flex items-center gap-2 text-[12px]">
                 <Avatar text={c!.nickname} size={20} />
                 <span className="min-w-0 flex-1 truncate text-zinc-600">{c!.nickname}</span>
                 <span className="text-[11px] text-red-600">{restrictionLabel(r)}</span>
-                {canRestrict && <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => lift(c!)}>解封</Button>}
+                {canRestrict && <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => lift(c!)}>解除禁止</Button>}
               </li>
             ))}
           </ul>
@@ -194,7 +194,7 @@ function MenuItem({ children, onClick, danger, disabled }: { children: React.Rea
 
 function AddSeatModal({ group: g, actor, onClose }: Pick<GroupPanelProps, 'group' | 'actor'> & { onClose: () => void }) {
   const s = useStore()
-  const options = s.seats.filter((x) => x.status !== 'disabled' && !g.memberSeatIds.includes(x.id))
+  const options = s.seats.filter((x) => !g.memberSeatIds.includes(x.id))
   const [seatId, setSeatId] = useState(options[0]?.id ?? '')
   const submit = () => {
     s.addGroupSeat(g.id, seatId, actor)

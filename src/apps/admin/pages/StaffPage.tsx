@@ -114,7 +114,7 @@ export function StaffPage() {
                     强制下线
                   </Button>
                   {st.status === 'active' ? (
-                    <Button size="sm" variant="danger" disabled={st.id === admin} onClick={() => void disable(st)}>
+                    <Button size="sm" variant="danger" disabled={st.id === admin || !!s.staffDisableBlocker(st.id)} title={s.staffDisableBlocker(st.id) ?? (st.id === admin ? '不能停用自己' : undefined)} onClick={() => void disable(st)}>
                       停用
                     </Button>
                   ) : (

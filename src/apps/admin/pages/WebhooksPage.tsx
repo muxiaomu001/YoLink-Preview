@@ -85,7 +85,7 @@ export function WebhooksPage() {
       <PageHeader
         title="Webhook"
         level="P1"
-        desc="事件发生时 YoLink 主动 POST 到你的地址：新客户注册、挂头衔、购买记录同步等。请求带签名头，用签名密钥校验来源。"
+        desc="事件发生时 YoLink 主动 POST 到你的地址：新客户注册、挂头衔、业务记录同步等。请求带签名头，用签名密钥校验来源。"
         extra={
           <Button variant="primary" onClick={() => setCreating(true)}>
             <Plus size={14} /> 创建 Webhook

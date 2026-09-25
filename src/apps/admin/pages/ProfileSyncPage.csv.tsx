@@ -14,7 +14,7 @@ type Template = 'purchase' | 'referral'
 
 const TEMPLATES: Record<Template, { name: string; header: string[]; desc: string[] }> = {
   purchase: {
-    name: '购买记录',
+    name: '业务记录',
     header: ['手机号', '产品', '金额', '日期'],
     desc: ['手机号：匹配键，与客户注册手机号一致（空格可有可无）', '产品：产品名称，最多 64 字', '金额：数字，单位随钱包币种', '日期：YYYY-MM-DD'],
   },
@@ -115,14 +115,14 @@ export function CsvImportTab() {
   return (
     <div className="space-y-4">
       <Note>按手机号匹配客户，匹配不上的行不入库，只计入统计。</Note>
-      <DemoNote>演示不做文件上传，把 CSV 文本直接粘进来即可；正式产品还支持按客户系统 ID 匹配。</DemoNote>
+      <DemoNote>演示不做文件上传，把 CSV 文本直接粘进来即可；正式产品还支持按业务系统 ID 匹配。</DemoNote>
       <div className="grid grid-cols-[1fr_320px] gap-4">
         <Card title="粘贴 CSV">
           <div className="space-y-3">
             <div className="flex items-end gap-2">
               <Field label="选择模板">
                 <Select className="w-40" value={tpl} onChange={(e) => { setTpl(e.target.value as Template); setPreview(null); setResult(null) }}>
-                  <option value="purchase">购买记录</option>
+                  <option value="purchase">业务记录</option>
                   <option value="referral">邀请关系</option>
                 </Select>
               </Field>
@@ -175,7 +175,7 @@ export function CsvImportTab() {
         <Card title="导入结果">
           <KV
             items={[
-              { k: '类型', v: result.kind === 'purchase' ? '购买记录' : '邀请关系' },
+              { k: '类型', v: result.kind === 'purchase' ? '业务记录' : '邀请关系' },
               { k: '成功', v: <span className="font-medium text-emerald-700">{result.count} 条</span> },
               { k: '失败', v: result.failed ? <span className="text-red-600">{result.failed} 条：{result.failReason}</span> : '0' },
               { k: '未匹配', v: result.unmatched ? <span className="text-amber-600">{result.unmatched} 条（手机号不在客户库中，已跳过）</span> : '0' },

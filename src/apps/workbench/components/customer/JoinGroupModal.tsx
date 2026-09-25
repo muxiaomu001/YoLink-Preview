@@ -13,7 +13,7 @@ import { useWorkbench } from '../../useWorkbench'
 function skipReason(s: DemoState, g: ChatGroup, c: Customer): string {
   if (c.deletedAt) return '客户已注销'
   if (g.memberCustomerIds.includes(c.id)) return '已在群里'
-  if (g.restrictions.some((r) => r.customerId === c.id && r.kind === 'ban' && (r.until === null || r.until > new Date().toISOString()))) return '该客户被这个群封禁'
+  if (g.restrictions.some((r) => r.customerId === c.id && r.kind === 'ban' && (r.until === null || r.until > new Date().toISOString()))) return '该客户已被移出并禁止再进'
   if (g.requiredTitleId && !c.titleIds.includes(g.requiredTitleId)) return `需要头衔「${s.titles.find((t) => t.id === g.requiredTitleId)?.name ?? ''}」`
   if (g.memberCustomerIds.length >= groupCapacity(s, g)) return '群已满'
   return '未知原因'

@@ -1,7 +1,7 @@
 import { messageShadow } from '@/domain/messageRules'
 /**
  * 群管理（工作台群信息卡与管理后台群管理页共用）：
- * 建群、群设置、公告、置顶、成员增删、管理员任免、禁言封禁、群邀请链接、批量拉人。
+ * 建群、群设置、公告、置顶、成员增删、管理员任免、禁言与移出并禁止再进、群邀请链接、批量拉人。
  * 所有动作记管理员日志（groupLogs，48 小时）与审计。
  */
 import { groupWelcomeMessages } from '@/domain/groupWelcome'
@@ -29,7 +29,7 @@ export interface GroupActions {
   addGroupSeat: (groupId: string, seatId: string, by: Actor) => void
   promoteGroupAdmin: (groupId: string, memberKind: GroupMemberKind, memberId: string, perms: GroupAdminPerm[], by: Actor) => void
   demoteGroupAdmin: (groupId: string, memberKind: GroupMemberKind, memberId: string, by: Actor) => void
-  /** 禁言或封禁；hours 为 null 表示永久 */
+  /** 禁言或移出并禁止再进；hours 为 null 表示永久 */
   restrictGroupMember: (groupId: string, customerId: string, kind: 'mute' | 'ban', hours: number | null, reason: string, by: Actor) => void
   liftGroupRestriction: (groupId: string, customerId: string, by: Actor) => void
   createGroupInviteLink: (groupId: string, input: { name: string; expiresAt: string | null; maxUses: number | null }, by: Actor) => GroupInviteLink
@@ -47,7 +47,7 @@ function log(groupId: string, by: Actor, action: string, detail: string): GroupL
 const PERM_LABEL: Record<GroupAdminPerm, string> = {
   can_manage_chat: '管理员日志',
   can_delete_messages: '删他人消息',
-  can_restrict_members: '禁言封禁',
+  can_restrict_members: '禁言与移出并禁止再进',
   can_promote_members: '任免管理员',
   can_change_info: '改群信息',
   can_invite_users: '邀请用户',
@@ -177,7 +177,7 @@ export function groupActions(set: Set, get: Get): GroupActions {
       set({
         chatGroups: patchGroup(groupId, (x) => ({ ...x, memberCustomerIds: [...x.memberCustomerIds, ...toAdd] }))(s.chatGroups),
         messages: [...s.messages, ...sys, ...(conv?groupWelcomeMessages(g,conv.id,s.customers.filter((c)=>toAdd.includes(c.id)),at):[])],
-        groupLogs: [log(groupId, by, 'member', `拉入 ${toAdd.length} 位客户${skipped.length ? `，跳过 ${skipped.length} 位（已在群、已满、被封禁或不满足头衔条件）` : ''}`), ...s.groupLogs],
+        groupLogs: [log(groupId, by, 'member', `拉入 ${toAdd.length} 位客户${skipped.length ? `，跳过 ${skipped.length} 位（已在群、已满、被禁止再进或不满足头衔条件）` : ''}`), ...s.groupLogs],
         audit: withAudit(s.audit, 'group.member', `往群「${g.name}」拉入 ${toAdd.length} 位客户`, by.staffId),
       })
       return { added: toAdd.length, skipped }
@@ -245,12 +245,12 @@ export function groupActions(set: Set, get: Get): GroupActions {
         if (!g || !c) return {}
         const at = now()
         const until = hours == null ? null : new Date(Date.now() + hours * 3600000).toISOString()
-        const detail = `${kind === 'ban' ? '封禁' : '禁言'}客户「${c.nickname}」${hours == null ? '（永久）' : `${hours} 小时`}${reason ? `：${reason}` : ''}`
+        const detail = `${kind === 'ban' ? '移出并禁止再进' : '禁言'}客户「${c.nickname}」${hours == null ? '（永久）' : `${hours} 小时`}${reason ? `：${reason}` : ''}`
         return {
           chatGroups: patchGroup(groupId, (x) => ({
             ...x,
             restrictions: [{ customerId, kind, until, bySeatId: by.seatId, at, reason }, ...x.restrictions.filter((r) => r.customerId !== customerId)],
-            // 封禁同时移出群
+            // 移出并禁止再进
             memberCustomerIds: kind === 'ban' ? x.memberCustomerIds.filter((id) => id !== customerId) : x.memberCustomerIds,
           }))(s.chatGroups),
           groupLogs: [log(groupId, by, 'restrict', detail), ...s.groupLogs],
@@ -266,8 +266,8 @@ export function groupActions(set: Set, get: Get): GroupActions {
         const r = g.restrictions.find((x) => x.customerId === customerId)
         return {
           chatGroups: patchGroup(groupId, (x) => ({ ...x, restrictions: x.restrictions.filter((y) => y.customerId !== customerId) }))(s.chatGroups),
-          groupLogs: [log(groupId, by, 'restrict', `解除客户「${c.nickname}」的${r?.kind === 'ban' ? '封禁（不会自动回群，可通过链接加入）' : '禁言'}`), ...s.groupLogs],
-          audit: withAudit(s.audit, 'group.restrict', `群「${g.name}」解除「${c.nickname}」的${r?.kind === 'ban' ? '封禁' : '禁言'}`, by.staffId),
+          groupLogs: [log(groupId, by, 'restrict', `${r?.kind === 'ban' ? '解除禁止' : '解除禁言'}：客户「${c.nickname}」${r?.kind === 'ban' ? '（不会自动回群，可通过链接加入）' : ''}`), ...s.groupLogs],
+          audit: withAudit(s.audit, 'group.restrict', `群「${g.name}」${r?.kind === 'ban' ? '解除禁止' : '解除禁言'}：客户「${c.nickname}」`, by.staffId),
         }
       }),
 

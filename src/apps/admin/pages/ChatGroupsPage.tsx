@@ -116,7 +116,7 @@ const DESC_MAX = 255
 function CreateGroupModal({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
   const s = useStore()
   const admin = s.session.adminStaffId!
-  const seats = s.seats.filter((x) => x.status !== 'disabled')
+  const seats = s.seats
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [kind, setKind] = useState<ChatGroupKind>('group')

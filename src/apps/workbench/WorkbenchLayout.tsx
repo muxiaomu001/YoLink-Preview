@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { Bell, BellOff, Bot, Link2, MessageSquare, Send, Settings, Users, Wallet } from 'lucide-react'
 import { useStore } from '@/store/store'
+import { staffServiceBlocker } from '@/domain/providerLicense'
 import { conversationsForSeat, seatsOfStaff, staffById, staffHasCap } from '@/store/selectors'
 import { toast } from '@/ui/overlay'
 import { DemoBar } from './components/layout/DemoBar'
@@ -87,6 +88,9 @@ export function WorkbenchLayout() {
     const sent = sendDesktopNotification(`「${seatName}」有 ${delta} 条新消息`, body, go)
     if (!sent) toast(`「${seatName}」有 ${delta} 条新消息：${body}`, 'info')
   }, [activeRows, notifyOn, seatId, seatName, nav])
+
+  const serviceBlocker = staffServiceBlocker(s)
+  if (serviceBlocker) return <div className="flex h-full items-center justify-center p-6"><p role="alert">{serviceBlocker}</p></div>
 
   const perm = notifyPermission()
   const notifyTitle = !notifyOn ? '桌面通知已关闭（设置里开启）' : perm === 'granted' ? '桌面通知已开启' : perm === 'unsupported' ? '当前浏览器不支持桌面通知，改用页内提示' : '桌面通知未授权，改用页内提示（设置里重新开启可申请授权）'

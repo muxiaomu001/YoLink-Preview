@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState } from 'react'
 import { ArrowLeftRight, Plus } from 'lucide-react'
 import type { Seat } from '@/domain/types'
 import { seatIdsOf } from '@/domain/allocation'
@@ -8,7 +8,6 @@ import { customersOfSeat, staffById } from '@/store/selectors'
 import { Button } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, SeatAvatar, Table, type Column } from '@/ui/display'
 import { toast } from '@/ui/overlay'
-import { confirm } from '@/ui/confirm'
 import { HandoverModal, SeatEditModal } from './SeatsPage.parts'
 
 export function SeatsPage() {
@@ -29,14 +28,11 @@ export function SeatsPage() {
             .filter((g) => seatIdsOf(g).includes(seat.id))
             .map((g) => ({ name: g.name, rotating: g.rotatingSeatIds.includes(seat.id) })),
           customers,
-          off: seat.status === 'disabled',
         }
       }),
     [s],
   )
   type Row = (typeof rows)[number]
-  /** 停用的坐席整行灰显 */
-  const dim = (r: Row, node: ReactNode) => <span className={r.off ? 'opacity-40' : ''}>{node}</span>
 
   const pause = (seat: Seat) => {
     s.updateSeat(seat.id, { status: 'paused' }, admin)
@@ -46,28 +42,16 @@ export function SeatsPage() {
     s.updateSeat(seat.id, { status: 'accepting' }, admin)
     toast(`「${seat.displayName}」已恢复接新`)
   }
-  const disable = async (seat: Seat) => {
-    const ok = await confirm({
-      title: `停用坐席「${seat.displayName}」？`,
-      body: '停用后不再分新客户，也不能再交接；客户侧会话保留但不再有人回复。离职或轮岗请用「交接」，不要停用。',
-      okText: '停用',
-      danger: true,
-    })
-    if (!ok) return
-    s.updateSeat(seat.id, { status: 'disabled' }, admin)
-    toast(`「${seat.displayName}」已停用`)
-  }
 
   const columns: Column<Row>[] = [
-    { key: 'avatar', title: '头像', width: '48px', render: (r) => dim(r, <SeatAvatar seat={r.seat} size={30} />) },
-    { key: 'name', title: '显示名', render: (r) => dim(r, <span className="inline-flex items-center gap-2"><span className="font-medium text-zinc-900">{r.seat.displayName}</span>{!r.seat.welcome.trim() && <Pill tone="amber">未配欢迎语</Pill>}</span>) },
-    { key: 'roleDesc', title: '职能说明', render: (r) => dim(r, <span className="text-zinc-600">{r.seat.roleDesc || '-'}</span>) },
+    { key: 'avatar', title: '头像', width: '48px', render: (r) => <SeatAvatar seat={r.seat} size={30} /> },
+    { key: 'name', title: '显示名', render: (r) => <span className="inline-flex items-center gap-2"><span className="font-medium text-zinc-900">{r.seat.displayName}</span>{!r.seat.welcome.trim() && <Pill tone="amber">未配欢迎语</Pill>}</span> },
+    { key: 'roleDesc', title: '职能说明', render: (r) => <span className="text-zinc-600">{r.seat.roleDesc || '-'}</span> },
     {
       key: 'operator',
       title: '当前实操员工',
       render: (r) =>
-        dim(
-          r,
+        (
           r.operator ? (
             <span className={r.operator.status === 'disabled' ? 'text-red-600' : ''}>
               {r.operator.name}
@@ -75,15 +59,14 @@ export function SeatsPage() {
             </span>
           ) : (
             <Pill tone="red">无人实操</Pill>
-          ),
+          )
         ),
     },
     {
       key: 'groups',
       title: '所在邀请组',
       render: (r) =>
-        dim(
-          r,
+        (
           r.groups.length ? (
             <div className="flex flex-wrap gap-1">
               {r.groups.map((g) => (
@@ -95,19 +78,19 @@ export function SeatsPage() {
             </div>
           ) : (
             <span className="text-zinc-400">未加入任何组</span>
-          ),
+          )
         ),
     },
     {
       key: 'customers',
       title: '客户数',
       align: 'right',
-      render: (r) => dim(r, <span className="tabular-nums">{r.customers}</span>),
+      render: (r) => <span className="tabular-nums">{r.customers}</span>,
     },
     {
       key: 'status',
       title: '状态',
-      render: (r) => (r.seat.status === 'accepting' ? <Pill tone="green">接新中</Pill> : r.seat.status === 'paused' ? <Pill tone="amber">暂停接新</Pill> : <Pill tone="red">停用</Pill>),
+      render: (r) => (r.seat.status === 'accepting' ? <Pill tone="green">接新中</Pill> : <Pill tone="amber">暂停接新</Pill>),
     },
     {
       key: 'ops',
@@ -115,10 +98,10 @@ export function SeatsPage() {
       align: 'right',
       render: (r) => (
         <div className="flex justify-end gap-1">
-          <Button size="sm" variant="ghost" disabled={r.off} onClick={() => setEditing(r.seat)}>
+          <Button size="sm" variant="ghost" onClick={() => setEditing(r.seat)}>
             编辑
           </Button>
-          <Button size="sm" variant="secondary" disabled={r.off} onClick={() => setHandover(r.seat)}>
+          <Button size="sm" variant="secondary" onClick={() => setHandover(r.seat)}>
             <ArrowLeftRight size={12} /> 交接
           </Button>
           {r.seat.status === 'accepting' && (
@@ -129,11 +112,6 @@ export function SeatsPage() {
           {r.seat.status === 'paused' && (
             <Button size="sm" variant="ghost" onClick={() => resume(r.seat)}>
               恢复接新
-            </Button>
-          )}
-          {!r.off && (
-            <Button size="sm" variant="danger" onClick={() => void disable(r.seat)}>
-              停用
             </Button>
           )}
         </div>
@@ -153,7 +131,7 @@ export function SeatsPage() {
         }
       />
       <Note>
-        坐席与员工账号是两样东西。<b>客户绑的是坐席</b>，员工离职不需要「转移客户」，把坐席交接给新人即可。一个员工可以同时持有多个坐席（陈默同时是「陈顾问」和「客户服务」）。
+        坐席与员工账号是两样东西。<b>客户绑的是坐席</b>，员工离职不需要「转移客户」，把坐席交接给新人即可。一个员工可以同时持有多个坐席（陈默同时是「陈二宝」和「客户服务」）。
         <b>人员变更：离职、轮岗、休假走坐席交接，不是转移客户；短期休假用暂停接新。</b>
       </Note>
       <Card className="mt-4" padded={false}>

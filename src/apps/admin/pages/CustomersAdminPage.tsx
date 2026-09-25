@@ -171,9 +171,9 @@ export function CustomersAdminPage() {
   return (
     <div>
       <PageHeader title="客户列表" desc="全企业客户。员工在工作台只能看到自己坐席主归属的客户。" />
-      <Note>头衔是官方发给客户、所有人可见的；内部标签只有员工看得到。批量挂头衔每个客户最多 5 个，超了自动跳过。重置密码、强制下线、封禁、全群禁言、全局禁言、改主归属与注销都在「详情」里。</Note>
+      <Note>头衔是官方发给客户、所有人可见的；内部标签只有员工看得到。批量挂头衔每个客户最多 5 个，超了自动跳过。重置密码、强制下线、封禁、群聊禁言、全部禁言、改主归属与注销都在「详情」里。</Note>
       <DemoNote className="mt-2">
-        状态列与工作台资料卡是同一份判断：封禁、全局禁言、全群禁言、待首次改密会同时显示，一个客户可以同时占几项。改主归属与注销排在第二版<DemoLevelTag level="P1" />。
+        状态列与工作台资料卡是同一份判断：封禁、全部禁言、群聊禁言、待首次改密会同时显示，一个客户可以同时占几项。改主归属与注销排在第二版<DemoLevelTag level="P1" />。
       </DemoNote>
 
       <Card className="mt-4" title="筛选">
@@ -213,7 +213,7 @@ export function CustomersAdminPage() {
               </option>
             ))}
           </Select>
-          <Select value={status} onChange={(e) => setStatus(e.target.value as CustomerStatusFilter)} className="w-32" title="正常 = 没有封禁、全局禁言、全群禁言、待改密、注销中的任何一项">
+          <Select value={status} onChange={(e) => setStatus(e.target.value as CustomerStatusFilter)} className="w-32" title="正常 = 没有封禁、全部禁言、群聊禁言、待改密、注销中的任何一项">
             {STATUS_FILTER_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}

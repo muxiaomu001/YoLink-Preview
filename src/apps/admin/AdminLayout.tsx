@@ -2,6 +2,7 @@ import { clsx } from 'clsx'
 import { NavLink, Outlet, Link, useLocation, useMatch } from 'react-router-dom'
 import { ExternalLink, FileSearch } from 'lucide-react'
 import { useStore } from '@/store/store'
+import { staffServiceBlocker } from '@/domain/providerLicense'
 import { staffById } from '@/store/selectors'
 import { Avatar } from '@/ui/display'
 import { ADMIN_NAV } from './nav'
@@ -13,8 +14,11 @@ export function AdminLayout() {
   const currentItem = ADMIN_NAV.flatMap((g) => g.items).find((it) => it.to === location.pathname)
   const enterprise = useStore((s) => s.enterprise)
   const admin = useStore((s) => staffById(s, s.session.adminStaffId))
+  const roleName = useStore((s) => s.roles.find((role) => role.id === admin?.roleId)?.name)
+  const serviceBlocker = useStore(staffServiceBlocker)
   const pending = useStore((s) => s.reports.filter((r) => r.status === 'pending').length + s.withdrawals.filter((w) => w.status === 'pending').length)
   const demoNotes = useDemoNotes()
+  if (serviceBlocker) return <div className="flex h-full items-center justify-center p-6"><p role="alert">{serviceBlocker}</p></div>
   return (
     <div className="flex h-full">
       <aside className="flex w-56 shrink-0 flex-col border-r border-zinc-200 bg-white">
@@ -80,7 +84,7 @@ export function AdminLayout() {
             <DemoNoteToggle />
             <span className="flex items-center gap-2">
               <Avatar text={admin?.name ?? '管'} size={22} color="#52525b" />
-              {admin?.name} · 管理员
+              {admin?.name} · {roleName}
             </span>
           </div>
         </header>

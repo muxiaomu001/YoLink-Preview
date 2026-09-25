@@ -31,7 +31,7 @@ function GroupReceipt({ m, conv, group }: { m: Message; conv: Conversation; grou
   const [q, setQ] = useState('')
   const recipients = [
     ...(m.receiptMemberCustomerIds ?? group.memberCustomerIds).filter((id) => id !== m.senderId).map((id) => ({ id, name: s.customers.find((c) => c.id === id)?.nickname ?? '已离开的成员', seat: undefined, read: (conv.readAtByCustomer?.[id] ?? '') >= m.at })),
-    ...(m.receiptMemberSeatIds ?? group.memberSeatIds).filter((id) => id !== m.senderId).map((id) => ({ id, name: s.seats.find((c) => c.id === id)?.displayName ?? '已停用的官方号', seat: s.seats.find((c) => c.id === id), read: (conv.readAtBySeat?.[id] ?? '') >= m.at })),
+    ...(m.receiptMemberSeatIds ?? group.memberSeatIds).filter((id) => id !== m.senderId).map((id) => ({ id, name: s.seats.find((c) => c.id === id)?.displayName ?? '未知联系人', seat: s.seats.find((c) => c.id === id), read: (conv.readAtBySeat?.[id] ?? '') >= m.at })),
   ]
   const read = recipients.filter((x) => x.read).length
   const shown = recipients.filter((x) => x.read === (tab === 'read') && x.name.toLowerCase().includes(q.toLowerCase()))

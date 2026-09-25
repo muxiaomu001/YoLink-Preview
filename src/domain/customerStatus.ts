@@ -1,7 +1,7 @@
 /**
  * 客户状态的唯一口径。
  *
- * 之前后台客户列表只认「正常 / 已注销」两种，工作台的资料卡却认四种（封禁、全局禁言、
+ * 之前后台客户列表只认「正常 / 已注销」两种，工作台的资料卡却认四种（封禁、全部禁言、
  * 待首次改密、已注销）——同一个被封禁的客户，后台显示"正常"，工作台显示"封禁"，
  * 谁对谁错说不清。这里把判断收成一处，两边都从这里取。
  *
@@ -65,20 +65,20 @@ export function isGlobalMutedForever(c: Customer): boolean {
   return forever(c.globalMutedUntil)
 }
 
-/** 客户发送前的全局禁言提示；到期后自然返回 undefined。 */
+/** 客户发送前的全部禁言提示；到期后自然返回 undefined。 */
 export function globalMuteReason(c: Customer, at = new Date().toISOString()): string | undefined {
   if (!isGlobalMutedNow(c, at)) return undefined
-  if (isGlobalMutedForever(c)) return '你已被全局禁言'
+  if (isGlobalMutedForever(c)) return '你已被全部禁言'
   const seconds = Math.ceil((new Date(c.globalMutedUntil!).getTime() - new Date(at).getTime()) / 1000)
-  return `你已被全局禁言，剩余 ${fmtDuration(Math.max(1, seconds))}`
+  return `你已被全部禁言，剩余 ${fmtDuration(Math.max(1, seconds))}`
 }
 
-/** 客户在群或频道发送前的全群禁言提示；私聊不会走这里。 */
+/** 客户在群或频道发送前的群聊禁言提示；私聊不会走这里。 */
 export function allGroupsMuteReason(c: Customer, at = new Date().toISOString()): string | undefined {
   if (!isAllGroupsMutedNow(c, at)) return undefined
-  if (isAllGroupsMutedForever(c)) return '你已被全群禁言，私聊不受影响'
+  if (isAllGroupsMutedForever(c)) return '你已被群聊禁言，私聊不受影响'
   const seconds = Math.ceil((new Date(c.mutedAllUntil!).getTime() - new Date(at).getTime()) / 1000)
-  return `你已被全群禁言，私聊不受影响，剩余 ${fmtDuration(Math.max(1, seconds))}`
+  return `你已被群聊禁言，私聊不受影响，剩余 ${fmtDuration(Math.max(1, seconds))}`
 }
 
 /**
@@ -92,8 +92,8 @@ export function customerStatusFlags(c: Customer): CustomerStatusFlag[] {
   // 影子模式紫色单独一档：它既不是「已拦下」（红）也不是「限时限制」（黄），
   // 而是一种客户完全不知情的处理方式，后台看列表时必须一眼认出来别当成正常人
   if (c.shadowModeAt) flags.push({ key: 'shadowed', label: '影子模式', tone: 'purple', title: `开启于 ${fmtDateTime(c.shadowModeAt)}：群消息只有他自己和坐席看得见，客户端无提示${c.shadowModeReason ? `。原因：${c.shadowModeReason}` : ''}` })
-  if (isGlobalMutedNow(c)) flags.push({ key: 'muted', label: isGlobalMutedForever(c) ? '全局禁言（永久）' : '全局禁言', tone: 'amber', title: isGlobalMutedForever(c) ? '永久禁言，不能向任何官方联系人、群或频道发送消息' : `禁言至 ${fmtDateTime(c.globalMutedUntil!)}，不能向任何官方联系人、群或频道发送消息` })
-  if (isAllGroupsMutedNow(c)) flags.push({ key: 'mutedAll', label: isAllGroupsMutedForever(c) ? '全群禁言（永久）' : '全群禁言', tone: 'amber', title: isAllGroupsMutedForever(c) ? '永久禁言，群与频道不能发送消息；私聊不受影响' : `禁言至 ${fmtDateTime(c.mutedAllUntil!)}，群与频道不能发送消息；私聊不受影响` })
+  if (isGlobalMutedNow(c)) flags.push({ key: 'muted', label: isGlobalMutedForever(c) ? '全部禁言（永久）' : '全部禁言', tone: 'amber', title: isGlobalMutedForever(c) ? '永久禁言，不能向任何坐席、群或频道发送消息' : `禁言至 ${fmtDateTime(c.globalMutedUntil!)}，不能向任何坐席、群或频道发送消息` })
+  if (isAllGroupsMutedNow(c)) flags.push({ key: 'mutedAll', label: isAllGroupsMutedForever(c) ? '群聊禁言（永久）' : '群聊禁言', tone: 'amber', title: isAllGroupsMutedForever(c) ? '永久禁言，群与频道不能发送消息；私聊不受影响' : `禁言至 ${fmtDateTime(c.mutedAllUntil!)}，群与频道不能发送消息；私聊不受影响` })
   if (c.mustChangePassword) flags.push({ key: 'mustChangePassword', label: '待首次改密', tone: 'zinc', title: '员工重置过密码，客户下次登录必须改' })
   if (isWatching(c, new Date().toISOString())) flags.push({ key: 'watching', label: '新号观察期', tone: 'blue', title: `观察期至 ${fmtDateTime(c.watchUntil!)}：${WATCH_LIMIT_TEXT}` })
   return flags
@@ -112,8 +112,8 @@ export const STATUS_FILTER_OPTIONS: { value: CustomerStatusFilter; label: string
   { value: 'normal', label: '正常' },
   { value: 'banned', label: '封禁' },
   { value: 'shadowed', label: '影子模式' },
-  { value: 'muted', label: '全局禁言' },
-  { value: 'mutedAll', label: '全群禁言' },
+  { value: 'muted', label: '全部禁言' },
+  { value: 'mutedAll', label: '群聊禁言' },
   { value: 'mustChangePassword', label: '待首次改密' },
   { value: 'watching', label: '新号观察期' },
   { value: 'deleted', label: '已注销' },

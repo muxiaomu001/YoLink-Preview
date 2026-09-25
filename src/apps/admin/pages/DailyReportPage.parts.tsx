@@ -5,10 +5,11 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { ReportChannel, ReportRecipient } from '@/domain/types'
 import { REPORT_CHANNEL_LABEL } from '@/domain/labels'
+import { dailyReportRecipients } from '@/domain/dailyReport'
 import { newId } from '@/domain/ids'
 import { useStore } from '@/store/store'
 import { staffById } from '@/store/selectors'
-import { Button, Checkbox, Field, Input, Select } from '@/ui/primitives'
+import { Button, Checkbox, Field, Select } from '@/ui/primitives'
 import { Card, Pill, Table } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
@@ -19,7 +20,7 @@ const isAvailable = (c: ReportChannel) => REPORT_CHANNEL_LABEL[c].level === 'P0'
 
 /** 渠道多选：还没开放的渠道禁用，旁边挂排期徽章 */
 function ChannelPicker({ value, onChange }: { value: ReportChannel[]; onChange: (v: ReportChannel[]) => void }) {
-  // 还没开放的渠道只在演示里露出来（带排期徽章）；关掉批注后就是第一版真实支持的三个渠道
+  // 还没开放的渠道只在演示里露出来（带排期徽章）；关掉批注后就是第一版真实支持的两个渠道
   const demoNotes = useDemoNotes()
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1.5">
@@ -48,7 +49,7 @@ function ChannelPicker({ value, onChange }: { value: ReportChannel[]; onChange: 
 export function RecipientsCard() {
   const s = useStore()
   const admin = s.session.adminStaffId!
-  const recipients = s.dailyReport.recipients
+  const recipients = dailyReportRecipients(s)
   const [adding, setAdding] = useState(false)
 
   const save = (next: ReportRecipient[], msg: string) => {
@@ -82,10 +83,10 @@ export function RecipientsCard() {
           { key: 'name', title: '姓名', render: (r) => <span className="font-medium text-zinc-900">{r.name}</span> },
           {
             key: 'staff',
-            title: '是否关联员工',
+            title: '员工角色',
             render: (r) => {
               const st = staffById(s, r.staffId)
-              return st ? <Pill tone="blue">员工 · {st.name}</Pill> : <Pill tone="zinc">经营者，不登录后台</Pill>
+              return <Pill tone="blue">超级管理员 · {st?.name}</Pill>
             },
           },
           {
@@ -128,30 +129,16 @@ export function RecipientsCard() {
 function AddRecipientModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r: ReportRecipient) => void }) {
   const s = useStore()
   const used = new Set(s.dailyReport.recipients.map((r) => r.staffId).filter(Boolean))
-  const candidates = s.staff.filter((st) => st.status === 'active' && !used.has(st.id))
+  const candidates = s.staff.filter((st) => st.roleId === 'role_super' && st.status === 'active' && !used.has(st.id))
   const [staffId, setStaffId] = useState('')
-  const [name, setName] = useState('')
-  const [channels, setChannels] = useState<ReportChannel[]>(['app'])
-  const pickStaff = (id: string) => {
-    setStaffId(id)
-    const st = staffById(s, id)
-    if (st) setName(st.name)
-    // 不关联员工时 App 推送收不到，默认改成企微
-    if (!id) {
-      setChannels((list) => {
-        const rest = list.filter((c) => c !== 'app')
-        return rest.length ? rest : ['wecom']
-      })
-    }
-  }
-  const finalName = name.trim()
+  const [channels, setChannels] = useState<ReportChannel[]>(['feishu'])
+  const selectedStaff = candidates.find((staff) => staff.id === staffId)
   const errors: string[] = []
-  if (!finalName || finalName.length > 32) errors.push('姓名 1 到 32 字')
+  if (!selectedStaff) errors.push(candidates.length ? '请选择超级管理员' : '没有可添加的超级管理员')
   if (!channels.length) errors.push('至少选一个渠道')
-  if (!staffId && channels.includes('app')) errors.push('未关联员工收不到 App 推送')
   const submit = () => {
-    if (errors.length) return
-    onAdd({ id: newId('rr'), name: finalName, staffId: staffId || undefined, channels })
+    if (errors.length || !selectedStaff) return
+    onAdd({ id: newId('rr'), name: selectedStaff.name, staffId, channels })
     onClose()
   }
   return (
@@ -169,9 +156,9 @@ function AddRecipientModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r:
       }
     >
       <div className="space-y-3">
-        <Field label="关联员工" hint="经营者不一定有后台账号，可不关联">
-          <Select value={staffId} onChange={(e) => pickStaff(e.target.value)}>
-            <option value="">不关联（经营者）</option>
+        <Field label="超级管理员" required hint="接收人只能从已激活的超级管理员中选择">
+          <Select value={staffId} onChange={(e) => setStaffId(e.target.value)}>
+            <option value="">请选择超级管理员</option>
             {candidates.map((st) => (
               <option key={st.id} value={st.id}>
                 {st.name}（{s.roles.find((r) => r.id === st.roleId)?.name}）
@@ -179,11 +166,8 @@ function AddRecipientModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r:
             ))}
           </Select>
         </Field>
-        <Field label="姓名" required hint="1 到 32 字">
-          <Input value={name} maxLength={32} onChange={(e) => setName(e.target.value)} placeholder="如：李总（经营者）" />
-        </Field>
         <div>
-          <div className="mb-1.5 text-xs font-medium text-zinc-600">渠道（App 推送需关联员工）</div>
+          <div className="mb-1.5 text-xs font-medium text-zinc-600">渠道</div>
           <ChannelPicker value={channels} onChange={setChannels} />
         </div>
         {errors.length > 0 && <div className="text-[11px] text-red-600">{errors.join('；')}</div>}

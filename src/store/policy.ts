@@ -1,7 +1,7 @@
 /**
  * 策略解析与群内角色：纯函数，页面按结果渲染。
  *
- * 裁决顺序（03 文档）：模块授权 → 角色硬边界 → 策略矩阵（企业默认 → 群级覆盖 → 用户级覆盖）→ 员工角色能力与群内角色。
+ * 裁决顺序（03 文档）：模块启停 → 角色硬边界 → 策略矩阵（企业默认 → 群级覆盖 → 用户级覆盖）→ 员工角色能力与群内角色。
  * 群级覆盖只作用于客户在该群里的能力；用户级覆盖作用在客户或坐席上（坐席不是员工）。
  */
 import type { ChatGroup, DemoState, GroupAdminPerm, GroupMemberKind, Message, PolicyCol } from '@/domain/types'
@@ -104,12 +104,12 @@ export function seatGroupPerm(s: DemoState, g: ChatGroup, seatId: string, staffI
   return groupPerm(g, 'seat', seatId, perm)
 }
 
-/** 群内谁被禁言 / 封禁（未过期） */
+/** 群内谁被禁言 / 禁止再进（未过期） */
 export function activeRestriction(g: ChatGroup, customerId: string, nowIso: string) {
   return g.restrictions.find((r) => r.customerId === customerId && (r.until === null || r.until > nowIso))
 }
 
-/** 客户此刻能不能在群里发言：封禁、全局禁言、全群禁言、新号观察期、频道只读、全员禁言、单人禁言、策略 group.send */
+/** 客户此刻能不能在群里发言：封禁、全部禁言、群聊禁言、新号观察期、频道只读、全员禁言、单人禁言、策略 group.send */
 export function customerCanSpeakIn(s: DemoState, g: ChatGroup, customerId: string, nowIso: string): { ok: boolean; reason?: string } {
   const c = s.customers.find((x) => x.id === customerId)
   if (!c) return { ok: false, reason: '不是成员' }
@@ -123,7 +123,7 @@ export function customerCanSpeakIn(s: DemoState, g: ChatGroup, customerId: strin
   if (g.kind === 'channel') return { ok: false, reason: '频道只读' }
   if (g.settings.allMuted && groupRoleOf(g, 'customer', customerId) === 'member') return { ok: false, reason: '全员禁言中' }
   const r = activeRestriction(g, customerId, nowIso)
-  if (r) return { ok: false, reason: r.kind === 'ban' ? '已被封禁' : '已被禁言' }
+  if (r) return { ok: false, reason: r.kind === 'ban' ? '已被移出并禁止再进' : '已被禁言' }
   if (!customerCan(s, customerId, 'group.send', g.id)) return { ok: false, reason: '策略不允许群内发言' }
   return { ok: true }
 }

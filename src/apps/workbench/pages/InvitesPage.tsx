@@ -66,7 +66,7 @@ export function InvitesPage() {
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-zinc-600">
           <span className="text-zinc-500">「{seat?.displayName}」所在的邀请组：</span>
           {myGroups.map((g) => (
-            <span key={g.id} className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 leading-6" title={`接待员（轮流分）：${g.rotatingSeatIds.map((id) => s.seats.find((x) => x.id === id)?.displayName).join('、') || '无'}；固定坐席：${g.fixedSeatIds.map((id) => s.seats.find((x) => x.id === id)?.displayName).join('、') || '无'}`}>
+            <span key={g.id} className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 leading-6" title={`轮询坐席（轮流分）：${g.rotatingSeatIds.map((id) => s.seats.find((x) => x.id === id)?.displayName).join('、') || '无'}；固定坐席：${g.fixedSeatIds.map((id) => s.seats.find((x) => x.id === id)?.displayName).join('、') || '无'}`}>
               <b className="font-medium text-zinc-800">{g.name}</b>
               <span className="font-mono text-[11px] text-zinc-400">{g.code}</span>
             </span>

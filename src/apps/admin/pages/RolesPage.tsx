@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { Capability, Role } from '@/domain/types'
 import { CAPABILITIES } from '@/domain/labels'
+import { canManageEmployeeRoles, rolePermissionsBlocker } from '@/domain/staffRoles'
 import { useStore } from '@/store/store'
 import { Button, Checkbox, Field, Input, Textarea } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, Table } from '@/ui/display'
@@ -9,13 +10,13 @@ import { Modal, toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { DemoLevelTag } from '@/ui/DemoNote'
 
-const ADMIN_ROLE_ID = 'role_admin'
 const ALL_CAPS: Capability[] = CAPABILITIES.map((c) => c.key)
 const CATEGORIES = Array.from(new Set(CAPABILITIES.map((c) => c.cat)))
 
 export function RolesPage() {
   const s = useStore()
   const admin = s.session.adminStaffId!
+  const canManage = canManageEmployeeRoles(s, admin)
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<Role | null>(null)
   const memberCount = (roleId: string) => s.staff.filter((x) => x.roleId === roleId).length
@@ -33,13 +34,13 @@ export function RolesPage() {
         title="员工角色"
         desc="角色控制员工能用工作台和后台的哪些功能。权限跟人走，身份跟号走：同一个员工换到另一个坐席，角色能力不变。"
         extra={
-          <Button variant="primary" onClick={() => setCreating(true)}>
+          <Button variant="primary" disabled={!canManage} title={!canManage ? '当前员工角色不能管理员工角色' : undefined} onClick={() => setCreating(true)}>
             <Plus size={14} /> 创建角色
           </Button>
         }
       />
       <Note>
-        内置预置「管理员」（全部权限）与「坐席」（只看本人坐席的会话与客户，能发邀请链接、群发、挂头衔），不可删除，可改权限；管理员的权限固定为全部。聊天层能力（建群、拉人、发消息）不在这里，那是策略矩阵，作用在坐席上。
+        内置「超级管理员」「管理员」「客服」三档角色，均不可删除。超级管理员拥有全部权限，不可修改、停用或降级；管理员拥有除管理员工角色外的全部权限；客服默认只看本人持有坐席的会话与客户。聊天能力在策略矩阵中设置。
       </Note>
 
       <Card className="mt-4" padded={false}>
@@ -75,10 +76,10 @@ export function RolesPage() {
               align: 'right',
               render: (r) => (
                 <div className="flex justify-end gap-1">
-                  <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
+                  <Button size="sm" variant="ghost" disabled={!canManage || r.id === 'role_super'} title={!canManage ? '当前员工角色不能管理员工角色' : r.id === 'role_super' ? '超级管理员为系统内置，不能修改' : undefined} onClick={() => setEditing(r)}>
                     编辑
                   </Button>
-                  <Button size="sm" variant="danger" disabled={r.builtin || memberCount(r.id) > 0} title={r.builtin ? '内置角色不可删除' : memberCount(r.id) ? '还有成员，先改成员的角色' : undefined} onClick={() => void remove(r)}>
+                  <Button size="sm" variant="danger" disabled={!canManage || r.builtin || memberCount(r.id) > 0} title={!canManage ? '当前员工角色不能管理员工角色' : r.builtin ? '内置角色不可删除' : memberCount(r.id) ? '还有成员，先改成员的角色' : undefined} onClick={() => void remove(r)}>
                     删除
                   </Button>
                 </div>
@@ -88,14 +89,14 @@ export function RolesPage() {
         />
       </Card>
 
-      <Card className="mt-4" title="权限矩阵总览（勾选即改；管理员列固定为全部）" padded={false}>
+      <Card className="mt-4" title="权限矩阵总览（超级管理员与管理员的权限固定）" padded={false}>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50/80">
                 <th className="px-3 py-2 text-left text-[11px] font-medium text-zinc-500">能力</th>
                 {s.roles.map((r) => (
-                  <th key={r.id} className="px-3 py-2 text-center text-[11px] font-medium text-zinc-700">
+                  <th key={r.id} title={rolePermissionsBlocker(r.id) ?? undefined} className="px-3 py-2 text-center text-[11px] font-medium text-zinc-700">
                     {r.name}
                     {r.builtin && <Pill className="ml-1">系统</Pill>}
                     <div className="text-[10px] font-normal text-zinc-400">{memberCount(r.id)} 人</div>
@@ -115,10 +116,10 @@ export function RolesPage() {
                     <div className="text-[11px] text-zinc-500">{c.desc}</div>
                   </td>
                   {s.roles.map((r) => (
-                    <td key={r.id} className="px-3 py-2 text-center">
+                    <td key={r.id} title={!canManage ? '当前员工角色不能管理员工角色' : rolePermissionsBlocker(r.id) ?? undefined} className="px-3 py-2 text-center">
                       <Checkbox
-                        checked={r.id === ADMIN_ROLE_ID || r.caps.includes(c.key)}
-                        disabled={r.id === ADMIN_ROLE_ID}
+                        checked={r.caps.includes(c.key)}
+                        disabled={!canManage || !!rolePermissionsBlocker(r.id)}
                         onChange={(v) => {
                           s.updateRoleCaps(r.id, v ? [...r.caps, c.key] : r.caps.filter((x) => x !== c.key))
                           toast(`「${r.name}」${v ? '开启' : '关闭'} ${c.key}`)
@@ -142,10 +143,10 @@ export function RolesPage() {
 function RoleEditModal({ role, onClose }: { role?: Role; onClose: () => void }) {
   const s = useStore()
   const admin = s.session.adminStaffId!
-  const isAdmin = role?.id === ADMIN_ROLE_ID
+  const isAdmin = !!role && !!rolePermissionsBlocker(role.id)
   const [name, setName] = useState(role?.name ?? '')
   const [desc, setDesc] = useState(role?.desc ?? '')
-  const [caps, setCaps] = useState<Capability[]>(isAdmin ? ALL_CAPS : (role?.caps ?? []))
+  const [caps, setCaps] = useState<Capability[]>(role?.caps ?? [])
   const nameOk = name.trim().length >= 1 && name.trim().length <= 32
   const descOk = desc.length <= 255
   const dup = s.roles.some((r) => r.name === name.trim() && r.id !== role?.id)
@@ -159,10 +160,16 @@ function RoleEditModal({ role, onClose }: { role?: Role; onClose: () => void }) 
   const submit = () => {
     if (error) return
     if (role) {
-      s.updateRole(role.id, isAdmin ? { name: name.trim(), desc } : { name: name.trim(), desc, caps }, admin)
+      if (!s.updateRole(role.id, isAdmin ? { name: name.trim(), desc } : { name: name.trim(), desc, caps }, admin)) {
+        toast('当前角色不能修改，或你没有管理员工角色的权限', 'warn')
+        return
+      }
       toast(`已保存角色「${name.trim()}」${isAdmin ? '' : `，${caps.length} 项权限`}`)
     } else {
-      s.createRole({ name: name.trim(), desc, caps }, admin)
+      if (!s.createRole({ name: name.trim(), desc, caps }, admin)) {
+        toast('你没有管理员工角色的权限', 'warn')
+        return
+      }
       toast(`已创建角色「${name.trim()}」，${caps.length} 项权限`)
     }
     onClose()
@@ -190,7 +197,7 @@ function RoleEditModal({ role, onClose }: { role?: Role; onClose: () => void }) 
           <Textarea rows={2} maxLength={255} value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="一句话说明这个角色干什么" />
         </Field>
         {name.length > 0 && error && <p className="text-[11px] text-red-600">{error}</p>}
-        {isAdmin && <Note tone="amber">管理员角色拥有全部权限，不可修改；只能改名称与描述。</Note>}
+        {isAdmin && <Note tone="amber">{rolePermissionsBlocker(role!.id)}；只能改名称与描述。</Note>}
         <div>
           <div className="mb-1 flex items-center justify-between text-xs font-medium text-zinc-600">
             <span>权限勾选</span>

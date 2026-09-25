@@ -32,7 +32,7 @@ export function MessageText({ m, highlight, viewerCustomerId }: { m: Message; hi
       <div className="flex items-center gap-3 text-zinc-800">
         {selectedSeat ? <SeatAvatar seat={selectedSeat} size={48} /> : <Avatar text={selectedCustomer?.nickname ?? '已离开的成员'} size={48} />}
         <div><div className="text-sm font-medium">{selectedSeat?.displayName ?? selectedCustomer?.nickname ?? '已离开的成员'}</div>
-          {selectedSeat && <div className="mt-1 text-xs text-zinc-500">企业官方账号 · {selectedSeat.roleDesc}</div>}
+          {selectedSeat && <div className="mt-1 text-xs text-zinc-500">官方 · {selectedSeat.roleDesc}</div>}
           {title && <TitleChip title={title} />}
         </div>
       </div>

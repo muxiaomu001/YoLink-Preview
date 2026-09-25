@@ -93,7 +93,7 @@ export function InviteCreateModal({ open, onClose }: { open: boolean; onClose: (
         <Field label="自定义邀请码" hint={`留空自动生成；${INVITE_CODE_HINT}`}>
           <Input value={form.code} maxLength={INVITE_CODE_MAX} onChange={(e) => patch({ code: e.target.value.toUpperCase() })} placeholder="留空自动生成" className="font-mono tracking-wider" />
         </Field>
-        <Field label="邀请组" required hint="只列出包含当前坐席的组；组决定自动添加哪几个官方号">
+        <Field label="邀请组" required hint="只列出包含当前坐席的组；组决定自动添加哪几个坐席">
           <Select value={form.groupId} onChange={(e) => patch({ groupId: e.target.value })}>
             <option value="">选择…</option>
             {myGroups.map((g) => (

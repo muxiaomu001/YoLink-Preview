@@ -57,11 +57,11 @@ export function providerLicensingActions(set: Set, get: Get): ProviderLicensingA
       const expiresAt = expiryIso(expiresOn)
       if (new Date(expiresAt).getTime() <= Math.max(Date.now(), new Date(instance.expiresAt).getTime())) return
       const license = instance.instanceId === s.license.instanceId
-        ? { ...s.license, expiresAt, modules: s.license.modules.map((module) => ({ ...module, expiresAt })) }
+        ? { ...s.license, expiresAt }
         : s.license
       set({
         providerInstances: s.providerInstances.map((x) => (x.id === id ? { ...x, expiresAt } : x)),
-        providerLicenseActions: [action(instance.instanceId, 'renew', `到期日更新为 ${expiresOn}${instance.stoppedAt ? '；停用状态保持不变' : ''}`), ...s.providerLicenseActions],
+        providerLicenseActions: [action(instance.instanceId, 'renew', `到期日更新为 ${expiresOn}${instance.stoppedAt ? '；暂停服务状态保持不变' : ''}`), ...s.providerLicenseActions],
         license,
       })
     },
@@ -73,7 +73,7 @@ export function providerLicensingActions(set: Set, get: Get): ProviderLicensingA
       if (!instance || !cleanReason || instance.stoppedAt) return
       set({
         providerInstances: s.providerInstances.map((x) => (x.id === id ? { ...x, stoppedAt: now(), stopReason: cleanReason } : x)),
-        providerLicenseActions: [action(instance.instanceId, 'stop', `人工停用：${cleanReason}`), ...s.providerLicenseActions],
+        providerLicenseActions: [action(instance.instanceId, 'stop', `暂停服务：${cleanReason}`), ...s.providerLicenseActions],
       })
     },
 
@@ -83,7 +83,7 @@ export function providerLicensingActions(set: Set, get: Get): ProviderLicensingA
       if (!instance || !instance.stoppedAt) return
       set({
         providerInstances: s.providerInstances.map((x) => (x.id === id ? { ...x, stoppedAt: null, stopReason: null } : x)),
-        providerLicenseActions: [action(instance.instanceId, 'resume', '恢复实例授权；到期日保持不变'), ...s.providerLicenseActions],
+        providerLicenseActions: [action(instance.instanceId, 'resume', '恢复服务；到期日保持不变'), ...s.providerLicenseActions],
       })
     },
   }

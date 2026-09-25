@@ -83,7 +83,7 @@ export const POLICY_ITEMS: PolicyItem[] = [
   { key: 'friend.view_profile', label: '查看非好友资料', group: '关系链', desc: '点开陌生人的资料页', level: 'P0' },
   { key: 'friend.block', label: '拉黑', group: '关系链', desc: '把某个用户或坐席拉黑', level: 'P0' },
   // 私聊
-  { key: 'dm.create_with_friend', label: '与好友发起私聊', group: '私聊', desc: '客服预设下客户的好友只有官方坐席', level: 'P0' },
+  { key: 'dm.create_with_friend', label: '与好友发起私聊', group: '私聊', desc: '客服预设下客户的好友只有坐席', level: 'P0' },
   { key: 'dm.create_with_stranger', label: '与非好友发起私聊', group: '私聊', desc: '不加好友直接私聊', level: 'P0' },
   { key: 'dm.send_media', label: '私聊发送媒体', group: '私聊', desc: '图片、视频、语音', level: 'P0' },
   { key: 'dm.recall', label: '为所有人删除自己发出的消息', group: '私聊', desc: '两端普通聊天里直接消失、不留占位，原文保留审计；时限见数值型策略', level: 'P0' },
@@ -108,7 +108,7 @@ export const POLICY_ITEMS: PolicyItem[] = [
   { key: 'account.delete', label: '注销账号', group: '账号与设备', desc: '客户自助注销', level: 'P1' },
   // 工作台
   { key: 'tag.create', label: '工作台新建内部标签', group: '工作台', desc: '员工在资料卡直接新建标签', level: 'P0', staffOnly: true },
-  // 模块能力键：模块停用或未授权时整体不生效
+  // 模块能力键：模块停用时整体不生效
   { key: 'wallet.view', label: '查看钱包', group: '模块 · 钱包', desc: '客户 App 显示钱包入口', level: 'P2', module: 'wallet' },
   { key: 'wallet.withdraw', label: '申请提现', group: '模块 · 钱包', desc: '发起提现申请', level: 'P2', module: 'wallet' },
   { key: 'wallet.bind_account', label: '绑定收款账户', group: '模块 · 钱包', desc: '填写收款信息', level: 'P2', module: 'wallet' },
@@ -157,7 +157,7 @@ export const POLICY_PRESETS: PolicyPreset[] = [
   {
     id: 'preset_cs',
     name: '客服预设',
-    desc: '客户不能加好友、不能搜索、不能互聊、看不到群成员、不能建群建频道、不能 @ 所有人；只与官方坐席往来。坐席全部开放。',
+    desc: '客户不能加好友、不能搜索、不能互聊、看不到群成员、不能建群建频道、不能 @ 所有人；只与坐席往来。坐席全部开放。',
     builtin: true,
     matrix: matrixFrom(Object.fromEntries(CS_CUSTOMER_OFF.map((k) => [k, false]))),
   },
@@ -242,7 +242,7 @@ export const BANNERS: Banner[] = [
 
 export const ANNOUNCEMENTS: Announcement[] = [
   { id: 'an_1', title: '系统维护通知', body: '9 月 20 日 02:00 至 04:00（香港时间）进行系统维护，期间账户查询可能短暂不可用，交易不受影响。', buttonText: '我知道了', buttonAction: 'close', kind: 'popup', startAt: ago(2), endAt: iso(agoMs(-5)), showMode: 'once', impressions: 612 },
-  { id: 'an_2', title: '合规提示：谨防冒充顾问收款', body: '恒信财富所有资金往来均通过您本人名下的托管账户，顾问不会要求您向个人账户转账。', buttonText: '查看详情', buttonAction: 'link', url: 'https://hxwm.example/compliance', kind: 'bar', startAt: ago(20), endAt: iso(agoMs(-30)), showMode: 'every', impressions: 4380 },
+  { id: 'an_2', title: '合规提示：谨防冒充服务专员收款', body: '恒信财富所有资金往来均通过您本人名下的托管账户，服务专员不会要求您向个人账户转账。', buttonText: '查看详情', buttonAction: 'link', url: 'https://hxwm.example/compliance', kind: 'bar', startAt: ago(20), endAt: iso(agoMs(-30)), showMode: 'every', impressions: 4380 },
 ]
 
 // ---------- 客户画像 ----------
@@ -250,7 +250,7 @@ export const ANNOUNCEMENTS: Announcement[] = [
 export const PROFILE_SYNC: ProfileSyncSettings = {
   apiKeyConfigured: true,
   apiKeyPrefix: 'hxp_7f3a',
-  amountVisibleRoleIds: ['role_admin', 'role_lead'],
+  amountVisibleRoleIds: ['role_super', 'role_admin', 'role_lead'],
   scheduledPull: false,
   webhookUrl: '',
 }
@@ -271,15 +271,14 @@ export const CUSTOM_FIELDS: CustomField[] = [
 export const AUTOMATION_RULES: AutomationRule[] = [
   { id: 'ar_1', name: '推荐满 10 人挂「认证推荐人」', trigger: '推荐关系同步', condition: '直接邀请人数 ≥ 10', action: '挂头衔：认证推荐人', enabled: true, runs: 14, lastRunAt: ago(0, 3) },
   { id: 'ar_2', name: '30 天没聊过打「需回访」', trigger: '每日 10:00', condition: '最近消息距今 ≥ 30 天且已入金', action: '打内部标签：需回访', enabled: false, runs: 0, lastRunAt: null },
-  { id: 'ar_3', name: '会员到期前两周提醒顾问', trigger: '每日 10:00', condition: '头衔 = 私享会员 且 到期日 ≤ 14 天', action: '给主归属坐席的实操员工发提醒', enabled: true, runs: 3, lastRunAt: ago(1, 2) },
+  { id: 'ar_3', name: '会员到期前两周提醒坐席', trigger: '每日 10:00', condition: '头衔 = 私享会员 且 到期日 ≤ 14 天', action: '给主归属坐席的实操员工发提醒', enabled: true, runs: 3, lastRunAt: ago(1, 2) },
 ]
 
 // ---------- 日报 ----------
 
 export const DAILY_REPORT: DailyReportSettings = {
   recipients: [
-    { id: 'rr_1', name: '周敏', staffId: 'st_admin', channels: ['app', 'feishu'] },
-    { id: 'rr_2', name: '李总（经营者）', channels: ['wecom'] },
+    { id: 'rr_1', name: '周敏', staffId: 'st_admin', channels: ['feishu'] },
   ],
   sendTime: '08:30',
   thresholds: { medianMinutes: 10, waitingOverMinutes: 60, idleDays: 14 },
@@ -293,7 +292,7 @@ function buildDailyReportRecords(): DailyReportRecord[] {
     list.push({
       id: aid('dr'),
       date: dateStr(ms),
-      sentTo: failed ? ['周敏'] : ['周敏', '李总（经营者）'],
+      sentTo: ['周敏'],
       status: failed ? 'failed' : 'sent',
       summary: failed ? '企微机器人 webhook 超时，已重试 3 次' : `客户 ${36 + between(-3, 3)} 位 · 7 日活跃 ${between(14, 24)} · 首响中位 ${between(3, 14)} 分钟`,
     })
@@ -308,7 +307,7 @@ export const PLUGINS: Plugin[] = [
     id: 'pl_crm',
     name: 'CRM 同步',
     version: '1.2.0',
-    desc: '把客户、内部标签与购买记录同步到企业 CRM',
+    desc: '把客户、内部标签与业务记录同步到企业 CRM',
     enabled: true,
     fields: [
       { key: 'crm_url', label: 'CRM 地址', type: 'text' },
@@ -380,16 +379,6 @@ export const LICENSE: License = {
   instanceId: '6f1c2a3e-9b4d-4c8e-a1f2-7d5e8b9c0a11',
   type: 'private',
   expiresAt: iso(agoMs(-200)),
-  modules: [
-    { key: 'customers', name: '客户管理', enabled: true, expiresAt: iso(agoMs(-200)) },
-    { key: 'invite', name: '邀请与分配', enabled: true, expiresAt: iso(agoMs(-200)) },
-    { key: 'broadcast', name: '群发', enabled: true, expiresAt: iso(agoMs(-200)) },
-    { key: 'banner', name: '公告与横幅', enabled: true, expiresAt: iso(agoMs(-200)) },
-    { key: 'content', name: '内容管控', enabled: true, expiresAt: iso(agoMs(-200)) },
-    { key: 'wallet', name: '钱包', enabled: true, expiresAt: iso(agoMs(-110)) },
-    { key: 'checkin', name: '签到', enabled: true, expiresAt: iso(agoMs(-110)) },
-    { key: 'referral', name: '推荐奖励', enabled: true, expiresAt: iso(agoMs(-110)) },
-  ],
 }
 
 export const PROVIDER_INSTANCES: ProviderInstance[] = [
@@ -432,7 +421,7 @@ export const PROVIDER_INSTANCES: ProviderInstance[] = [
 ]
 
 export const PROVIDER_LICENSE_ACTIONS: ProviderLicenseAction[] = [
-  { id: 'pla_1', instanceId: PROVIDER_INSTANCES[2].instanceId, at: ago(2), operatorName: '供应方管理员', action: 'stop', detail: '人工停用：客户确认暂停本期服务' },
+  { id: 'pla_1', instanceId: PROVIDER_INSTANCES[2].instanceId, at: ago(2), operatorName: '供应方管理员', action: 'stop', detail: '暂停服务：客户确认暂停本期服务' },
   { id: 'pla_2', instanceId: PROVIDER_INSTANCES[0].instanceId, at: ago(16), operatorName: '供应方管理员', action: 'renew', detail: '续期 12 个月，到期日更新' },
   { id: 'pla_3', instanceId: PROVIDER_INSTANCES[1].instanceId, at: ago(403), operatorName: '供应方管理员', action: 'bind', detail: '绑定企业部署实例设备码' },
 ]
@@ -458,7 +447,7 @@ export const SENSITIVE_WORDS: SensitiveWord[] = [
   // 一路试到能过为止；影子屏蔽他每次都以为发成功了，反而不会换写法
   { id: 'sw_6', word: '加微信', scope: 'customer', action: 'shadow' },
   { id: 'sw_7', word: '私我', scope: 'customer', action: 'shadow', exact: true },
-  // 坐席合规词库：顾问对客户说的话
+  // 坐席合规词库：坐席对客户说的话
   { id: 'sw_8', word: '稳赚不赔', scope: 'seat', action: 'block' },
   { id: 'sw_9', word: '保证收益', scope: 'seat', action: 'block' },
   { id: 'sw_10', word: '转我私人账户', scope: 'seat', action: 'block' },

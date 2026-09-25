@@ -13,16 +13,15 @@ import { DemoNote, DemoNoteToggle } from '@/ui/DemoNote'
 import { BindInstanceModal, RenewInstanceModal, StopInstanceModal } from './ProviderApp.parts'
 import { PROVIDER_DEMO_ACCESS_KEY } from '@/domain/demoAccess'
 
-type Filter = 'all' | 'active' | 'expired' | 'stopped'
+type Filter = 'all' | 'active' | 'stopped'
 
 function StatusPill({ instance }: { instance: ProviderInstance }) {
   const status = providerInstanceStatus(instance)
   if (status === 'stopped') return <Pill tone="red">{PROVIDER_STATUS_LABEL.stopped}</Pill>
-  if (status === 'expired') return <Pill tone="amber">{PROVIDER_STATUS_LABEL.expired}</Pill>
   return <Pill tone="green">{PROVIDER_STATUS_LABEL.active}</Pill>
 }
 
-const ACTION_LABEL = { bind: '绑定', renew: '续期', stop: '停用', resume: '恢复' } as const
+const ACTION_LABEL = { bind: '绑定', renew: '续期', stop: '暂停服务', resume: '恢复服务' } as const
 
 export function ProviderApp() {
   const s = useStore()
@@ -44,7 +43,7 @@ export function ProviderApp() {
   const counts = s.providerInstances.reduce((result, instance) => {
     result[providerInstanceStatus(instance)] += 1
     return result
-  }, { active: 0, expired: 0, stopped: 0 })
+  }, { active: 0, stopped: 0 })
 
   if (!hasAccess) {
     return (
@@ -61,10 +60,10 @@ export function ProviderApp() {
   }
 
   const resume = async (instance: ProviderInstance) => {
-    const ok = await confirm({ title: `恢复「${instance.enterpriseName}」`, body: '恢复人工停用状态；如果授权已经到期，仍会保持“已到期”提示。', okText: '恢复' })
+    const ok = await confirm({ title: `恢复服务：「${instance.enterpriseName}」`, body: '恢复服务；如果授权已经到期，仍会保持“已到期”提示。', okText: '恢复服务' })
     if (!ok) return
     s.resumeProviderInstance(instance.id)
-    toast(`已恢复「${instance.enterpriseName}」`)
+    toast(`已恢复服务：「${instance.enterpriseName}」`)
   }
 
   return (
@@ -90,13 +89,12 @@ export function ProviderApp() {
           <div className="flex items-center gap-3"><DemoNoteToggle /><span className="text-xs text-zinc-600">供应方管理员</span></div>
         </header>
         <main className="p-6">
-          <DemoNote className="mb-4">这是独立于客户企业后台的供应方管理端。当前演示停用状态和操作记录，不定义停用后具体限制哪些企业功能。</DemoNote>
-          <PageHeader title="企业部署实例" desc="绑定企业提交的实例设备码，查看授权状态，并由供应方执行续期、人工停用和恢复。" extra={<Button variant="primary" onClick={() => setBinding(true)}><Plus size={14} /> 绑定实例</Button>} />
+          <DemoNote className="mb-4">这是独立于企业后台的供应方管理端。暂停服务后，企业员工不能进入工作台或管理后台；到期日只作提醒，不会自动暂停服务。</DemoNote>
+          <PageHeader title="企业部署实例" desc="绑定企业提交的实例设备码，查看授权状态，并由供应方执行续期、暂停服务和恢复服务。" extra={<Button variant="primary" onClick={() => setBinding(true)}><Plus size={14} /> 绑定实例</Button>} />
 
-          <div className="mb-4 grid grid-cols-4 gap-3">
+          <div className="mb-4 grid grid-cols-3 gap-3">
             <Stat label="全部实例" value={s.providerInstances.length} sub="按企业部署实例统计" />
-            <Stat label={PROVIDER_STATUS_LABEL.active} value={counts.active} sub="到期日尚未到达" />
-            <Stat label={PROVIDER_STATUS_LABEL.expired} value={counts.expired} sub="到期不会自动停用" tone={counts.expired ? 'warn' : 'default'} />
+            <Stat label={PROVIDER_STATUS_LABEL.active} value={counts.active} sub="到期不会自动暂停服务" />
             <Stat label={PROVIDER_STATUS_LABEL.stopped} value={counts.stopped} sub="需要供应方明确操作" />
           </div>
 
@@ -106,7 +104,7 @@ export function ProviderApp() {
             extra={
               <div className="flex items-center gap-2">
                 <div className="relative"><Search size={13} className="absolute top-2 left-2.5 text-zinc-400" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索企业、设备码或实例标识" className="w-64 pl-8" /></div>
-                <Select value={filter} onChange={(event) => setFilter(event.target.value as Filter)} className="w-36"><option value="all">全部状态</option><option value="active">{PROVIDER_STATUS_LABEL.active}</option><option value="expired">{PROVIDER_STATUS_LABEL.expired}</option><option value="stopped">{PROVIDER_STATUS_LABEL.stopped}</option></Select>
+                <Select value={filter} onChange={(event) => setFilter(event.target.value as Filter)} className="w-36"><option value="all">全部状态</option><option value="active">{PROVIDER_STATUS_LABEL.active}</option><option value="stopped">{PROVIDER_STATUS_LABEL.stopped}</option></Select>
               </div>
             }
           >
@@ -120,7 +118,7 @@ export function ProviderApp() {
                 { key: 'version', title: '版本', render: (instance) => <span className="font-mono text-xs">{instance.version}</span> },
                 { key: 'expiry', title: '本期到期日', render: (instance) => <span className="tabular-nums">{fmtDate(instance.expiresAt)}</span> },
                 { key: 'status', title: '状态', render: (instance) => <div><StatusPill instance={instance} />{instance.stopReason && <div className="mt-1 max-w-36 truncate text-[10px] text-zinc-400" title={instance.stopReason}>{instance.stopReason}</div>}</div> },
-                { key: 'ops', title: '操作', align: 'right', render: (instance) => <div className="flex justify-end gap-1"><Button size="sm" variant="ghost" onClick={() => setRenewing(instance)}>续期</Button>{instance.stoppedAt ? <Button size="sm" variant="secondary" onClick={() => void resume(instance)}>恢复</Button> : <Button size="sm" variant="danger" onClick={() => setStopping(instance)}>停用</Button>}</div> },
+                { key: 'ops', title: '操作', align: 'right', render: (instance) => <div className="flex justify-end gap-1"><Button size="sm" variant="ghost" onClick={() => setRenewing(instance)}>续期</Button>{instance.stoppedAt ? <Button size="sm" variant="secondary" onClick={() => void resume(instance)}>恢复服务</Button> : <Button size="sm" variant="danger" onClick={() => setStopping(instance)}>暂停服务</Button>}</div> },
               ]}
             />
           </Card>

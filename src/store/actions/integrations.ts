@@ -69,7 +69,7 @@ export function integrationActions(set: Set, get: Get): IntegrationActions {
         matched += 1
       })
       const rec: SyncRecord = { id: newId('sr'), at: now(), kind: 'purchase', source: 'csv', count: matched, failed: 0, unmatched }
-      set({ customers, syncRecords: [rec, ...s.syncRecords], audit: withAudit(s.audit, 'profile.import', `CSV 导入购买记录：匹配 ${matched} 条，未匹配 ${unmatched} 条`, byStaffId) })
+      set({ customers, syncRecords: [rec, ...s.syncRecords], audit: withAudit(s.audit, 'profile.import', `CSV 导入业务记录：匹配 ${matched} 条，未匹配 ${unmatched} 条`, byStaffId) })
       return rec
     },
 

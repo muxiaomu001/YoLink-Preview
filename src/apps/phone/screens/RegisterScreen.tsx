@@ -2,7 +2,7 @@
  * 注册页与注册成功页。
  *
  * 注册页按企业设置的昵称三档（必填 / 选填 / 不问）决定要不要出昵称框；
- * 成功页列出官方联系人 + 自动加入的群与频道（邀请组与邀请链接附带群的并集），
+ * 成功页列出官方 + 自动加入的群与频道（邀请组与邀请链接附带群的并集），
  * 并把「系统给你起了个名」和「新号观察期」这两件事在这里讲清楚，不留到客户在群里发不出话才发现。
  */
 import { useState } from 'react'
@@ -33,7 +33,7 @@ export function WelcomeScreen({ added, onEnter }: { added: JustAdded; onEnter: (
     <div className="thin-scroll flex h-full flex-col items-center overflow-y-auto px-7 pt-10 pb-6 text-center">
       <BadgeCheck size={40} className="text-emerald-600" />
       <div className="mt-3 text-base font-semibold">注册成功</div>
-      <p className="mt-2 text-xs leading-relaxed text-zinc-500">你的官方联系人已经在会话列表里了，不需要搜索或申请。</p>
+      <p className="mt-2 text-xs leading-relaxed text-zinc-500">下方联系人已经在会话列表里了，不需要搜索或申请。</p>
       {added.nicknameAuto && me && (
         <div className="mt-3 flex w-full items-start gap-2 rounded-lg border border-brand-200 bg-brand-50/70 px-3 py-2 text-left">
           <PenLine size={14} className="mt-0.5 shrink-0 text-brand-700" />
@@ -46,7 +46,7 @@ export function WelcomeScreen({ added, onEnter }: { added: JustAdded; onEnter: (
         <div className="mt-2 flex w-full items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-left">
           <Clock size={14} className="mt-0.5 shrink-0 text-amber-700" />
           <p className="text-[11px] leading-relaxed text-amber-900">
-            新号观察期至 {fmtDateTime(added.watchUntil)}：{WATCH_LIMIT_TEXT}。有问题直接问上面的官方联系人，不受影响。
+            新号观察期至 {fmtDateTime(added.watchUntil)}：{WATCH_LIMIT_TEXT}。有问题可直接向下方联系人发消息。
           </p>
         </div>
       )}

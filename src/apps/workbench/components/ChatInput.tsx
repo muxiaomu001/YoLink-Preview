@@ -243,7 +243,7 @@ export function ChatInput({
     }
   }
 
-  // 上限值直接读后台策略：老板在后台改一个数字，这里的提示立刻跟着变
+  // 上限值直接读后台策略：管理员在后台改一个数字，这里的提示立刻跟着变
   const mediaHint = `上限：图片 ${s.policyNumbers.imageMaxMb}MB · 视频 ${s.policyNumbers.videoMaxMb}MB · 文件 ${s.policyNumbers.fileMaxMb}MB · 语音 ${s.policyNumbers.voiceMaxSeconds} 秒（后台「策略 · 数值型」可改）`
 
   return (

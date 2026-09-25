@@ -113,7 +113,10 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
       s.updateSeat(seat.id, patch, admin)
       toast('坐席已更新')
     } else {
-      s.createSeat({ ...patch, status: 'accepting' }, admin)
+      if (!s.createSeat({ ...patch, status: 'accepting' }, admin)) {
+        toast('坐席状态只能是接新中或暂停接新', 'warn')
+        return
+      }
       toast('坐席已创建。记得把它放进邀请组，否则新客户不会加到它')
     }
     onClose()
@@ -135,10 +138,10 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
       <div className="space-y-3">
         {seat && <Note tone="amber">显示名和头像创建后可改，但客户会看到名字变了。除非确实要改，否则不要动。</Note>}
         <Field label="显示名" required hint="客户看到的名字，1 到 32 字">
-          <Input value={form.displayName} maxLength={32} onChange={(e) => set('displayName', e.target.value)} placeholder="如：林顾问" />
+          <Input value={form.displayName} maxLength={32} onChange={(e) => set('displayName', e.target.value)} placeholder="如：林晓明" />
         </Field>
-        <Field label="职能说明" hint="0 到 64 字，多个官方号时客户靠它判断该找谁">
-          <Input value={form.roleDesc} maxLength={64} onChange={(e) => set('roleDesc', e.target.value)} placeholder="如：资深投资顾问 · 全球资产配置" />
+        <Field label="职能说明" hint="0 到 64 字，多个坐席时客户靠它判断该找谁">
+          <Input value={form.roleDesc} maxLength={64} onChange={(e) => set('roleDesc', e.target.value)} placeholder="如：资深客户服务 · 全球资产配置" />
         </Field>
         <Field label="实操员工" required hint="坐席必须有人实操">
           <Select value={form.operatorStaffId} onChange={(e) => set('operatorStaffId', e.target.value)}>

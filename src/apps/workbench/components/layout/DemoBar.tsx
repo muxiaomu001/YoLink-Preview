@@ -19,7 +19,7 @@ export function DemoBar() {
   const customerId = conv?.customerId ?? group?.memberCustomerIds[0]
   const phoneUrl = customerId && convId ? `/phone?customer=${customerId}&conversation=${convId}` : '/phone'
   const [open, setOpen] = useState(false)
-  const candidates = s.staff.filter((x) => x.status === 'active' && x.roleId !== 'role_admin')
+  const candidates = s.staff.filter((x) => x.status === 'active' && !['role_super', 'role_admin'].includes(x.roleId))
 
   const loginAs = (staffId: string) => {
     const target = candidates.find((x) => x.id === staffId)

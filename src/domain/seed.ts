@@ -125,10 +125,11 @@ export const ALL_CAPS: Role['caps'] = [
 ]
 
 export const ROLES: Role[] = [
-  { id: 'role_admin', name: '管理员', desc: '全部权限，系统内置', builtin: true, caps: ALL_CAPS },
+  { id: 'role_super', name: '超级管理员', desc: '全部权限，系统内置，不可删除、停用或降级', builtin: true, caps: ALL_CAPS },
+  { id: 'role_admin', name: '管理员', desc: '除管理员工角色外的全部权限，系统内置', builtin: true, caps: ALL_CAPS.filter((cap) => cap !== 'manage_roles') },
   {
-    id: 'role_seat',
-    name: '坐席',
+    id: 'role_cs',
+    name: '客服',
     desc: '只看本人持有坐席的会话与客户；能发邀请链接、群发、挂头衔',
     builtin: true,
     caps: ['create_invite', 'broadcast', 'assign_title'],
@@ -161,7 +162,7 @@ const STAFF_BASE: Staff[] = [
     name: '周敏',
     username: 'zhoumin',
     email: 'zhoumin@hxwm.example',
-    roleId: 'role_admin',
+    roleId: 'role_super',
     status: 'active',
     lastLoginAt: ago(0, 1),
     createdAt: ago(120),
@@ -171,7 +172,7 @@ const STAFF_BASE: Staff[] = [
     name: '林薇',
     username: 'linwei',
     email: 'linwei@hxwm.example',
-    roleId: 'role_seat',
+    roleId: 'role_cs',
     status: 'active',
     lastLoginAt: ago(0, 0, 25),
     createdAt: ago(110),
@@ -181,7 +182,7 @@ const STAFF_BASE: Staff[] = [
     name: '陈默',
     username: 'chenmo',
     email: 'chenmo@hxwm.example',
-    roleId: 'role_seat',
+    roleId: 'role_cs',
     status: 'active',
     lastLoginAt: ago(0, 2),
     createdAt: ago(110),
@@ -201,7 +202,7 @@ const STAFF_BASE: Staff[] = [
     name: '王芳',
     username: 'wangfang',
     email: 'wangfang@hxwm.example',
-    roleId: 'role_seat',
+    roleId: 'role_cs',
     status: 'active',
     lastLoginAt: undefined,
     createdAt: ago(2),
@@ -216,27 +217,27 @@ export const STAFF: Staff[] = STAFF_BASE.map((st) => ({ ...st, prefs: { ...DEFAU
 export const SEATS: Seat[] = [
   {
     id: 'seat_lin',
-    displayName: '林顾问',
+    displayName: '林晓明',
     avatarText: '林',
     avatarColor: '#1f3b73',
-    roleDesc: '资深投资顾问 · 全球资产配置',
+    roleDesc: '资深投资服务专员 · 全球资产配置',
     operatorStaffId: 'st_lin',
     status: 'accepting',
     welcome:
-      '{{customer.nickname}}您好，我是您的专属投资顾问林顾问。先花两分钟做个风险测评，我再根据结果给您一版配置思路，可以吗？',
+      '{{customer.nickname}}您好，我是您的专属投资服务专员林晓明。先花两分钟做个风险测评，我再根据结果给您一版配置思路，可以吗？',
     customerDeletable: false,
     createdAt: ago(110),
   },
   {
     id: 'seat_chen',
-    displayName: '陈顾问',
+    displayName: '陈二宝',
     avatarText: '陈',
     avatarColor: '#2f56ad',
-    roleDesc: '投资顾问 · 固收与现金管理',
+    roleDesc: '投资服务专员 · 固收与现金管理',
     operatorStaffId: 'st_chen',
     status: 'accepting',
     welcome:
-      '{{customer.nickname}}您好，我是陈顾问，负责您的账户配置与日常跟进。您先说说这笔资金的用途和期限，我们从这里开始。',
+      '{{customer.nickname}}您好，我是陈二宝，负责您的账户配置与日常跟进。您先说说这笔资金的用途和期限，我们从这里开始。',
     customerDeletable: false,
     createdAt: ago(110),
   },
@@ -309,7 +310,7 @@ const CHAT_GROUPS_BASE: Omit<ChatGroup, keyof ReturnType<typeof groupDefaults>>[
     name: '恒信财富社群',
     kind: 'group',
     official: true,
-    desc: '客户交流与顾问答疑',
+    desc: '客户交流与服务专员答疑',
     ownerSeatId: 'seat_lin',
     memberSeatIds: ['seat_lin', 'seat_chen', 'seat_cs'],
     memberCustomerIds: [],
@@ -322,7 +323,7 @@ const CHAT_GROUPS_BASE: Omit<ChatGroup, keyof ReturnType<typeof groupDefaults>>[
     name: '私享会员群',
     kind: 'group',
     official: true,
-    desc: '仅私享会员可入，顾问一对一答疑优先',
+    desc: '仅私享会员可入，服务专员一对一答疑优先',
     ownerSeatId: 'seat_lin',
     memberSeatIds: ['seat_lin', 'seat_chen'],
     memberCustomerIds: [],
@@ -342,7 +343,7 @@ export const INVITE_GROUPS: InviteGroup[] = [
     id: 'ig_default',
     name: '默认组',
     code: 'HX2026',
-    // 客户服务人人都加；两位顾问轮流接
+    // 客户服务人人都加；两位坐席轮流接
     fixedSeatIds: ['seat_cs'],
     rotatingSeatIds: ['seat_chen', 'seat_lin'],
     rotationIndex: 0,
@@ -365,7 +366,7 @@ export const INVITE_GROUPS: InviteGroup[] = [
   },
   {
     id: 'ig_lin',
-    name: '林顾问专属码',
+    name: '林晓明专属码',
     code: 'LIN001',
     // 一对一专属码：没有固定坐席，队列里只有他自己
     fixedSeatIds: [],
@@ -477,7 +478,7 @@ const SCENARIOS: Record<ScenarioKey, ScriptLine[]> = {
     { from: 'c', text: '好的，那开户需要准备什么材料？', gapMin: 120 },
   ],
   us_market_question: [
-    { from: 'c', text: '林顾问，美股现在这个位置还能进吗？感觉涨太多了', gapMin: 0 },
+    { from: 'c', text: '林晓明，美股现在这个位置还能进吗？感觉涨太多了', gapMin: 0 },
     { from: 's', text: '这个问题我不会给"能"或"不能"这种回答，说实话谁也判断不了短期。您现在的组合里美股占比是 35%，在合理区间；如果担心高位，可以把新增资金分三个月分批进，不用一次到位。', gapMin: 8 },
     { from: 'c', text: '分批的话每次多少合适？', gapMin: 30 },
   ],
@@ -515,7 +516,7 @@ const SCENARIOS: Record<ScenarioKey, ScriptLine[]> = {
     { from: 'c', text: '让我想想，明天答复你', gapMin: 30 },
   ],
   referral_intro: [
-    { from: 'c', text: '林顾问你好，我是老王介绍来的，他说你这边配置做得挺稳', gapMin: 0 },
+    { from: 'c', text: '林晓明你好，我是老王介绍来的，他说你这边配置做得挺稳', gapMin: 0 },
     { from: 's', text: '欢迎！王先生是我三年的老客户了。既然是他介绍的，我先不推产品，先了解您的情况：目前资产大概怎么分布的，有没有海外账户？', gapMin: 5 },
     { from: 'c', text: '还没有海外账户，都在国内银行理财', gapMin: 60 },
     { from: 's', text: '那第一步是开户，我让客户服务同事把材料清单发您，一般三个工作日办完。开好户我们再聊配置。', gapMin: 4 },
@@ -533,7 +534,7 @@ const SCENARIOS: Record<ScenarioKey, ScriptLine[]> = {
 }
 
 const PLANS: CustomerPlan[] = [
-  // 直播间组（林顾问主归属）
+  // 直播间组（林晓明主归属）
   { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 0.1, scenario: 'just_registered' },
   { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 1, scenario: 'onboarding_pending' },
   { inviteGroupId: 'ig_live', inviteLinkId: 'il_douyin', daysAgo: 2, scenario: 'us_market_question' },
@@ -550,14 +551,14 @@ const PLANS: CustomerPlan[] = [
   { inviteGroupId: 'ig_live', daysAgo: 38, scenario: 'quiet_long' },
   { inviteGroupId: 'ig_live', daysAgo: 45, scenario: 'deposit_arrival' },
   { inviteGroupId: 'ig_live', daysAgo: 55, scenario: 'renewal' },
-  // 林顾问专属码
+  // 林晓明专属码
   { inviteGroupId: 'ig_lin', inviteLinkId: 'il_referral', daysAgo: 4, scenario: 'referral_intro' },
   { inviteGroupId: 'ig_lin', inviteLinkId: 'il_referral', daysAgo: 11, scenario: 'referral_intro' },
   { inviteGroupId: 'ig_lin', inviteLinkId: 'il_referral', daysAgo: 18, scenario: 'active_investor' },
   { inviteGroupId: 'ig_lin', daysAgo: 26, scenario: 'quiet_long' },
   { inviteGroupId: 'ig_lin', daysAgo: 33, scenario: 'risk_survey_done' },
   { inviteGroupId: 'ig_lin', daysAgo: 41, scenario: 'active_investor' },
-  // 默认组（陈顾问主归属）
+  // 默认组（陈二宝主归属）
   { inviteGroupId: 'ig_default', inviteLinkId: 'il_xhs', daysAgo: 0.3, scenario: 'just_registered' },
   { inviteGroupId: 'ig_default', inviteLinkId: 'il_xhs', daysAgo: 1, scenario: 'onboarding_pending' },
   { inviteGroupId: 'ig_default', inviteLinkId: 'il_xhs', daysAgo: 2, scenario: 'deposit_arrival' },
@@ -579,9 +580,9 @@ const PLANS: CustomerPlan[] = [
 ]
 
 const NOTICE_TEXTS = [
-  '【合规提示】近期有不法分子冒充顾问私下收款。恒信财富所有资金往来均通过您本人名下的托管账户，顾问不会以任何理由要求您向个人账户转账。',
+  '【合规提示】近期有不法分子冒充服务专员私下收款。恒信财富所有资金往来均通过您本人名下的托管账户，服务专员不会以任何理由要求您向个人账户转账。',
   '【系统通知】9 月 20 日 02:00 至 04:00（香港时间）进行系统维护，期间账户查询可能短暂不可用，交易不受影响。',
-  '【策略会通知】10 月 12 日"四季度全球配置展望"线下策略会开放报名，私享会员优先。详情请咨询您的顾问。',
+  '【策略会通知】10 月 12 日"四季度全球配置展望"线下策略会开放报名，私享会员优先。详情请咨询您的服务专员。',
 ]
 
 /** 某坐席在某时刻由谁实操：按交接记录反推，保证种子数据与审计口径一致 */
@@ -684,7 +685,7 @@ function buildCustomers() {
       if (c.inviteCount >= 3) c.roleLabel = '推荐大使'
     }
     // 给几个客户种上管控状态：状态列与筛选空着演示不了，
-    // 而"封禁 / 全群禁言 / 全局禁言 / 待首次改密"本来就是任何一个跑了半年的企业都有几个的常态
+    // 而"封禁 / 群聊禁言 / 全部禁言 / 待首次改密"本来就是任何一个跑了半年的企业都有几个的常态
     if (s === 'complaint_refund') c.bannedAt = iso(registeredMs + 86400000 * 12)
     if (s === 'quiet_long' && idx % 7 === 3) c.mutedAllUntil = iso(Date.now() + 86400000 * 2)
     if (s === 'quiet_long' && idx % 7 === 4) c.globalMutedUntil = iso(Date.now() + 86400000 * 2)
@@ -712,7 +713,7 @@ function buildCustomers() {
 
     customers.push(c)
 
-    // 固定坐席全加，接待员按轮询分到一位
+    // 固定坐席全加，轮询坐席按轮询分到一位
     let lastActivity = registeredMs
     alloc.seatIds.forEach((seatId, order) => {
       const seat = seatById[seatId]
@@ -818,21 +819,21 @@ function buildGroupMessages(customers: Customer[], chatGroups: ChatGroup[]) {
   })
   conversations.push(convStrategy)
 
-  // 社群：客户闲聊 + @林顾问
+  // 社群：客户闲聊 + @林晓明
   const convCommunity: Conversation = { id: sid('conv'), kind: 'group', chatGroupId: community.id, lastMessageAt: ago(1) }
   const members = customers.slice(0, 12)
   const CHAT = [
     { c: 0, text: '今天美元又涨了，换汇的朋友注意一下' },
     { c: 1, text: '请问黄金 ETF 现在还适合进吗' },
     { s: 'seat_chen', text: '黄金建议看研究部给的区间，5% 到 12%，在区间内按纪律配，不看单日价格。' },
-    { c: 2, text: '@林顾问 上次说的四季度策略会什么时候报名' },
+    { c: 2, text: '@林晓明 上次说的四季度策略会什么时候报名' },
     { s: 'seat_lin', text: '10 月 12 日，私享会员优先，报名链接稍后我私发大家。' },
     { c: 3, text: '收到' },
-    { c: 4, text: '@林顾问 我的组合今天怎么没更新净值' },
+    { c: 4, text: '@林晓明 我的组合今天怎么没更新净值' },
     { c: 5, text: '同问，我的也没更新' },
     { s: 'seat_cs', text: '净值更新有延迟，托管行数据要到晚上 8 点后才推送，各位稍后刷新即可。' },
     { c: 6, text: '好的谢谢' },
-    { c: 7, text: '@林顾问 想约个时间聊聊美元短债，明天下午方便吗' },
+    { c: 7, text: '@林晓明 想约个时间聊聊美元短债，明天下午方便吗' },
   ]
   let t = agoMs(1, 6)
   CHAT.forEach((line) => {
@@ -842,7 +843,7 @@ function buildGroupMessages(customers: Customer[], chatGroups: ChatGroup[]) {
       messages.push({ id: sid('msg'), convId: convCommunity.id, senderKind: 'seat', senderId: seat.id, seatId: seat.id, operatorId: seat.operatorStaffId, kind: 'text', text: line.text, at: iso(t) })
     } else if ('c' in line && typeof line.c === 'number') {
       const cus = members[line.c % members.length]
-      const mentions = line.text.includes('@林顾问') ? ['seat_lin'] : undefined
+      const mentions = line.text.includes('@林晓明') ? ['seat_lin'] : undefined
       messages.push({ id: sid('msg'), convId: convCommunity.id, senderKind: 'customer', senderId: cus.id, kind: 'text', text: line.text, at: iso(t), mentionSeatIds: mentions })
     }
     convCommunity.lastMessageAt = iso(t)
@@ -878,16 +879,16 @@ function buildBroadcasts(): Broadcast[] {
 function buildAudit(): AuditEvent[] {
   const list: AuditEvent[] = [
     { id: sid('au'), at: ago(45), actorStaffId: 'st_admin', type: 'seat.handover', detail: '坐席「客户服务」由 赵磊 交接给 陈默；原因：赵磊转任运营主管' },
-    { id: sid('au'), at: ago(40), actorStaffId: 'st_admin', type: 'invite_group.create', detail: '创建邀请组「林顾问专属码」，轮询坐席：林顾问；固定坐席：无' },
-    { id: sid('au'), at: ago(35), actorStaffId: 'st_lin', type: 'invite_link.create', detail: '在「林顾问专属码」下创建邀请链接「林薇 · 老客户转介绍」' },
+    { id: sid('au'), at: ago(40), actorStaffId: 'st_admin', type: 'invite_group.create', detail: '创建邀请组「林晓明专属码」，轮询坐席：林晓明；固定坐席：无' },
+    { id: sid('au'), at: ago(35), actorStaffId: 'st_lin', type: 'invite_link.create', detail: '在「林晓明专属码」下创建邀请链接「林薇 · 老客户转介绍」' },
     { id: sid('au'), at: ago(30), actorStaffId: 'st_zhao', type: 'invite_link.create', detail: '在「默认组」下创建邀请链接「小红书投放」' },
     { id: sid('au'), at: ago(20), actorStaffId: 'st_admin', type: 'title.library', detail: '头衔库新增「官方讲师」' },
     { id: sid('au'), at: ago(14), actorStaffId: 'st_lin', type: 'invite_link.create', detail: '在「直播间组」下创建邀请链接「抖音直播 · 9 月」' },
     { id: sid('au'), at: ago(9, 4), actorStaffId: 'st_chen', type: 'broadcast.send', detail: '以「客户服务」身份群发「开户资料提醒」，目标：内部标签 = 观望中，8 人' },
-    { id: sid('au'), at: ago(5, 1), actorStaffId: 'st_lin', type: 'broadcast.send', detail: '以「林顾问」身份群发「策略会报名」，目标：我的客户，22 人' },
+    { id: sid('au'), at: ago(5, 1), actorStaffId: 'st_lin', type: 'broadcast.send', detail: '以「林晓明」身份群发「策略会报名」，目标：我的客户，22 人' },
     { id: sid('au'), at: ago(3), actorStaffId: 'st_admin', type: 'policy.update', detail: '应用策略预设「客服预设」' },
     { id: sid('au'), at: ago(2), actorStaffId: 'st_admin', type: 'staff.create', detail: '创建员工 王芳（角色：坐席），未创建同名坐席' },
-    { id: sid('au'), at: ago(2, 3), actorStaffId: 'st_lin', type: 'broadcast.send', detail: '以「林顾问」身份群发「本周市场观点」，目标：头衔 = 私享会员，9 人' },
+    { id: sid('au'), at: ago(2, 3), actorStaffId: 'st_lin', type: 'broadcast.send', detail: '以「林晓明」身份群发「本周市场观点」，目标：头衔 = 私享会员，9 人' },
     { id: sid('au'), at: ago(0, 5), actorStaffId: 'st_zhao', type: 'login', detail: '登录工作台' },
     { id: sid('au'), at: ago(0, 2), actorStaffId: 'st_chen', type: 'login', detail: '登录工作台' },
     { id: sid('au'), at: ago(0, 1), actorStaffId: 'st_admin', type: 'login', detail: '登录管理后台' },

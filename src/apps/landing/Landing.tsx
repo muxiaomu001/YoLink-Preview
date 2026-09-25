@@ -8,17 +8,17 @@ import { DemoNoteToggle, useDemoNotes } from '@/ui/DemoNote'
 import { PROVIDER_DEMO_ACCESS_KEY } from '@/domain/demoAccess'
 
 const CARDS = [
-  { to: '/phone', icon: Smartphone, title: '客户手机屏', who: '客户这边看到什么', desc: '扫码注册、加上官方联系人、聊天和查资料。客户全程只看到「顾问」，看不到背后是谁在操作。' },
+  { to: '/phone', icon: Smartphone, title: '客户手机屏', who: '客户这边看到什么', desc: '扫码注册、聊天和查资料。客户看到的是林晓明等显示名与「官方」小标，看不到背后的实操员工。' },
   { to: '/workbench', icon: MonitorSmartphone, title: '客服工作台', who: '员工每天在这里干活', desc: '待我回复、话术一键发、客户资料和群发。右下角可以切换成别的员工试。' },
-  { to: '/admin', icon: Settings2, title: '管理后台', who: '老板和管理员管什么', desc: '邀请组、员工与坐席、权限开关、人员交接、经营看板。这里改一个开关，前面两屏立刻生效。' },
+  { to: '/admin', icon: Settings2, title: '管理后台', who: '超级管理员和管理员管什么', desc: '邀请组、员工与坐席、权限开关、人员交接、经营看板。这里改一个开关，前面两屏立刻生效。' },
 ]
 
 const FLOWS = [
-  { title: '01 · 客户进入与接待', to: '/admin/invite-groups', steps: ['邀请组查看直播间组与 LIVE88；客户屏注册一个新昵称。', '客户看到林顾问和恒信官方通知频道；向林顾问发送“开户需要什么材料”。', '工作台以林薇登录，从待我回复找到该客户，发送一条回复；回到客户屏确认收到。'] },
-  { title: '02 · 话术与客户运营', to: '/workbench', steps: ['工作台右栏切到话术，搜索材料清单，发送文字或附件。', '查看客户资料，区分购买记录、内部标签与公开头衔；按条件选择群发人群。', '检查目标与发送身份，发送后在对应客户屏核对消息；样例回执不代表真实触达效果。'] },
-  { title: '03 · 人员交接', to: '/admin/seats', steps: ['后台把林顾问交接给王芳，填写原因。', '工作台右下角演示控制切换为王芳，继续使用林顾问回复同一客户。', '客户侧名字、头像、历史不变；消息审计能区分交接前后的真实员工。'] },
-  { title: '04 · 老板看见什么', to: '/admin/home', steps: ['经营首页查看五项样例指标，解释客户与员工分别如何统计。', '日报与提醒查看内容预览，点击模拟发送，只新增本地模拟记录。', '当前手机屏尚无经营入口；不演示真实 App 推送、飞书发送、计费或客户成效。'] },
-  { title: '讨论区 · 后续与待定', to: '/admin/modules', steps: ['P1/P2 页面用于讨论后续需求，不自动纳入第一版。', 'AI 模块和群活跃助手是独立板块，还没设计，只留了占位入口。', '订阅到期不会自动停用；续期、停用与恢复在供应方授权中心演示，人工停用的影响范围仍待确认。'] },
+  { title: '01 · 客户进入与接待', to: '/admin/invite-groups', steps: ['邀请组查看直播间组与 LIVE88；客户屏注册一个新昵称。', '客户看到林晓明和恒信官方通知频道；向林晓明发送“开户需要什么材料”。', '工作台以林薇登录，从待我回复找到该客户，发送一条回复；回到客户屏确认收到。'] },
+  { title: '02 · 话术与客户运营', to: '/workbench', steps: ['工作台右栏切到话术，搜索材料清单，发送文字或附件。', '查看客户资料，区分业务记录、内部标签与公开头衔；按条件选择群发人群。', '检查目标与发送身份，发送后在对应客户屏核对消息；样例回执不代表真实触达效果。'] },
+  { title: '03 · 人员交接', to: '/admin/seats', steps: ['后台把林晓明交接给王芳，填写原因。', '工作台右下角演示控制切换为王芳，继续使用林晓明回复同一客户。', '客户侧名字、头像、历史不变；消息审计能区分交接前后的真实员工。'] },
+  { title: '04 · 超级管理员看见什么', to: '/admin/home', steps: ['经营首页查看五项样例指标，解释客户与员工分别如何统计。', '日报与提醒从超级管理员中选择接收人，点击模拟发送，只新增本地模拟记录。', '日报通过企微或飞书机器人发送；这里不演示真实发送、计费或客户成效。'] },
+  { title: '讨论区 · 后续与待定', to: '/admin/modules', steps: ['P1/P2 页面用于讨论后续需求，不自动纳入第一版。', 'AI 模块和群活跃助手是独立板块，还没设计，只留了占位入口。', '订阅到期不会自动暂停服务；供应方可续期、暂停服务或恢复服务。暂停服务后企业员工不能进入工作台和后台。'] },
 ]
 
 export function Landing() {
@@ -31,7 +31,7 @@ export function Landing() {
         <header className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-[-0.02em] text-zinc-900">YoLink 交互演示</h1>
-            <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-zinc-600">一套自己的客户沟通系统：客户在手机上聊，员工在工作台接，老板在后台管。三个入口下面都打开，改一边看另一边。</p>
+            <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-zinc-600">一套自己的客户沟通系统：客户在手机上聊，员工在工作台接，超级管理员在后台管。三个入口下面都打开，改一边看另一边。</p>
             <p className="mt-1 text-xs text-zinc-400">演示环境以虚构企业「{enterprise.name}」为例（{enterprise.slogan}）。</p>
           </div>
           <Button
@@ -99,7 +99,7 @@ export function Landing() {
           <KeyRound size={16} className="shrink-0 text-zinc-400 group-hover:text-zinc-600" />
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-medium text-zinc-700">供应方授权中心<span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-normal text-zinc-500">YoLink 内部</span></div>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">绑定企业部署实例、查看到期状态、续期与人工停用。企业客户看不到这一层，给客户演示时不用打开。</p>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">绑定企业部署实例、查看到期状态、续期与暂停服务。企业客户看不到这一层，给客户演示时不用打开。</p>
           </div>
           <ArrowRight size={14} className="shrink-0 text-zinc-300 transition-transform group-hover:translate-x-0.5 group-hover:text-zinc-500" />
         </Link>

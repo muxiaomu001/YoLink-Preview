@@ -1,5 +1,5 @@
 /**
- * 客户列表的详情弹窗：基本信息、官方联系人、账号管控（重置密码 / 强制下线 / 全群/全局禁言 / 封禁）、
+ * 客户列表的详情弹窗：基本信息、坐席、账号管控（重置密码 / 强制下线 / 群聊禁言 / 全部禁言 / 封禁）、
  * 改主归属坐席（P1）、注销客户（P1）。状态标记与列表同一口径，见 domain/customerStatus。
  */
 import { useState } from 'react'
@@ -24,8 +24,8 @@ export function CustomerDetailModal({ customerId, onClose }: { customerId: strin
   const c = customerById(s, customerId)
   const seats = seatsOfCustomer(s, customerId)
   const primary = seats.find((x) => x.primary)
-  // 改主归属只能选未停用的坐席，排除当前主归属
-  const candidates = s.seats.filter((x) => x.status !== 'disabled' && x.id !== primary?.seatId)
+  // 改主归属只能选坐席，排除当前主归属
+  const candidates = s.seats.filter((x) => x.id !== primary?.seatId)
   const [newSeatId, setNewSeatId] = useState('')
 
   if (!c) return null
@@ -105,7 +105,7 @@ export function CustomerDetailModal({ customerId, onClose }: { customerId: strin
         </section>
 
         <section>
-          <h4 className="mb-2 text-xs font-semibold text-zinc-700">官方联系人（{seats.length}）</h4>
+          <h4 className="mb-2 text-xs font-semibold text-zinc-700">坐席（{seats.length}）</h4>
           <div className="space-y-1.5">
             {seats.map((x) => (
               <div key={x.seatId} className="flex items-center gap-2.5 rounded-md border border-zinc-200 px-3 py-2 text-xs">
@@ -127,7 +127,7 @@ export function CustomerDetailModal({ customerId, onClose }: { customerId: strin
                 </div>
               </div>
             ))}
-            {!seats.length && <div className="text-xs text-zinc-400">没有官方联系人</div>}
+            {!seats.length && <div className="text-xs text-zinc-400">没有坐席</div>}
           </div>
         </section>
 

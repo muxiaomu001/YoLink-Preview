@@ -38,7 +38,7 @@ export function BroadcastsAdminPage() {
               text={
                 <span>
                   频控：每个实操员工每天 {perStaff} 个任务（跨其持有的坐席合并），每客户每天最多收 {perCustomer} 条（跨坐席、跨任务合并）。目标人群在发送时计算；自动跳过已注销、已封禁、屏蔽该坐席、当日已达频控的客户。
-                  <b className="ml-1">多坐席全覆盖只算发起人一个任务</b>，不去扣各坐席实操员工的额度——否则管理员发一条全员通知，顾问们当天的营销群发就全发不出去了。
+                  <b className="ml-1">多坐席全覆盖只算发起人一个任务</b>，不去扣各坐席实操员工的额度——否则管理员发一条全员通知，坐席们当天的营销群发就全发不出去了。
                   <Link to="/admin/settings" className="ml-1 text-brand-700 hover:underline">
                     去企业设置 › 群发与话术 改
                   </Link>

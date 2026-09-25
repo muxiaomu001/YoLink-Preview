@@ -1,9 +1,280 @@
 const { test, beforeEach } = require('node:test')
 const assert = require('node:assert/strict')
-const { reset, flush, store, rules, customerStatus, policy } = require('./source-store.cjs')
+const { reset, flush, store, rules, customerStatus, policy, loadSource } = require('./source-store.cjs')
 const current = () => store.getState()
 const seat = { kind: 'seat', id: 'seat_lin', staffId: 'st_lin' }
 beforeEach(reset)
+
+test('第十批：三档内置角色、坐席显示名与存储版本对齐', () => {
+  const state = current()
+  const { CAPABILITIES } = loadSource('src/domain/labels.ts')
+  const { STORAGE_KEY } = loadSource('src/store/store.ts')
+  const superRole = state.roles.find(role => role.id === 'role_super')
+  const adminRole = state.roles.find(role => role.id === 'role_admin')
+  assert.equal(superRole.name, '超级管理员')
+  assert.deepEqual([...superRole.caps].sort(), Array.from(CAPABILITIES, capability => capability.key).sort())
+  assert.deepEqual([...adminRole.caps].sort(), [...superRole.caps].filter(capability => capability !== 'manage_roles').sort())
+  assert.equal(state.roles.find(role => role.id === 'role_cs').name, '客服')
+  assert.deepEqual(state.roles.filter(role => role.builtin).map(role => role.id).sort(), ['role_admin', 'role_cs', 'role_super'])
+  assert.equal(state.staff.find(staff => staff.id === 'st_admin').roleId, 'role_super')
+  assert.equal(state.staff.find(staff => staff.id === 'st_lin').name, '林薇')
+  assert.equal(state.staff.find(staff => staff.id === 'st_chen').name, '陈默')
+  assert.deepEqual(state.seats.map(seatRecord => seatRecord.displayName), ['林晓明', '陈二宝', '客户服务'])
+  assert.equal(STORAGE_KEY, 'yolink-demo-v17')
+})
+
+test('第十批：超级管理员不能删除或修改权限，自定义角色仍可编辑删除', () => {
+  const protectedRole = current().roles.find(role => role.id === 'role_super')
+  const auditCount = current().audit.length
+  assert.equal(current().deleteRole('role_super', 'st_admin'), false)
+  assert.equal(current().updateRole('role_super', { caps: [], name: '已改名' }, 'st_admin'), false)
+  current().updateRoleCaps('role_super', [])
+  assert.deepEqual(current().roles.find(role => role.id === 'role_super'), protectedRole)
+  assert.equal(current().audit.length, auditCount)
+  const custom = current().createRole({ name: '临时角色', desc: '', caps: [] }, 'st_admin')
+  assert.ok(custom)
+  assert.equal(current().updateRole(custom.id, { caps: ['broadcast'] }, 'st_admin'), true)
+  assert.deepEqual([...current().roles.find(role => role.id === custom.id).caps], ['broadcast'])
+  current().updateRoleCaps(custom.id, ['create_invite'])
+  assert.deepEqual([...current().roles.find(role => role.id === custom.id).caps], ['create_invite'])
+  assert.equal(current().deleteRole(custom.id, 'st_admin'), true)
+})
+
+test('第十批：管理员不能管理员工角色，也不能用另一入口改内置权限', () => {
+  const custom = current().createRole({ name: '可删除角色', desc: '', caps: [] }, 'st_admin')
+  current().updateStaff('st_zhao', { roleId: 'role_admin' }, 'st_admin')
+  current().setSession({ adminStaffId: 'st_zhao' })
+  const roles = structuredClone(current().roles)
+  const auditCount = current().audit.length
+  assert.equal(current().createRole({ name: '越权角色', desc: '', caps: ['manage_roles'] }, 'st_zhao'), null)
+  assert.equal(current().updateRole(custom.id, { caps: ['manage_roles'] }, 'st_zhao'), false)
+  assert.equal(current().deleteRole(custom.id, 'st_zhao'), false)
+  current().updateRoleCaps(custom.id, ['manage_roles'])
+  assert.deepEqual(structuredClone(current().roles), roles)
+  assert.equal(current().audit.length, auditCount)
+  current().setSession({ adminStaffId: 'st_admin' })
+  assert.equal(current().updateRole('role_admin', { caps: ['manage_roles'] }, 'st_admin'), false)
+  current().updateRoleCaps('role_admin', [])
+  assert.deepEqual(structuredClone(current().roles), roles)
+})
+
+test('第十批：超级管理员不能停用，普通无坐席员工仍可停用和恢复', () => {
+  const auditCount = current().audit.length
+  assert.match(current().staffDisableBlocker('st_admin'), /超级管理员不能停用/)
+  const denied = current().disableStaff('st_admin', 'st_zhao')
+  assert.equal(denied.ok, false)
+  assert.match(denied.error, /超级管理员不能停用/)
+  assert.equal(current().staff.find(staff => staff.id === 'st_admin').status, 'active')
+  assert.equal(current().audit.length, auditCount)
+  assert.equal(current().disableStaff('st_wang', 'st_admin').ok, true)
+  assert.equal(current().staff.find(staff => staff.id === 'st_wang').status, 'disabled')
+  current().activateStaff('st_wang', 'st_admin')
+  assert.equal(current().staff.find(staff => staff.id === 'st_wang').status, 'active')
+})
+
+test('第十批：最后一位超级管理员不能降级，普通员工可改角色', () => {
+  const auditCount = current().audit.length
+  assert.match(current().updateStaff('st_admin', { roleId: 'role_cs' }, 'st_zhao'), /最后一位超级管理员/)
+  assert.equal(current().staff.find(staff => staff.id === 'st_admin').roleId, 'role_super')
+  assert.equal(current().audit.length, auditCount)
+  assert.equal(current().updateStaff('st_wang', { roleId: 'role_admin' }, 'st_admin'), null)
+  assert.equal(current().staff.find(staff => staff.id === 'st_wang').roleId, 'role_admin')
+  assert.equal(current().updateStaff('st_admin', { name: '周敏更新', roleId: 'role_super' }, 'st_admin'), null)
+  assert.equal(current().staff.find(staff => staff.id === 'st_admin').name, '周敏更新')
+  assert.match(current().updateStaff('st_admin', { roleId: '' }, 'st_zhao'), /最后一位超级管理员/)
+  assert.match(current().updateStaff('st_admin', { status: 'disabled', id: 'replaced' }, 'st_zhao'), /只能修改员工姓名、邮箱与角色/)
+  assert.equal(current().staff.find(staff => staff.id === 'st_admin').status, 'active')
+})
+
+test('第十批：有多位超级管理员时也不能替他人降级或停用', () => {
+  assert.equal(current().updateStaff('st_wang', { roleId: 'role_super' }, 'st_admin'), null)
+  const auditCount = current().audit.length
+  assert.match(current().updateStaff('st_wang', { roleId: 'role_cs' }, 'st_admin'), /超级管理员不能改成其他角色/)
+  assert.equal(current().disableStaff('st_wang', 'st_admin').ok, false)
+  assert.equal(current().staff.find(staff => staff.id === 'st_wang').roleId, 'role_super')
+  assert.equal(current().audit.length, auditCount)
+})
+
+test('第十批：坐席只接受接新中和暂停接新，拒绝旧停用状态', () => {
+  assert.ok(current().seats.every(seatRecord => ['accepting', 'paused'].includes(seatRecord.status)))
+  const auditCount = current().audit.length
+  current().updateSeat('seat_lin', { status: 'disabled' }, 'st_admin')
+  assert.equal(current().seats.find(seatRecord => seatRecord.id === 'seat_lin').status, 'accepting')
+  assert.equal(current().audit.length, auditCount)
+  current().updateSeat('seat_lin', { status: 'paused' }, 'st_admin')
+  assert.equal(current().seats.find(seatRecord => seatRecord.id === 'seat_lin').status, 'paused')
+  current().updateSeat('seat_lin', { status: 'accepting' }, 'st_admin')
+  assert.equal(current().seats.find(seatRecord => seatRecord.id === 'seat_lin').status, 'accepting')
+  const template = { ...current().seats[0], displayName: '新建测试' }
+  const seatCount = current().seats.length
+  assert.equal(current().createSeat({ ...template, status: 'disabled' }, 'st_admin'), null)
+  assert.equal(current().seats.length, seatCount)
+  assert.equal(current().createSeat({ ...template, status: 'paused' }, 'st_admin').status, 'paused')
+})
+
+test('第十批：暂停接新仅跳过新客分配，不影响已有会话与交接', () => {
+  const { allocateSeats } = loadSource('src/domain/allocation.ts')
+  const { seatsOfStaff } = loadSource('src/store/selectors.ts')
+  const group = current().inviteGroups.find(inviteGroup => inviteGroup.rotatingSeatIds.includes('seat_lin') && inviteGroup.rotatingSeatIds.includes('seat_chen'))
+  const configured = { ...group, rotationIndex: group.rotatingSeatIds.indexOf('seat_lin') }
+  const seatMap = () => Object.fromEntries(current().seats.map(seatRecord => [seatRecord.id, seatRecord]))
+  assert.equal(allocateSeats(configured, seatMap()).primarySeatId, 'seat_lin')
+  current().updateSeat('seat_lin', { status: 'paused' }, 'st_admin')
+  const allocation = allocateSeats(configured, seatMap())
+  assert.equal(allocation.primarySeatId, 'seat_chen')
+  assert.ok(allocation.skippedSeatIds.includes('seat_lin'))
+  assert.equal(seatsOfStaff(current(), 'st_lin').some(seatRecord => seatRecord.id === 'seat_lin'), true)
+  assert.match(current().staffDisableBlocker('st_lin'), /请先交接/)
+  assert.equal(current().disableStaff('st_lin', 'st_admin').ok, false)
+  send(dm().id, seat, '暂停接新仍可回复已有客户')
+  current().handoverSeat('seat_lin', 'st_wang', '休假交接', 'st_admin')
+  assert.equal(current().seats.find(seatRecord => seatRecord.id === 'seat_lin').operatorStaffId, 'st_wang')
+})
+
+test('第十批：许可只有系统到期日，模块只由企业启停', () => {
+  assert.equal(Object.hasOwn(current().license, 'modules'), false)
+  const instance = current().providerInstances.find(item => item.instanceId === current().license.instanceId)
+  const expiry = new Date(instance.expiresAt)
+  expiry.setFullYear(expiry.getFullYear() + 1)
+  current().renewProviderInstance(instance.id, expiry.toISOString().slice(0, 10))
+  assert.equal(Object.hasOwn(current().license, 'modules'), false)
+  assert.notEqual(current().license.expiresAt, instance.expiresAt)
+  current().toggleModule('wallet', false, 'st_admin')
+  assert.equal(current().enterprise.modules.wallet, false)
+  current().toggleModule('wallet', true, 'st_admin')
+  assert.equal(current().enterprise.modules.wallet, true)
+})
+
+test('第十批：暂停服务拦截员工入口，恢复允许进入，到期不会自动暂停', () => {
+  const { providerInstanceStatus, staffServiceBlocker } = loadSource('src/domain/providerLicense.ts')
+  const instance = current().providerInstances.find(item => item.instanceId === current().license.instanceId)
+  assert.equal(providerInstanceStatus({ ...instance, expiresAt: '2000-01-01T00:00:00.000Z' }), 'active')
+  assert.equal(staffServiceBlocker(current()), null)
+  current().stopProviderInstance(instance.id, '企业申请暂停')
+  assert.equal(providerInstanceStatus(current().providerInstances.find(item => item.id === instance.id)), 'stopped')
+  const before = structuredClone(current().session)
+  assert.equal(current().setSession({ workbenchStaffId: 'st_chen', workbenchSeatId: 'seat_chen' }), '本企业服务已暂停，请联系管理员')
+  assert.equal(current().setSession({ adminStaffId: 'st_zhao' }), '本企业服务已暂停，请联系管理员')
+  assert.deepEqual(current().session, before)
+  assert.equal(current().setSession({ phoneCustomerId: current().customers[0].id }), null)
+  current().resumeProviderInstance(instance.id)
+  assert.equal(staffServiceBlocker(current()), null)
+  assert.equal(current().setSession({ workbenchStaffId: 'st_chen', workbenchSeatId: 'seat_chen' }), null)
+  assert.equal(current().session.workbenchStaffId, 'st_chen')
+})
+
+test('第十批：日报只选超级管理员且无 App 渠道，拒绝无关接收人', () => {
+  const { REPORT_CHANNEL_LABEL } = loadSource('src/domain/labels.ts')
+  assert.equal(Object.hasOwn(REPORT_CHANNEL_LABEL, 'app'), false)
+  const settings = structuredClone(current().dailyReport)
+  for (const invalid of [
+    { id: 'invalid', name: '无员工账号', channels: ['feishu'] },
+    { id: 'invalid', name: '普通员工', staffId: 'st_lin', channels: ['feishu'] },
+    { id: 'invalid', name: '周敏', staffId: 'st_admin', channels: ['app'] },
+  ]) {
+    current().updateDailyReportSettings({ recipients: [invalid] }, 'st_admin')
+    assert.deepEqual(current().dailyReport, settings)
+  }
+  current().updateDailyReportSettings({ recipients: [{ id: 'valid', name: '不会采用的姓名', staffId: 'st_admin', channels: ['wecom', 'feishu'] }] }, 'st_admin')
+  assert.equal(current().dailyReport.recipients[0].name, '周敏')
+  current().sendDailyReportNow()
+  assert.deepEqual([...current().dailyReportRecords[0].sentTo], ['周敏'])
+  current().updateStaff('st_admin', { name: '周敏新姓名' }, 'st_admin')
+  current().sendDailyReportNow()
+  assert.deepEqual([...current().dailyReportRecords[0].sentTo], ['周敏新姓名'])
+})
+
+test('第十批：日报发送时重新核对超级管理员，不向失效接收人写成功记录', () => {
+  store.setState({ dailyReport: { ...current().dailyReport, recipients: [{ id: 'invalid', name: '林薇', staffId: 'st_lin', channels: ['feishu'] }] } })
+  const count = current().dailyReportRecords.length
+  current().sendDailyReportNow()
+  assert.equal(current().dailyReportRecords.length, count)
+})
+
+test('第十批：两类禁言及解除分别写入四个明确的审计事件', () => {
+  const { AUDIT_LABEL } = loadSource('src/domain/labels.ts')
+  const customerId = current().customers[0].id
+  for (const [action, hours, event] of [
+    ['muteCustomerAllGroups', 1, 'customer.group_mute'],
+    ['muteCustomerAllGroups', 0, 'customer.group_unmute'],
+    ['muteCustomerGlobally', 1, 'customer.mute'],
+    ['muteCustomerGlobally', 0, 'customer.unmute'],
+  ]) {
+    current()[action](customerId, hours, 'st_admin')
+    assert.equal(current().audit[0].type, event)
+    assert.ok(AUDIT_LABEL[event])
+  }
+  assert.equal(current().customers[0].mutedAllUntil, null)
+  assert.equal(current().customers[0].globalMutedUntil, null)
+})
+
+function renderPage(relative, component, props = {}) {
+  const { createElement } = require('react')
+  const { renderToStaticMarkup } = require('react-dom/server')
+  return renderToStaticMarkup(createElement(loadSource(relative)[component], props))
+}
+
+test('第十批界面：超级管理员编辑删除灰掉，普通角色编辑仍可用', () => {
+  const html = renderPage('src/apps/admin/pages/RolesPage.tsx', 'RolesPage')
+  const rows = html.match(/<tr\b[\s\S]*?<\/tr>/g)
+  const superRow = rows.find(row => row.includes('全部权限，系统内置，不可删除'))
+  assert.match(superRow, /<button[^>]*disabled=""[^>]*>编辑<\/button>/)
+  assert.match(superRow, /<button[^>]*disabled=""[^>]*>删除<\/button>/)
+  assert.match(html, /超级管理员权限固定为全部，不能修改/)
+  const customRow = rows.find(row => row.includes('运营主管') && row.includes('编辑'))
+  const editButton = customRow.match(/<button[^>]*>编辑<\/button>/)[0]
+  assert.doesNotMatch(editButton, / disabled=/)
+})
+
+test('第十批界面：超级管理员停用与角色下拉灰掉并给出原因', () => {
+  const listHtml = renderPage('src/apps/admin/pages/StaffPage.tsx', 'StaffPage')
+  const superRow = listHtml.match(/<tr\b[\s\S]*?<\/tr>/g).find(row => row.includes('周敏'))
+  assert.match(superRow, /<button[^>]*disabled=""[^>]*title="超级管理员不能停用"[^>]*>停用<\/button>/)
+  const modalProps = { onClose() {}, staff: current().staff.find(staff => staff.id === 'st_admin') }
+  const superHtml = renderPage('src/apps/admin/pages/StaffPage.parts.tsx', 'EditStaffModal', modalProps)
+  assert.match(superHtml, /最后一位超级管理员不能改成其他角色/)
+  assert.match(superHtml, /<select[^>]*disabled=""/)
+  const ordinaryHtml = renderPage('src/apps/admin/pages/StaffPage.parts.tsx', 'EditStaffModal', { ...modalProps, staff: current().staff.find(staff => staff.id === 'st_lin') })
+  assert.doesNotMatch(ordinaryHtml.match(/<select[^>]*>/)[0], / disabled=/)
+  const createHtml = renderPage('src/apps/admin/pages/StaffPage.parts.tsx', 'CreateStaffModal', { onClose() {} })
+  for (const roleId of ['role_super', 'role_admin', 'role_cs']) assert.ok(createHtml.includes(`value="${roleId}"`))
+  assert.doesNotMatch(createHtml, /role_seat/)
+})
+
+test('第十批界面：坐席不再有停用，许可不再有逐模块开关和日期', () => {
+  const seatsHtml = renderPage('src/apps/admin/pages/SeatsPage.tsx', 'SeatsPage')
+  assert.match(seatsHtml, /暂停接新/)
+  assert.doesNotMatch(seatsHtml, />停用<|停用坐席/)
+  const licenseHtml = renderPage('src/apps/admin/pages/LicensePage.tsx', 'LicensePage')
+  assert.match(licenseHtml, /许可到期时间/)
+  assert.doesNotMatch(licenseHtml, /模块授权表|本期到期日|未授权/)
+  const reportHtml = renderPage('src/apps/admin/pages/DailyReportPage.tsx', 'DailyReportPage')
+  assert.match(reportHtml, /超级管理员/)
+  assert.doesNotMatch(reportHtml, /App 推送|关联员工|不登录后台/)
+})
+
+test('第十批界面：客户只看到显示名与官方小标', () => {
+  const customerId = current().customers.find(customer => current().customerSeats.some(link => link.customerId === customer.id && link.seatId === 'seat_lin')).id
+  const html = renderPage('src/apps/phone/screens/ContactsScreen.tsx', 'ContactsScreen', { customerId, onOpen() {} })
+  assert.match(html, /林晓明/)
+  assert.match(html, />官方</)
+  assert.doesNotMatch(html, /坐席|官方联系人|官方账号/)
+})
+
+test('第十批：群成员限制与解除使用新文案，账号封禁保持不变', () => {
+  const { g: group, actor: customerActor } = groupContext()
+  const actor = { seatId: group.ownerSeatId, staffId: 'st_admin' }
+  const customer = current().customers.find(item => item.id === customerActor.id)
+  const html = renderPage('src/apps/workbench/components/group/GroupMemberModals.tsx', 'RestrictModal', { group, actor, customer, kind: 'ban', onClose() {} })
+  assert.match(html, /移出并禁止再进/)
+  assert.match(html, /解除禁止/)
+  assert.doesNotMatch(html, /封禁|解封/)
+  current().restrictGroupMember(group.id, customer.id, 'ban', 1, '测试群限制', actor)
+  assert.match(current().audit[0].detail, /移出并禁止再进/)
+  current().liftGroupRestriction(group.id, customer.id, actor)
+  assert.match(current().audit[0].detail, /解除禁止/)
+  assert.equal(current().customers.find(item => item.id === customer.id).bannedAt, customer.bannedAt)
+})
 test('AI 与群活跃助手只保留占位，不生成业务数据或群成员', () => {
   const state = current()
   for (const field of ['bots', 'botScripts', 'botRules', 'botRuns', 'botsPausedAll', 'knowledge', 'aiSettings', 'aiEvents']) {
@@ -18,7 +289,7 @@ test('AI 与群活跃助手只保留占位，不生成业务数据或群成员',
   assert.ok(state.messages.every(message => !Object.hasOwn(message, 'aiDraftUsed') && !Object.hasOwn(message, 'botRuleId')))
   assert.ok(state.roles.every(role => !role.caps.includes('manage_bots')))
   assert.ok(state.staff.every(staff => !Object.hasOwn(staff.prefs, 'aiSuggest')))
-  assert.ok(state.license.modules.every(module => module.key !== 'ai' && !Object.hasOwn(module, 'botLimit') && !Object.hasOwn(module, 'botUsed')))
+  assert.equal(Object.hasOwn(state.license, 'modules'), false)
   assert.equal(Object.hasOwn(state.profileSync, 'shareWithAi'), false)
 })
 function send(convId, actor, text, extra = {}) {
@@ -174,7 +445,7 @@ test('指定群群发同样检查词库', () => {
   assert.equal(current().messages.length, n)
 })
 test('频道没有发布权限时，群发跳过且不影响其他任务', () => {
-  // 种子里林顾问在「恒信官方通知」就没有发布权，不用再改状态
+  // 种子里林晓明在「恒信官方通知」就没有发布权，不用再改状态
   const channel = current().chatGroups.find(g => g.kind === 'channel' && g.memberSeatIds.includes(seat.id))
   const conv = current().conversations.find(c => c.chatGroupId === channel.id)
 
@@ -211,7 +482,7 @@ test('封禁的收件人不产生替换记录或消息', () => {
   assert.equal(current().sensitiveHits.length, hits)
 })
 
-test('全群禁言不拦私聊，但拦群和频道', () => {
+test('群聊禁言不拦私聊，但拦群和频道', () => {
   const { g, conv, actor } = groupContext()
   const until = new Date(Date.now() + 3600000).toISOString()
   store.setState({ customers: current().customers.map(c => c.id === actor.id ? { ...c, mutedAllUntil: until } : c) })
@@ -219,28 +490,28 @@ test('全群禁言不拦私聊，但拦群和频道', () => {
   const channelConv = current().conversations.find(c => c.kind === 'channel')
 
   assert.equal(current().queueChatMessage({ convId: privateConv.id, actor, text: '私聊消息' }).ok, true)
-  assert.match(current().queueChatMessage({ convId: conv.id, actor, text: '群聊消息' }).reason ?? '', /全群禁言.*私聊不受影响/)
-  assert.match(current().queueChatMessage({ convId: channelConv.id, actor, text: '频道消息' }).reason ?? '', /全群禁言.*私聊不受影响/)
+  assert.match(current().queueChatMessage({ convId: conv.id, actor, text: '群聊消息' }).reason ?? '', /群聊禁言.*私聊不受影响/)
+  assert.match(current().queueChatMessage({ convId: channelConv.id, actor, text: '频道消息' }).reason ?? '', /群聊禁言.*私聊不受影响/)
   assert.equal(policy.customerCanSpeakIn(current(), g, actor.id, new Date(Date.now() + 7200000).toISOString()).ok, true)
 })
 
-test('全局禁言拦私聊、群和频道，到期后自动解除', () => {
+test('全部禁言拦私聊、群和频道，到期后自动解除', () => {
   const { g, conv, actor } = groupContext()
   const until = new Date(Date.now() + 3600000).toISOString()
   store.setState({ customers: current().customers.map(c => c.id === actor.id ? { ...c, globalMutedUntil: until, mutedAllUntil: until } : c) })
   const privateConv = current().conversations.find(c => c.kind === 'dm' && c.customerId === actor.id)
   const channelConv = current().conversations.find(c => c.kind === 'channel')
 
-  assert.match(current().queueChatMessage({ convId: privateConv.id, actor, text: '私聊消息' }).reason ?? '', /全局禁言/)
-  assert.match(current().queueChatMessage({ convId: conv.id, actor, text: '群聊消息' }).reason ?? '', /全局禁言/)
-  assert.match(current().queueChatMessage({ convId: channelConv.id, actor, text: '频道消息' }).reason ?? '', /全局禁言/)
+  assert.match(current().queueChatMessage({ convId: privateConv.id, actor, text: '私聊消息' }).reason ?? '', /全部禁言/)
+  assert.match(current().queueChatMessage({ convId: conv.id, actor, text: '群聊消息' }).reason ?? '', /全部禁言/)
+  assert.match(current().queueChatMessage({ convId: channelConv.id, actor, text: '频道消息' }).reason ?? '', /全部禁言/)
   const flags = customerStatus.customerStatusFlags(current().customers.find(c => c.id === actor.id)).map(f => f.key)
   assert.ok(flags.includes('muted'))
   assert.ok(flags.includes('mutedAll'))
   assert.equal(policy.customerCanSpeakIn(current(), g, actor.id, new Date(Date.now() + 7200000).toISOString()).ok, true)
 })
 
-test('全局禁言的客户会被私聊群发跳过，全群禁言不会', () => {
+test('全部禁言的客户会被私聊群发跳过，群聊禁言不会', () => {
   const customerId = dm().customerId
   const until = new Date(Date.now() + 3600000).toISOString()
   store.setState({ customers: current().customers.map(c => c.id === customerId ? { ...c, globalMutedUntil: until } : c) })
@@ -264,7 +535,7 @@ test('激活员工写入 staff.activate 审计类型', () => {
   assert.equal(current().audit.at(0).type, 'staff.activate')
 })
 
-test('恒信官方通知只有 owner 客户服务能发布，两位顾问只能置顶', () => {
+test('恒信官方通知只有 owner 客户服务能发布，两位坐席只能置顶', () => {
   const channel = current().chatGroups.find(g => g.id === 'cg_strategy')
   const conv = current().conversations.find(c => c.chatGroupId === channel.id)
   assert.deepEqual(channel.admins.find(a => a.memberId === 'seat_lin').perms, ['can_pin_messages'])

@@ -1,5 +1,5 @@
 /**
- * 日报与提醒（老板可感知层，PRD 05 942 行 + 15 文档口径）：
+ * 日报与提醒（经营数据与提醒，PRD 05 942 行 + 15 文档口径）：
  * 只给事实与对比，不换算金额，不写建议。
  */
 import { useState } from 'react'
@@ -7,6 +7,7 @@ import { Send } from 'lucide-react'
 import type { DemoState } from '@/domain/types'
 import { fmtDate } from '@/domain/time'
 import { useStore } from '@/store/store'
+import { dailyReportRecipients } from '@/domain/dailyReport'
 import { dashboardNumbers, waitingSince } from '@/store/selectors'
 import { Button, Field, Input } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, Table } from '@/ui/display'
@@ -18,7 +19,7 @@ const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
 
 export function DailyReportPage() {
   const s = useStore()
-  const recipients = s.dailyReport.recipients
+  const recipients = dailyReportRecipients(s)
   const send = () => {
     if (!recipients.length) {
       toast('没有接收人，先添加再发送', 'warn')
@@ -31,7 +32,7 @@ export function DailyReportPage() {
     <div>
       <PageHeader
         title="日报与提醒"
-        desc="每天按时把昨天的经营与服务数据推给指定的人，这里可以预览内容、管理接收人、查看发送记录。"
+        desc="每天按时把昨天的经营与服务数据推给选定的超级管理员，这里可以预览内容、管理接收人、查看发送记录。"
         extra={
           <Button variant="primary" onClick={send}>
             <Send size={14} /> 立即发送一次
@@ -42,7 +43,7 @@ export function DailyReportPage() {
         <b>只给事实与对比，不写建议</b>：日报会说「首响中位数 14 分钟，阈值 10 分钟」，不会说「建议增加客服」。
       </Note>
       <DemoNote className="mt-2">
-        第一版支持 App 推送、企微机器人、飞书机器人；微信服务号<DemoLevelTag level="P1" />，短信与邮件<DemoLevelTag level="P2" />。演示里「立即发送一次」只生成记录，不真的推出去。
+        第一版支持企微机器人、飞书机器人；微信服务号<DemoLevelTag level="P1" />，短信与邮件<DemoLevelTag level="P2" />。演示里「立即发送一次」只生成记录，不真的推出去。
       </DemoNote>
       <div className="mt-4 space-y-4">
         <RecipientsCard />

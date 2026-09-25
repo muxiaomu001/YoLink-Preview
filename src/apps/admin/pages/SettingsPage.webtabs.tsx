@@ -39,7 +39,7 @@ export function WebTabsPane() {
   return (
     <div className="space-y-4">
       <Note>
-        网址用应用内 WebView 打开，必须 HTTPS。可带占位符 {PLACEHOLDERS.join('、')}：sig 是用共享密钥对前三者的签名，客户系统验签后免登录，等同简单的可信单点登录。
+        网址用应用内 WebView 打开，必须 HTTPS。可带占位符 {PLACEHOLDERS.join('、')}：sig 是用共享密钥对前三者的签名，业务系统验签后免登录，等同简单的可信单点登录。
       </Note>
       {tabs.length > 1 && (
         <DemoNote>
@@ -176,7 +176,7 @@ function WebTabEditor({ tab, onClose, onSave }: { tab?: WebTab; onClose: () => v
               {p}
             </code>
           ))}
-          。客户端打开时替换成真实值；{'{sig}'} 为共享密钥对 user_id、external_id、ts 的签名，客户系统验签后免登录。
+          。客户端打开时替换成真实值；{'{sig}'} 为共享密钥对 user_id、external_id、ts 的签名，业务系统验签后免登录。
         </div>
         <div className="flex items-center justify-between rounded-md border border-zinc-200 px-3 py-2">
           <div className="text-xs">

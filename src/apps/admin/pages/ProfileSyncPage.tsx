@@ -21,7 +21,7 @@ export function ProfileSyncPage() {
   const [tab, setTab] = useState<TabKey>('sync')
   return (
     <div>
-      <PageHeader title="客户画像" desc="把企业自有系统的购买记录与邀请关系同步过来，展示在客户资料中。支持接口推送与 CSV 导入两种方式，金额字段按角色控制可见范围。" />
+      <PageHeader title="客户画像" desc="把企业自有系统的业务记录与邀请关系同步过来，展示在客户资料中。支持接口推送与 CSV 导入两种方式，金额字段按角色控制可见范围。" />
       <Tabs
         value={tab}
         onChange={setTab}
@@ -54,7 +54,7 @@ function SyncSettingsTab() {
   const error = !webhookOk ? '回传地址必须是 https:// 开头' : roleIds.length === 0 ? '至少选一个可见金额的角色' : ''
 
   const regenerate = async () => {
-    const ok = await confirm({ title: '重新生成 API Key', body: '旧 Key 立即失效，客户系统里的配置需要同步更换。新 Key 只显示一次。', okText: '重新生成', danger: true })
+    const ok = await confirm({ title: '重新生成 API Key', body: '旧 Key 立即失效，业务系统里的配置需要同步更换。新 Key 只显示一次。', okText: '重新生成', danger: true })
     if (!ok) return
     setFullKey(s.regenerateProfileApiKey(admin))
   }
@@ -80,7 +80,7 @@ function SyncSettingsTab() {
             <Field label="接口文档">
               <div className="flex flex-col gap-1 text-[13px]">
                 <a className="inline-flex items-center gap-1 text-brand-700 hover:underline" href={DOC_PURCHASE_URL} target="_blank" rel="noreferrer">
-                  <ExternalLink size={12} /> POST /profile/purchases 购买记录同步
+                  <ExternalLink size={12} /> POST /profile/purchases 业务记录同步
                 </a>
                 <a className="inline-flex items-center gap-1 text-brand-700 hover:underline" href={DOC_REFERRAL_URL} target="_blank" rel="noreferrer">
                   <ExternalLink size={12} /> POST /profile/referrals 邀请关系同步
@@ -102,11 +102,11 @@ function SyncSettingsTab() {
                 <div className="flex items-center justify-between">
                   <div className="text-xs">
                     <div className="text-zinc-800">定时拉取</div>
-                    <div className="text-zinc-500">每日 02:00 从客户系统拉增量；字段映射：手机号 → phone，订单号 → product，成交额 → amount，成交日 → at</div>
+                    <div className="text-zinc-500">每日 02:00 从业务系统拉增量；字段映射：手机号 → phone，订单号 → product，成交额 → amount，成交日 → at</div>
                   </div>
                   <Switch checked={scheduledPull} onChange={setScheduledPull} />
                 </div>
-                <Field label="反向回传 webhook URL" hint="坐席改备注、挂头衔时回传给客户系统；留空不回传">
+                <Field label="反向回传 webhook URL" hint="坐席改备注、挂头衔时回传给业务系统；留空不回传">
                   <Input value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} placeholder="https://crm.example.com/hooks/yolink" />
                 </Field>
               </div>
@@ -115,7 +115,7 @@ function SyncSettingsTab() {
           </div>
         </Card>
         <Note>
-          匹配键：手机号或客户系统 ID。接口推来的数据先按客户系统 ID 找，找不到再按手机号；都找不到计入「未匹配」，不落库。同步成功会触发自动化规则（如入金后挂头衔）。
+          匹配键：手机号或业务系统 ID。接口推来的数据先按业务系统 ID 找，找不到再按手机号；都找不到计入「未匹配」，不落库。同步成功会触发自动化规则（如入金后挂头衔）。
         </Note>
       </div>
       <Card title="最近同步记录" padded={false}>
@@ -125,7 +125,7 @@ function SyncSettingsTab() {
           dense
           columns={[
             { key: 'at', title: '时间', render: (r) => <span className="tabular-nums text-zinc-600">{fmtDateTime(r.at)}</span> },
-            { key: 'kind', title: '类型', render: (r) => (r.kind === 'purchase' ? <Pill tone="blue">购买记录</Pill> : <Pill tone="purple">邀请关系</Pill>) },
+            { key: 'kind', title: '类型', render: (r) => (r.kind === 'purchase' ? <Pill tone="blue">业务记录</Pill> : <Pill tone="purple">邀请关系</Pill>) },
             { key: 'source', title: '来源', render: (r) => (r.source === 'api' ? 'API' : 'CSV') },
             { key: 'count', title: '条数', align: 'right', render: (r) => <span className="tabular-nums">{r.count}</span> },
             {
@@ -162,7 +162,7 @@ function SyncSettingsTab() {
                 复制
               </Button>
             </div>
-            <Note tone="amber">关闭后无法再次查看，只能重新生成。把它配置到客户系统的同步任务里，权限只有画像写入。</Note>
+            <Note tone="amber">关闭后无法再次查看，只能重新生成。把它配置到业务系统的同步任务里，权限只有画像写入。</Note>
           </div>
         </Modal>
       )}

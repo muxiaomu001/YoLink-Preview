@@ -3,10 +3,11 @@
  */
 import type { Role, Staff } from '@/domain/types'
 import { newId } from '@/domain/ids'
+import { canManageEmployeeRoles, rolePermissionsBlocker, staffRoleChangeBlocker } from '@/domain/staffRoles'
 import { type Get, type Set, now, randomPassword, withAudit } from './helpers'
 
 export interface PeopleActions {
-  updateStaff: (id: string, patch: Partial<Pick<Staff, 'name' | 'email' | 'roleId'>>, byStaffId: string) => void
+  updateStaff: (id: string, patch: Partial<Pick<Staff, 'name' | 'email' | 'roleId'>>, byStaffId: string) => string | null
   /** 随机生成返回明文一次；手动设置返回 undefined */
   resetPassword: (id: string, input: { mode: 'random' } | { mode: 'manual'; password: string; mustChange: boolean }, byStaffId: string) => string | undefined
   forceLogout: (id: string, byStaffId: string) => void
@@ -14,28 +15,45 @@ export interface PeopleActions {
   /** 停用前必须完成名下有效坐席的交接 */
   disableStaff: (id: string, byStaffId: string) => { ok: true } | { ok: false; error: string }
   activateStaff: (id: string, byStaffId: string) => void
-  createRole: (input: { name: string; desc: string; caps: Role['caps'] }, byStaffId: string) => Role
-  updateRole: (id: string, patch: Partial<Pick<Role, 'name' | 'desc' | 'caps'>>, byStaffId: string) => void
+  createRole: (input: { name: string; desc: string; caps: Role['caps'] }, byStaffId: string) => Role | null
+  updateRole: (id: string, patch: Partial<Pick<Role, 'name' | 'desc' | 'caps'>>, byStaffId: string) => boolean
   /** 内置角色或还有成员的角色不能删，返回 false */
   deleteRole: (id: string, byStaffId: string) => boolean
 }
 
 export function peopleActions(set: Set, get: Get): PeopleActions {
   const disableBlocker = (id: string) => {
-    const held = get().seats.filter((x) => x.operatorStaffId === id && x.status !== 'disabled')
+    if (get().staff.find((staff) => staff.id === id)?.roleId === 'role_super') return '超级管理员不能停用'
+    const held = get().seats.filter((x) => x.operatorStaffId === id)
     return held.length ? `该员工还实操着 ${held.length} 个坐席（${held.map((x) => x.displayName).join('、')}），请先交接` : null
   }
 
   return {
-    updateStaff: (id, patch, byStaffId) =>
+    updateStaff: (id, patch, byStaffId) => {
+      const state = get()
+      const staff = state.staff.find((member) => member.id === id)
+      if (!staff) return '员工不存在'
+      if (Object.keys(patch).some((field) => !['name', 'email', 'roleId'].includes(field))) return '只能修改员工姓名、邮箱与角色'
+      if (patch.roleId !== undefined && patch.roleId !== staff.roleId) {
+        const blocker = staffRoleChangeBlocker(state, id)
+        if (blocker) return blocker
+        if (!state.roles.some((role) => role.id === patch.roleId)) return '员工角色不存在'
+      }
       set((s) => {
         const st = s.staff.find((x) => x.id === id)
         const roleName = patch.roleId ? s.roles.find((r) => r.id === patch.roleId)?.name : undefined
         return {
-          staff: s.staff.map((x) => (x.id === id ? { ...x, ...patch } : x)),
+          staff: s.staff.map((x) => (x.id === id ? {
+            ...x,
+            name: patch.name ?? x.name,
+            email: Object.hasOwn(patch, 'email') ? patch.email : x.email,
+            roleId: patch.roleId ?? x.roleId,
+          } : x)),
           audit: withAudit(s.audit, 'staff.update', `修改员工 ${st?.name}：${Object.keys(patch).join('、')}${roleName ? `（角色 → ${roleName}）` : ''}`, byStaffId),
         }
-      }),
+      })
+      return null
+    },
 
     resetPassword: (id, input, byStaffId) => {
       const s = get()
@@ -82,24 +100,30 @@ export function peopleActions(set: Set, get: Get): PeopleActions {
       }),
 
     createRole: (input, byStaffId) => {
+      if (!canManageEmployeeRoles(get(), byStaffId)) return null
       const role: Role = { id: newId('role'), name: input.name, desc: input.desc, builtin: false, caps: input.caps }
       set((s) => ({ roles: [...s.roles, role], audit: withAudit(s.audit, 'role.create', `创建角色「${role.name}」，${role.caps.length} 项权限`, byStaffId) }))
       return role
     },
 
-    updateRole: (id, patch, byStaffId) =>
+    updateRole: (id, patch, byStaffId) => {
+      const state = get()
+      if (!canManageEmployeeRoles(state, byStaffId) || !state.roles.some((role) => role.id === id) || id === 'role_super' || (patch.caps && rolePermissionsBlocker(id))) return false
       set((s) => {
         const r = s.roles.find((x) => x.id === id)
         return {
           roles: s.roles.map((x) => (x.id === id ? { ...x, ...patch } : x)),
           audit: withAudit(s.audit, 'role.update', `修改角色「${r?.name}」：${Object.keys(patch).join('、')}${patch.caps ? `（${patch.caps.length} 项权限）` : ''}`, byStaffId),
         }
-      }),
+      })
+      return true
+    },
 
     deleteRole: (id, byStaffId) => {
       const s = get()
+      if (!canManageEmployeeRoles(s, byStaffId)) return false
       const r = s.roles.find((x) => x.id === id)
-      if (!r || r.builtin || s.staff.some((x) => x.roleId === id)) return false
+      if (!r || id === 'role_super' || r.builtin || s.staff.some((x) => x.roleId === id)) return false
       set({ roles: s.roles.filter((x) => x.id !== id), audit: withAudit(s.audit, 'role.delete', `删除角色「${r.name}」`, byStaffId) })
       return true
     },

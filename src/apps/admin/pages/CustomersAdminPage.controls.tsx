@@ -1,5 +1,5 @@
 /**
- * 后台客户详情里的「账号管控」：重置密码、强制下线、封禁 / 解除、全群/全局禁言 / 解除、影子模式。
+ * 后台客户详情里的「账号管控」：重置密码、强制下线、封禁 / 解除、群聊禁言 / 全部禁言 / 解除、影子模式。
  *
  * 这些动作原来只有工作台有，管理员要处理一个闹事的客户得先去工作台、还得是那个客户
  * 主归属坐席的实操员工才点得动。后台是管理员的地盘，不该绕这一圈。
@@ -82,7 +82,7 @@ export function CustomerControlSection({ c }: { c: Customer }) {
   const mute = (kind: 'allGroups' | 'global', hours: number | null) => {
     if (kind === 'allGroups') s.muteCustomerAllGroups(c.id, hours, admin)
     else s.muteCustomerGlobally(c.id, hours, admin)
-    toast(`已${kind === 'allGroups' ? '全群禁言' : '全局禁言'}「${c.nickname}」${muteLabel(hours)}`)
+    toast(`已${kind === 'allGroups' ? '群聊禁言' : '全部禁言'}「${c.nickname}」${muteLabel(hours)}`)
     setMuting(null)
   }
 
@@ -99,7 +99,7 @@ export function CustomerControlSection({ c }: { c: Customer }) {
           <LogOut size={13} /> 下线
         </Button>
       </Row>
-      <Row title="全群禁言" desc={allGroupsMuted ? `禁言中${c.mutedAllUntil!.startsWith('9999-') ? '（永久）' : `，至 ${fmtDateTime(c.mutedAllUntil!)}`}；群与频道不能发消息，私聊不受影响` : '群与频道不能发消息，私聊不受影响'}>
+      <Row title="群聊禁言" desc={allGroupsMuted ? `禁言中${c.mutedAllUntil!.startsWith('9999-') ? '（永久）' : `，至 ${fmtDateTime(c.mutedAllUntil!)}`}；群与频道不能发消息，私聊不受影响` : '群与频道不能发消息，私聊不受影响'}>
         {allGroupsMuted ? (
           <Button size="sm" disabled={deleted} onClick={() => mute('allGroups', 0)}>
             <MicOff size={13} /> 解除禁言
@@ -110,7 +110,7 @@ export function CustomerControlSection({ c }: { c: Customer }) {
           </Button>
         )}
       </Row>
-      <Row title="全局禁言" desc={globallyMuted ? `禁言中${c.globalMutedUntil!.startsWith('9999-') ? '（永久）' : `，至 ${fmtDateTime(c.globalMutedUntil!)}`}；所有官方联系人、群和频道都不能发消息` : '所有官方联系人、群和频道都不能发消息'}>
+      <Row title="全部禁言" desc={globallyMuted ? `禁言中${c.globalMutedUntil!.startsWith('9999-') ? '（永久）' : `，至 ${fmtDateTime(c.globalMutedUntil!)}`}；所有坐席、群和频道都不能发消息` : '所有坐席、群和频道都不能发消息'}>
         {globallyMuted ? (
           <Button size="sm" disabled={deleted} onClick={() => mute('global', 0)}>
             <MicOff size={13} /> 解除禁言
@@ -161,7 +161,7 @@ export function CustomerControlSection({ c }: { c: Customer }) {
         </div>
       </Modal>
 
-      <Modal open={!!muting} onClose={() => setMuting(null)} title={`${muting === 'allGroups' ? '全群禁言' : '全局禁言'}「${c.nickname}」`} width={400}>
+      <Modal open={!!muting} onClose={() => setMuting(null)} title={`${muting === 'allGroups' ? '群聊禁言' : '全部禁言'}「${c.nickname}」`} width={400}>
         <div className="grid grid-cols-2 gap-2">
           {MUTE_OPTIONS.map((o) => (
             <Button key={o.label} onClick={() => muting && mute(muting, o.hours)}>

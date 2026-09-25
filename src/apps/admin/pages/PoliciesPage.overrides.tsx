@@ -146,7 +146,7 @@ function OverrideModal({ override, onClose }: { override?: PolicyOverride; onClo
     if (kind === 'group') {
       return s.chatGroups.filter((g) => !kw || g.name.toLowerCase().includes(kw)).map((g) => ({ id: g.id, label: `${g.kind === 'channel' ? '频道' : '群'} · ${g.name}${g.official ? '（官方）' : ''}` }))
     }
-    return s.seats.filter((x) => x.status !== 'disabled').filter((x) => !kw || x.displayName.toLowerCase().includes(kw)).map((x) => ({ id: x.id, label: x.displayName }))
+    return s.seats.filter((x) => !kw || x.displayName.toLowerCase().includes(kw)).map((x) => ({ id: x.id, label: x.displayName }))
   }, [s, kind, q])
 
   // 群级覆盖只对客户有意义：坐席专属键不出现

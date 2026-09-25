@@ -18,7 +18,7 @@ const ACTION_LABEL: Record<string, string> = {
   pin: '置顶',
   member: '成员变更',
   admin: '管理员任免',
-  restrict: '禁言封禁',
+  restrict: '禁言移出并禁止再进',
   invite_link: '邀请链接',
   delete_message: '删除消息',
 }

@@ -10,20 +10,20 @@ import { toast } from '@/ui/overlay'
 import { DemoLevelTag, useDemoNotes } from '@/ui/DemoNote'
 
 const MODULE_KEYS = Object.keys(MODULE_LABEL) as ModuleKey[]
-type Row = { key: ModuleKey; on: boolean; licensed: boolean } & (typeof MODULE_LABEL)[ModuleKey]
+type Row = { key: ModuleKey; on: boolean } & (typeof MODULE_LABEL)[ModuleKey]
 
 export function ModulesPage() {
   const s = useStore()
   const admin = s.session.adminStaffId!
   const demoNotes = useDemoNotes()
-  const rows = MODULE_KEYS.map((key) => ({ key, ...MODULE_LABEL[key], on: s.enterprise.modules[key], licensed: s.license.modules.find((m) => m.key === key)?.enabled ?? true }))
+  const rows = MODULE_KEYS.map((key) => ({ key, ...MODULE_LABEL[key], on: s.enterprise.modules[key] }))
   const onCount = rows.filter((r) => r.on).length
 
   return (
     <div>
       <PageHeader title="模块启停" desc="按企业需要开关功能模块。关掉的模块，管理后台侧边栏与客户端对应入口一起隐藏。" extra={<span className="text-xs text-zinc-500">已启用 {onCount} / {rows.length}</span>} />
       <Note>
-        <b>停用不删数据</b>：关掉钱包，积分与提现记录都还在，重新启用后数据仍可见。侧边栏对应入口隐藏，客户端对应页面也不再显示。未获许可授权的模块不能启用，请联系 YoLink 供应方处理。
+        <b>停用不删数据</b>：关掉钱包，积分与提现记录都还在，重新启用后数据仍可见。侧边栏对应入口隐藏，客户端对应页面也不再显示。各模块由企业自行启停。
       </Note>
       <Card className="mt-4" padded={false}>
         <Table
@@ -38,7 +38,7 @@ export function ModulesPage() {
               key: 'status',
               title: '状态',
               width: '120px',
-              render: (r) => (!r.licensed ? <Pill tone="red">未授权</Pill> : r.on ? <Pill tone="green">已启用</Pill> : <Pill tone="zinc">未启用（数据保留）</Pill>),
+              render: (r) => (r.on ? <Pill tone="green">已启用</Pill> : <Pill tone="zinc">未启用（数据保留）</Pill>),
             },
             {
               key: 'ops',
@@ -47,8 +47,7 @@ export function ModulesPage() {
               align: 'right',
               render: (r) => (
                 <Switch
-                  checked={r.on && r.licensed}
-                  disabled={!r.licensed}
+                  checked={r.on}
                   onChange={(v) => {
                     s.toggleModule(r.key, v, admin)
                     toast(v ? `已启用「${r.name}」，侧边栏入口恢复` : `已停用「${r.name}」，数据保留，侧边栏入口隐藏`)

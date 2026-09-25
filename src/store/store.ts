@@ -5,6 +5,7 @@ import { runSensitiveGate } from './sensitiveGate'
  */
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import { staffServiceBlocker } from '@/domain/providerLicense'
 import type {
   AuditType,
   Broadcast,
@@ -50,7 +51,7 @@ import { providerLicensingActions, type ProviderLicensingActions } from './actio
 import { clearStartupSeen } from '@/domain/startupSeen'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
-export const STORAGE_KEY = 'yolink-demo-v16'
+export const STORAGE_KEY = 'yolink-demo-v17'
 
 const now = () => iso(Date.now())
 
@@ -88,7 +89,7 @@ export interface CoreActions {
   resetDemo: () => void
   logAudit: (type: AuditType, detail: string, actorStaffId?: string | null) => void
   // 会话
-  setSession: (patch: Partial<DemoState['session']>) => void
+  setSession: (patch: Partial<DemoState['session']>) => string | null
   // 客户端
   registerCustomer: (input: RegisterInput) => RegisterResult
   customerSend: (convId: string, text: string) => void
@@ -119,7 +120,7 @@ export interface CoreActions {
   createInviteLink: (input: { name: string; inviteGroupId: string; creatorStaffId: string; expiresAt: string | null; maxUses: number | null; chatGroupIds?: string[]; code?: string }) => { ok: true; link: InviteLink } | { ok: false; error: string }
   revokeInviteLink: (id: string, byStaffId: string) => void
   // 管理后台
-  createSeat: (input: Omit<Seat, 'id' | 'createdAt' | 'avatarText' | 'avatarColor'> & { avatarColor?: string }, byStaffId: string) => Seat
+  createSeat: (input: Omit<Seat, 'id' | 'createdAt' | 'avatarText' | 'avatarColor'> & { avatarColor?: string }, byStaffId: string) => Seat | null
   updateSeat: (id: string, patch: Partial<Seat>, byStaffId: string) => void
   handoverSeat: (seatId: string, toStaffId: string, reason: string, byStaffId: string) => void
   createStaff: (input: { name: string; username: string; email?: string; roleId: string; withSeat: boolean; roleDesc?: string; assignSeatIds?: string[]; mustChangePassword?: boolean }, byStaffId: string) => Staff
@@ -155,14 +156,18 @@ export const useStore = create<DemoStore>()(
           audit: [{ id: newId('au'), at: now(), actorStaffId: actorStaffId ?? s.session.adminStaffId, type, detail, ip: DEMO_IP }, ...s.audit],
         })),
 
-      setSession: (patch) =>
+      setSession: (patch) => {
+        const blocker = staffServiceBlocker(get())
+        if (blocker && (patch.adminStaffId || patch.workbenchStaffId || patch.workbenchSeatId)) return blocker
         set((s) => ({
           session: {
             ...s.session,
             ...patch,
             ...(patch.phoneCustomerId !== undefined ? { phoneSessionStartedAt: patch.phoneCustomerId ? now() : null } : {}),
           },
-        })),
+        }))
+        return null
+      },
 
       registerCustomer: (input) => {
         const s = get()
@@ -227,7 +232,7 @@ export const useStore = create<DemoStore>()(
           blockedSeatIds: [],
         }
         const seatById = Object.fromEntries(s.seats.map((x) => [x.id, x]))
-        // 固定坐席全加，接待员按队列轮一个；停用与暂停接新的跳过
+        // 固定坐席全加，轮询坐席按队列轮一个；暂停接新的跳过
         const { seatIds: usable, primarySeatId, rotationIndex, skippedSeatIds: skipped } = allocateSeats(group, seatById)
         if (!usable.length) return { ok: false, error: '该邀请组当前没有可接客的坐席，请联系管理员' }
         const customerSeats: CustomerSeat[] = []
@@ -268,7 +273,7 @@ export const useStore = create<DemoStore>()(
         for(const gid of joinGroupIds){const g=s.chatGroups.find((x)=>x.id===gid),conv=s.conversations.find((x)=>x.chatGroupId===gid);if(g&&conv)messages.push(...groupWelcomeMessages(g,conv.id,[customer],at))}
         const inviteLinks = link ? s.inviteLinks.map((l) => (l.id === link!.id ? { ...l, uses: l.uses + 1 } : l)) : s.inviteLinks
         const auditEntries = [
-          { id: newId('au'), at, actorStaffId: null, type: 'customer.register' as AuditType, detail: `客户「${customer.nickname}」通过${link ? `邀请链接「${link.name}」（${group.name}）` : `邀请组「${group.name}」`}注册，轮询分配接待员：${primarySeatId ? seatById[primarySeatId]?.displayName : '无'}；自动添加：${usable.map((id) => seatById[id]?.displayName).join('、')}${skipped.length ? `；跳过（停用或暂停接新）：${skipped.map((id) => seatById[id]?.displayName).join('、')}` : ''}${joinGroupIds.length ? `；自动入群：${joinGroupIds.map((gid) => s.chatGroups.find((g) => g.id === gid)?.name).join('、')}` : ''}${nick.auto ? '；昵称未填，发默认昵称' : ''}${watchUntil ? `；新号观察期至 ${watchUntil.slice(0, 16).replace('T', ' ')}` : ''}${fullGroupNames.length ? `；因满员未加入：${fullGroupNames.join('、')}` : ''}` },
+          { id: newId('au'), at, actorStaffId: null, type: 'customer.register' as AuditType, detail: `客户「${customer.nickname}」通过${link ? `邀请链接「${link.name}」（${group.name}）` : `邀请组「${group.name}」`}注册，轮询分配轮询坐席：${primarySeatId ? seatById[primarySeatId]?.displayName : '无'}；自动添加：${usable.map((id) => seatById[id]?.displayName).join('、')}${skipped.length ? `；跳过（暂停接新）：${skipped.map((id) => seatById[id]?.displayName).join('、')}` : ''}${joinGroupIds.length ? `；自动入群：${joinGroupIds.map((gid) => s.chatGroups.find((g) => g.id === gid)?.name).join('、')}` : ''}${nick.auto ? '；昵称未填，发默认昵称' : ''}${watchUntil ? `；新号观察期至 ${watchUntil.slice(0, 16).replace('T', ' ')}` : ''}${fullGroupNames.length ? `；因满员未加入：${fullGroupNames.join('、')}` : ''}` },
         ]
         set({
           customers: [customer, ...s.customers],
@@ -477,7 +482,7 @@ export const useStore = create<DemoStore>()(
           return { sent: 0, skipped: 0, reason: gate.blocked }
         }
         // 频控归属：全覆盖只算发起人（后台管理员）的一个任务。
-        // 若按投递坐席去扣各自实操员工的额度，管理员发一条全员通知就会把所有顾问当天的
+        // 若按投递坐席去扣各自实操员工的额度，管理员发一条全员通知就会把所有坐席当天的
         // 群发额度吃光，他们自己的营销群发全发不出去——那是运营事故，不是风控。
         const myToday = s.broadcasts.filter((b) => b.operatorId === input.operatorId && b.sentAt.slice(0, 10) === today).length
         if (myToday >= s.enterprise.broadcastPerStaffPerDay) return null
@@ -552,6 +557,7 @@ export const useStore = create<DemoStore>()(
       },
 
       createSeat: (input, byStaffId) => {
+        if (input.status !== 'accepting' && input.status !== 'paused') return null
         const colors = ['#1f3b73', '#2f56ad', '#0f766e', '#b45309', '#7e22ce', '#be123c', '#0369a1']
         const seat: Seat = { ...input, id: newId('seat'), avatarText: input.displayName.slice(0, 1), avatarColor: input.avatarColor ?? colors[get().seats.length % colors.length], createdAt: now() }
         set((s) => ({ seats: [...s.seats, seat], audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'seat.create', detail: `创建坐席「${seat.displayName}」，实操员工：${s.staff.find((x) => x.id === seat.operatorStaffId)?.name ?? '无'}` }, ...s.audit] }))
@@ -562,6 +568,7 @@ export const useStore = create<DemoStore>()(
         const s = get()
         const seat = s.seats.find((x) => x.id === id)
         if (!seat) return
+        if (patch.status !== undefined && patch.status !== 'accepting' && patch.status !== 'paused') return
         const type: AuditType = patch.status === 'paused' ? 'seat.pause' : 'seat.update'
         set({
           seats: s.seats.map((x) => (x.id === id ? { ...x, ...patch } : x)),
@@ -595,7 +602,7 @@ export const useStore = create<DemoStore>()(
         const notes: string[] = []
         if (input.withSeat) {
           const colors = ['#1f3b73', '#2f56ad', '#0f766e', '#b45309', '#7e22ce', '#be123c', '#0369a1']
-          const seat: Seat = { id: newId('seat'), displayName: input.name, avatarText: input.name.slice(0, 1), avatarColor: colors[s.seats.length % colors.length], roleDesc: input.roleDesc ?? '投资顾问', operatorStaffId: staff.id, status: 'accepting', welcome: '', customerDeletable: false, createdAt: now() }
+          const seat: Seat = { id: newId('seat'), displayName: input.name, avatarText: input.name.slice(0, 1), avatarColor: colors[s.seats.length % colors.length], roleDesc: input.roleDesc ?? '客户服务', operatorStaffId: staff.id, status: 'accepting', welcome: '', customerDeletable: false, createdAt: now() }
           seats = [...seats, seat]
           notes.push(`同时创建同名坐席「${seat.displayName}」并指派`)
         }
@@ -619,7 +626,7 @@ export const useStore = create<DemoStore>()(
         return staff
       },
 
-      updateRoleCaps: (roleId, caps) => set((s) => ({ roles: s.roles.map((r) => (r.id === roleId ? { ...r, caps } : r)) })),
+      updateRoleCaps: (roleId, caps) => get().updateRole(roleId, { caps }, get().session.adminStaffId!),
 
       takenInviteCodes: (exceptId) => {
         const s = get()
@@ -640,7 +647,7 @@ export const useStore = create<DemoStore>()(
         const nameOf = (id: string) => s.seats.find((x) => x.id === id)?.displayName ?? id
         set({
           inviteGroups: [...s.inviteGroups, group],
-          audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'invite_group.create', detail: `创建邀请组「${group.name}」，码 ${group.code}${input.code ? '（自定义）' : ''}；轮询接待员：${group.rotatingSeatIds.map(nameOf).join(' → ') || '无'}；固定坐席：${group.fixedSeatIds.map(nameOf).join('、') || '无'}` }, ...s.audit],
+          audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'invite_group.create', detail: `创建邀请组「${group.name}」，码 ${group.code}${input.code ? '（自定义）' : ''}；轮询坐席：${group.rotatingSeatIds.map(nameOf).join(' → ') || '无'}；固定坐席：${group.fixedSeatIds.map(nameOf).join('、') || '无'}` }, ...s.audit],
         })
         return { ok: true, group }
       },
@@ -754,7 +761,6 @@ export const useStore = create<DemoStore>()(
           }),
           providerInstances: saved.providerInstances ?? current.providerInstances,
           providerLicenseActions: saved.providerLicenseActions ?? current.providerLicenseActions,
-          roles: (saved.roles??current.roles).map((role)=>role.id==='role_admin'?{...role,caps:[...role.caps.filter((c)=>c!=='manage_messages'),'manage_messages' as const]}:role),
           chatRulesVersion: 1,
           policyMatrix: saved.chatRulesVersion ? (saved.policyMatrix ?? current.policyMatrix) : { ...(saved.policyMatrix ?? current.policyMatrix), 'dm.recall': { staff: (saved.policyMatrix ?? current.policyMatrix)['dm.recall']?.staff ?? true, customer: false } },
           policyNumbers: { ...current.policyNumbers, ...saved.policyNumbers },
