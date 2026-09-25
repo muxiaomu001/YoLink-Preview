@@ -327,15 +327,15 @@ for (const welcome of ['', ' \t\n ']) {
 }
 
 for (const usePolicyLimit of [false, true]) {
-  test(`注册：附带群满员时跳过并审计，${usePolicyLimit ? '策略' : '群级'}上限计入坐席和活跃角色`, () => {
+  test(`注册：附带群满员时跳过并审计，${usePolicyLimit ? '策略' : '群级'}上限计入客户和坐席`, () => {
     const fullGroup = current().chatGroups.find(item => item.id === 'cg_community')
     const openGroup = current().chatGroups.find(item => item.id === 'cg_strategy')
     const group = registrationGroup([fullGroup.id, openGroup.id])
     store.setState({
-      policyNumbers: { ...current().policyNumbers, groupMaxMembers: usePolicyLimit ? 3 : 10000 },
+      policyNumbers: { ...current().policyNumbers, groupMaxMembers: usePolicyLimit ? 2 : 10000 },
       chatGroups: current().chatGroups.map(item => item.id === fullGroup.id
-        ? { ...item, memberCustomerIds: [item.memberCustomerIds[0]], memberSeatIds: ['seat_lin'], memberBotIds: ['bot_capacity_test'], maxMembers: usePolicyLimit ? null : 3, welcomeText: '满员群欢迎语' }
-        : item.id === openGroup.id ? { ...item, memberCustomerIds: [], memberSeatIds: ['seat_cs'], memberBotIds: [], maxMembers: 2, welcomeText: '可加入群欢迎语' } : item),
+        ? { ...item, memberCustomerIds: [item.memberCustomerIds[0]], memberSeatIds: ['seat_lin'], maxMembers: usePolicyLimit ? null : 2, welcomeText: '满员群欢迎语' }
+        : item.id === openGroup.id ? { ...item, memberCustomerIds: [], memberSeatIds: ['seat_cs'], maxMembers: 2, welcomeText: '可加入群欢迎语' } : item),
     })
     const result = current().registerCustomer({ nickname: '容量验收', inviteCode: group.code })
     assert.equal(result.ok, true, result.error)

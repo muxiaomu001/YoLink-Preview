@@ -257,7 +257,7 @@ export const useStore = create<DemoStore>()(
         const joinGroupIds = Array.from(new Set([...group.chatGroupIds, ...(link?.chatGroupIds ?? [])])).filter((groupId) => {
           const chatGroup = s.chatGroups.find((item) => item.id === groupId)
           if (!chatGroup) return false
-          const memberCount = chatGroup.memberCustomerIds.length + chatGroup.memberSeatIds.length + chatGroup.memberBotIds.length
+          const memberCount = chatGroup.memberCustomerIds.length + chatGroup.memberSeatIds.length
           if (memberCount >= (chatGroup.maxMembers ?? s.policyNumbers.groupMaxMembers)) {
             fullGroupNames.push(chatGroup.name)
             return false
