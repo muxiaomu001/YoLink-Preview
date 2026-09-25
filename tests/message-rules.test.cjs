@@ -319,3 +319,116 @@ test('客户隐藏最后上线时间后，员工侧已读回执仍正常写入',
   assert.equal(current().customers.find((customer) => customer.id === customerId).lastSeenVisibility, 'nobody')
   assert.equal(updated.readAtByCustomer[customerId], message.at)
 })
+
+function registrationGroup(chatGroupIds = []) {
+  const group = { ...current().inviteGroups[0], id: 'ig_registration_test', code: 'BATCH9', fixedSeatIds: ['seat_lin', 'seat_cs'], rotatingSeatIds: [], chatGroupIds, isDefault: true, enabled: true }
+  store.setState({
+    inviteGroups: [group],
+    enterprise: { ...current().enterprise, inviteCodeRequired: false },
+  })
+  return group
+}
+
+for (const welcome of ['', ' \t\n ']) {
+  test(`注册：坐席欢迎语${welcome ? '全空白' : '为空'}时只建会话，其他坐席照常问候`, () => {
+    const group = registrationGroup()
+    store.setState({ seats: current().seats.map(item => item.id === 'seat_lin' ? { ...item, welcome } : item.id === 'seat_cs' ? { ...item, welcome: '{{customer.nickname}}，我是{{seat.name}}' } : item) })
+    const result = current().registerCustomer({ nickname: '新客户', inviteCode: group.code })
+    assert.equal(result.ok, true, result.error)
+    const customer = current().customers.find(item => item.id === result.customerId)
+    const silentConversation = current().conversations.find(item => item.customerId === customer.id && item.seatId === 'seat_lin')
+    const welcomeConversation = current().conversations.find(item => item.customerId === customer.id && item.seatId === 'seat_cs')
+    assert.ok(silentConversation)
+    assert.ok(welcomeConversation)
+    assert.equal(silentConversation.lastMessageAt, customer.registeredAt)
+    assert.equal(current().messages.filter(item => item.convId === silentConversation.id).length, 0)
+    const messages = current().messages.filter(item => item.convId === welcomeConversation.id && item.isWelcome)
+    assert.equal(messages.length, 1)
+    assert.equal(messages[0].text, `${customer.nickname}，我是${current().seats.find(item => item.id === 'seat_cs').displayName}`)
+    assert.equal(messages[0].at, customer.registeredAt)
+  })
+}
+
+for (const usePolicyLimit of [false, true]) {
+  test(`注册：附带群满员时跳过并审计，${usePolicyLimit ? '策略' : '群级'}上限计入坐席和活跃角色`, () => {
+    const fullGroup = current().chatGroups.find(item => item.id === 'cg_community')
+    const openGroup = current().chatGroups.find(item => item.id === 'cg_strategy')
+    const group = registrationGroup([fullGroup.id, openGroup.id])
+    store.setState({
+      policyNumbers: { ...current().policyNumbers, groupMaxMembers: usePolicyLimit ? 3 : 10000 },
+      chatGroups: current().chatGroups.map(item => item.id === fullGroup.id
+        ? { ...item, memberCustomerIds: [item.memberCustomerIds[0]], memberSeatIds: ['seat_lin'], memberBotIds: ['bot_capacity_test'], maxMembers: usePolicyLimit ? null : 3, welcomeText: '满员群欢迎语' }
+        : item.id === openGroup.id ? { ...item, memberCustomerIds: [], memberSeatIds: ['seat_cs'], memberBotIds: [], maxMembers: 2, welcomeText: '可加入群欢迎语' } : item),
+    })
+    const result = current().registerCustomer({ nickname: '容量验收', inviteCode: group.code })
+    assert.equal(result.ok, true, result.error)
+    assert.deepEqual(Array.from(result.addedGroupIds), [openGroup.id])
+    assert.equal(current().chatGroups.find(item => item.id === fullGroup.id).memberCustomerIds.includes(result.customerId), false)
+    assert.equal(current().chatGroups.find(item => item.id === openGroup.id).memberCustomerIds.includes(result.customerId), true)
+    assert.ok(current().audit.find(item => item.type === 'customer.register').detail.endsWith(`；因满员未加入：${fullGroup.name}`))
+    const groupWelcomes = current().messages.filter(item => item.recipientCustomerId === result.customerId && item.isWelcome)
+    assert.equal(groupWelcomes.length, 1)
+    assert.equal(groupWelcomes[0].text, '可加入群欢迎语')
+  })
+}
+
+test('注册：邀请组未附带群时不加入任何群', () => {
+  const group = registrationGroup()
+  const result = current().registerCustomer({ nickname: '不入群客户', inviteCode: group.code })
+  assert.equal(result.ok, true, result.error)
+  assert.deepEqual(Array.from(result.addedGroupIds), [])
+  assert.equal(current().chatGroups.some(item => item.memberCustomerIds.includes(result.customerId)), false)
+})
+
+test('注册：邀请组与链接附带群取并集，去重并忽略不存在的群', () => {
+  const group = registrationGroup(['cg_community', 'cg_community', 'missing_group'])
+  const link = { ...current().inviteLinks[0], id: 'link_registration_test', code: 'BATCH9L', inviteGroupId: group.id, chatGroupIds: ['cg_community', 'cg_strategy', 'missing_group'], status: 'active' }
+  store.setState({ inviteLinks: [link] })
+  const result = current().registerCustomer({ nickname: '链接客户', inviteCode: link.code })
+  assert.equal(result.ok, true, result.error)
+  assert.deepEqual(Array.from(result.addedGroupIds), ['cg_community', 'cg_strategy'])
+  for (const groupId of result.addedGroupIds) {
+    assert.equal(current().chatGroups.find(item => item.id === groupId).memberCustomerIds.filter(customerId => customerId === result.customerId).length, 1)
+  }
+})
+
+test('注册：没带码只加入默认邀请组附带的群，官方群仍不可退出', () => {
+  const group = registrationGroup(['cg_community'])
+  store.setState({ chatGroups: current().chatGroups.map(item => item.id === 'cg_community' ? { ...item, official: true } : item) })
+  const result = current().registerCustomer({ nickname: '无码客户', inviteCode: '' })
+  assert.equal(result.ok, true, result.error)
+  assert.equal(current().customers.find(item => item.id === result.customerId).inviteGroupId, group.id)
+  assert.deepEqual(Array.from(result.addedGroupIds), ['cg_community'])
+  assert.equal(policy.customerCan(current(), result.customerId, 'group.leave', 'cg_community'), false)
+})
+
+for (const welcome of ['', ' \t\n ', '您好，我是{{seat.name}}']) {
+  test(`补加坐席：欢迎语${welcome.trim() ? '已配置时问候' : welcome ? '全空白时不问候' : '为空时不问候'}`, () => {
+    const group = registrationGroup()
+    store.setState({ inviteGroups: [{ ...group, fixedSeatIds: ['seat_lin'] }], seats: current().seats.map(item => item.id === 'seat_cs' ? { ...item, welcome } : item) })
+    const result = current().registerCustomer({ nickname: '补加客户', inviteCode: group.code })
+    assert.equal(result.ok, true, result.error)
+    assert.equal(current().backfillSeat(group.id, 'seat_cs', 'st_admin'), 1)
+    const conversation = current().conversations.find(item => item.customerId === result.customerId && item.seatId === 'seat_cs')
+    assert.ok(conversation)
+    assert.ok(conversation.lastMessageAt)
+    const messages = current().messages.filter(item => item.convId === conversation.id)
+    assert.equal(messages.length, welcome.trim() ? 1 : 0)
+    if (welcome.trim()) {
+      assert.equal(messages[0].isWelcome, true)
+      assert.equal(messages[0].text, `您好，我是${current().seats.find(item => item.id === 'seat_cs').displayName}`)
+    }
+    assert.equal(current().backfillSeat(group.id, 'seat_cs', 'st_admin'), 0)
+  })
+}
+
+test('注册：关闭邀请码必填后，种子默认组让无码客户加入官方通知和社区群', () => {
+  store.setState({ enterprise: { ...current().enterprise, inviteCodeRequired: false } })
+  const result = current().registerCustomer({ nickname: '默认组新客户', inviteCode: '' })
+  assert.equal(result.ok, true, result.error)
+  assert.equal(current().customers.find(item => item.id === result.customerId).inviteGroupId, 'ig_default')
+  assert.deepEqual(Array.from(result.addedGroupIds), ['cg_strategy', 'cg_community'])
+  for (const groupId of ['cg_strategy', 'cg_community']) {
+    assert.equal(current().chatGroups.find(item => item.id === groupId).memberCustomerIds.includes(result.customerId), true)
+  }
+})

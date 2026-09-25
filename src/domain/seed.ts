@@ -89,8 +89,6 @@ export const ENTERPRISE: Enterprise = {
     { id: 'wt_1', enabled: true, title: '我的账户', iconText: '账', url: 'https://portal.hxwm.example/account?uid={user_id}&ext={external_id}&ts={ts}&sig={sig}' },
     { id: 'wt_2', enabled: false, title: '产品中心', iconText: '产', url: 'https://portal.hxwm.example/products' },
   ],
-  defaultWelcome: '您好，我是恒信财富的{{seat.name}}，很高兴为您服务。有任何配置或账户问题随时找我。',
-  defaultChatGroupIds: ['cg_strategy', 'cg_community'],
   modules: { customers: true, invite: true, wallet: true, checkin: true, referral: true, broadcast: true, banner: true, content: true },
   broadcastPerStaffPerDay: 3,
   allowPersonalQuickReply: true,
@@ -352,7 +350,7 @@ export const INVITE_GROUPS: InviteGroup[] = [
     fixedSeatIds: ['seat_cs'],
     rotatingSeatIds: ['seat_chen', 'seat_lin'],
     rotationIndex: 0,
-    chatGroupIds: [],
+    chatGroupIds: ['cg_strategy', 'cg_community'],
     isDefault: true,
     enabled: true,
     createdAt: ago(100),
@@ -364,7 +362,7 @@ export const INVITE_GROUPS: InviteGroup[] = [
     fixedSeatIds: [],
     rotatingSeatIds: ['seat_lin', 'seat_chen'],
     rotationIndex: 0,
-    chatGroupIds: ['cg_community'],
+    chatGroupIds: ['cg_strategy', 'cg_community'],
     isDefault: false,
     enabled: true,
     createdAt: ago(60),
@@ -377,7 +375,7 @@ export const INVITE_GROUPS: InviteGroup[] = [
     fixedSeatIds: [],
     rotatingSeatIds: ['seat_lin'],
     rotationIndex: 0,
-    chatGroupIds: [],
+    chatGroupIds: ['cg_strategy', 'cg_community'],
     isDefault: false,
     enabled: true,
     createdAt: ago(40),
@@ -725,20 +723,22 @@ function buildCustomers() {
       customerSeats.push({ customerId: c.id, seatId, primary: seatId === alloc.primarySeatId, addedAt: iso(registeredMs), source: 'register' })
       const conv: Conversation = { id: sid('conv'), kind: 'dm', customerId: c.id, seatId, lastMessageAt: iso(registeredMs) }
       conversations.push(conv)
-      const welcomeAt = registeredMs + 1000 * (order + 1)
-      messages.push({
-        id: sid('msg'),
-        convId: conv.id,
-        senderKind: 'seat',
-        senderId: seatId,
-        seatId,
-        operatorId: opAt(seatId, welcomeAt),
-        kind: 'text',
-        text: renderWelcome(seat.welcome || ENTERPRISE.defaultWelcome, c.nickname, seat.displayName),
-        at: iso(welcomeAt),
-        isWelcome: true,
-      })
-      conv.lastMessageAt = iso(welcomeAt)
+      if (seat.welcome.trim()) {
+        const welcomeAt = registeredMs + 1000 * (order + 1)
+        messages.push({
+          id: sid('msg'),
+          convId: conv.id,
+          senderKind: 'seat',
+          senderId: seatId,
+          seatId,
+          operatorId: opAt(seatId, welcomeAt),
+          kind: 'text',
+          text: renderWelcome(seat.welcome, c.nickname, seat.displayName),
+          at: iso(welcomeAt),
+          isWelcome: true,
+        })
+        conv.lastMessageAt = iso(welcomeAt)
+      }
 
       if (seatId !== alloc.primarySeatId) {
         // 非主归属坐席：偶尔有一两句

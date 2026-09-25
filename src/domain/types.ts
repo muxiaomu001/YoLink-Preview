@@ -110,9 +110,6 @@ export interface Enterprise {
   push: PushConfig
   storage: StorageConfig
   webTabs: WebTab[]
-  defaultWelcome: string
-  /** 企业默认官方群与频道：所有新客户注册后自动加入，按顺序进第一个未满的 */
-  defaultChatGroupIds: string[]
   /** 模块启停：停用不删数据 */
   modules: Record<ModuleKey, boolean>
   /** 群发频控：每个实操员工每天任务数（跨其持有的坐席合并） */
@@ -302,7 +299,7 @@ export interface InviteLink {
   uses: number
   clicks: number
   status: InviteLinkStatus
-  /** 附带动作：通过该链接注册的客户额外自动加入的群或频道（叠加在邀请组与企业默认之上） */
+  /** 附带动作：通过该链接注册的客户额外自动加入的群或频道（叠加在邀请组之上） */
   chatGroupIds: string[]
   createdAt: ISODate
 }

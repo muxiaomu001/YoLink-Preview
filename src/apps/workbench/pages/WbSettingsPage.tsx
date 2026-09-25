@@ -40,7 +40,7 @@ export function WbSettingsPage() {
           </Card>
           {can('manage_settings') && (
             <Card title="企业设置">
-              <p className="text-[12px] text-zinc-600">你的角色「{role?.name}」可以维护企业级设置（默认欢迎语、群发频控、模块启停、策略），在管理后台操作。</p>
+              <p className="text-[12px] text-zinc-600">你的角色「{role?.name}」可以维护企业级设置（群发频控、模块启停、策略），在管理后台操作。</p>
               <Link to="/admin" target="_blank" className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-brand-700 hover:underline">
                 打开管理后台 <ExternalLink size={12} />
               </Link>
@@ -61,22 +61,22 @@ function WelcomeSettingsCard() {
       title={
         <span className="inline-flex items-center gap-1.5">
           「{seat?.displayName ?? '-'}」的欢迎语
-          <HelpTip text="欢迎语是坐席的属性：交接后跟着坐席走，不跟人走。客户添加该坐席后立即以坐席身份发出；留空用企业默认。" />
+          <HelpTip text="欢迎语是坐席的属性：交接后跟着坐席走，不跟人走。客户添加该坐席后立即以坐席身份发出；留空则不发欢迎语。" />
         </span>
       }
     >
       <Field label="模板" hint="支持 {{customer.nickname}}、{{seat.name}}">
-        <Textarea rows={4} value={welcome} disabled={!seat} onChange={(e) => setWelcome(e.target.value)} placeholder={s.enterprise.defaultWelcome} />
+        <Textarea rows={4} value={welcome} disabled={!seat} onChange={(e) => setWelcome(e.target.value)} placeholder="例如：您好，我是恒信财富的{{seat.name}}，有问题随时找我。" />
       </Field>
       <div className="mt-2 flex items-center justify-between">
-        <span className="text-[11px] text-zinc-400">企业默认：{s.enterprise.defaultWelcome.slice(0, 40)}…</span>
+        <span className={`text-[11px] ${welcome.trim() ? 'text-zinc-400' : 'text-amber-600'}`}>{welcome.trim() ? '新客户加上本坐席后立即以坐席身份发出，交接后跟着坐席走' : '未配置欢迎语，新客户加你时不会收到问候'}</span>
         <Button
           variant="primary"
           size="sm"
           disabled={!seat || welcome === (seat?.welcome ?? '')}
           onClick={() => {
             if (seat) s.updateSeatWelcome(seat.id, welcome)
-            toast(welcome.trim() ? '已保存坐席欢迎语' : '已清空，改用企业默认欢迎语')
+            toast(welcome.trim() ? '已保存坐席欢迎语' : '已清空，新客户加你时不会收到问候')
           }}
         >
           保存

@@ -60,7 +60,7 @@ export function SeatsPage() {
 
   const columns: Column<Row>[] = [
     { key: 'avatar', title: '头像', width: '48px', render: (r) => dim(r, <SeatAvatar seat={r.seat} size={30} />) },
-    { key: 'name', title: '显示名', render: (r) => dim(r, <span className="font-medium text-zinc-900">{r.seat.displayName}</span>) },
+    { key: 'name', title: '显示名', render: (r) => dim(r, <span className="inline-flex items-center gap-2"><span className="font-medium text-zinc-900">{r.seat.displayName}</span>{!r.seat.welcome.trim() && <Pill tone="amber">未配欢迎语</Pill>}</span>) },
     { key: 'roleDesc', title: '职能说明', render: (r) => dim(r, <span className="text-zinc-600">{r.seat.roleDesc || '-'}</span>) },
     {
       key: 'operator',

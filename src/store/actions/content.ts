@@ -16,7 +16,6 @@ export interface ContentActions {
   recordExport: (what: string, byStaffId: string) => void
   setGroupOfficial: (id: string, official: boolean, byStaffId: string) => void
   updateChatGroup: (id: string, patch: Partial<Pick<ChatGroup, 'name' | 'desc' | 'requiredTitleId' | 'maxMembers' | 'kind' | 'welcomeText'>>, byStaffId: string) => void
-  setDefaultChatGroups: (ids: string[], byStaffId: string) => void
   removeGroupMember: (groupId: string, customerId: string, byStaffId: string) => void
   updateTag: (id: string, patch: Partial<Pick<Tag, 'name' | 'color'>>, byStaffId: string) => void
   /** 把 from 合并到 to：客户身上换成 to，from 删除 */
@@ -94,12 +93,6 @@ export function contentActions(set: Set, get: Get): ContentActions {
           audit: withAudit(s.audit, 'group.update', `修改群「${g?.name}」：${Object.keys(patch).join('、')}`, byStaffId),
         }
       }),
-
-    setDefaultChatGroups: (ids, byStaffId) =>
-      set((s) => ({
-        enterprise: { ...s.enterprise, defaultChatGroupIds: ids },
-        audit: withAudit(s.audit, 'settings.update', `企业默认官方群与频道：${ids.map((id) => s.chatGroups.find((g) => g.id === id)?.name).join('、') || '无'}`, byStaffId),
-      })),
 
     removeGroupMember: (groupId, customerId, byStaffId) =>
       set((s) => {

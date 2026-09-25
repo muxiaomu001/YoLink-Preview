@@ -1,5 +1,5 @@
 /**
- * 邀请链接的「附带动作」：注册时自动入群按三层叠加（企业默认 → 邀请组 → 本链接），
+ * 邀请链接的「附带动作」：注册时自动入群取邀请组与本链接的并集，
  * 这里算出并渲染；管理后台的邀请链接总览也用 AttachedActionsCell。
  * 另有工作台的生成链接弹窗。
  */
@@ -14,8 +14,8 @@ import { Modal, toast } from '@/ui/overlay'
 import { useWorkbench } from '../useWorkbench'
 import { LINK_HOST, MAX_USES_LIMIT, attachedGroups, type AttachLayer } from './InvitesPage.shared'
 
-const LAYER_LABEL: Record<AttachLayer, string> = { enterprise: '企业默认', group: '组', link: '本链接' }
-const LAYER_TONE: Record<AttachLayer, 'blue' | 'purple' | 'green'> = { enterprise: 'blue', group: 'purple', link: 'green' }
+const LAYER_LABEL: Record<AttachLayer, string> = { group: '组', link: '本链接' }
+const LAYER_TONE: Record<AttachLayer, 'purple' | 'green'> = { group: 'purple', link: 'green' }
 
 export function AttachedActionsCell({ s, link }: { s: DemoState; link: Pick<InviteLink, 'inviteGroupId' | 'chatGroupIds'> }) {
   const list = attachedGroups(s, link)
@@ -42,7 +42,7 @@ const EXPIRE_OPTIONS = [
   { value: 'custom', label: '自定义日期' },
 ]
 
-/** 工作台生成链接：邀请组只列包含当前坐席的组；附带动作里已被企业默认或组覆盖的群打勾禁用 */
+/** 工作台生成链接：邀请组只列包含当前坐席的组；附带动作里已被组覆盖的群打勾禁用 */
 export function InviteCreateModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { s, staff, seat } = useWorkbench()
   const [form, setForm] = useState({ name: '', groupId: '', expires: 'never', customDate: '', max: '', code: '', chatGroupIds: [] as string[] })
@@ -50,7 +50,7 @@ export function InviteCreateModal({ open, onClose }: { open: boolean; onClose: (
   const myGroups = s.inviteGroups.filter((g) => g.enabled && seat && seatIdsOf(g).includes(seat.id))
   const ig = s.inviteGroups.find((g) => g.id === form.groupId)
   const today = fmtDate(new Date().toISOString())
-  const coveredBy = (gid: string): AttachLayer | null => (s.enterprise.defaultChatGroupIds.includes(gid) ? 'enterprise' : ig?.chatGroupIds.includes(gid) ? 'group' : null)
+  const coveredBy = (gid: string): AttachLayer | null => (ig?.chatGroupIds.includes(gid) ? 'group' : null)
 
   const nameOk = form.name.trim().length >= 1 && form.name.trim().length <= 32
   const dateOk = form.expires !== 'custom' || (!!form.customDate && form.customDate >= today)
@@ -103,7 +103,7 @@ export function InviteCreateModal({ open, onClose }: { open: boolean; onClose: (
             ))}
           </Select>
         </Field>
-        <Field label="附带动作" hint="通过本链接注册的客户额外自动加入；已被企业默认或邀请组覆盖的群打勾禁用">
+        <Field label="附带动作" hint="通过本链接注册的客户额外自动加入；已被邀请组覆盖的群打勾禁用">
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 rounded-md border border-zinc-200 px-3 py-2">
             {s.chatGroups.map((g) => {
               const covered = coveredBy(g.id)

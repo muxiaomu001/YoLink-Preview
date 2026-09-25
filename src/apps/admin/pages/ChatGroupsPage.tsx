@@ -44,7 +44,6 @@ export function ChatGroupsPage() {
         <div className="flex items-center gap-2">
           <span className="font-medium text-zinc-900">{g.name}</span>
           {g.official && <Pill tone="amber">官方</Pill>}
-          {s.enterprise.defaultChatGroupIds.includes(g.id) && <Pill tone="blue">默认加入</Pill>}
         </div>
       ),
     },
@@ -87,7 +86,7 @@ export function ChatGroupsPage() {
     <div>
       <PageHeader
         title="全部群列表"
-        desc="群主和管理员都是坐席，员工以坐席身份在群里。企业默认官方群：所有新客户注册后自动加入，邀请组附带的群在此之上叠加。"
+        desc="群主和管理员都是坐席，员工以坐席身份在群里。新客户自动加入邀请组和邀请链接附带的群。"
         extra={
           <>
             <Select value={kind} onChange={(e) => setKind(e.target.value as KindFilter)} className="w-32">
@@ -101,8 +100,7 @@ export function ChatGroupsPage() {
       />
       {creating && <CreateGroupModal onClose={() => setCreating(false)} onCreated={(id) => navigate(`/admin/groups/${id}`)} />}
       <Note>
-        标记为官方群后，客户不能退出该群（「退出群」能力对客户关闭），群名旁显示橙色「官方」。当前企业默认加入：
-        {s.enterprise.defaultChatGroupIds.map((id) => s.chatGroups.find((g) => g.id === id)?.name).filter(Boolean).join('、') || '无'}。
+        标记为官方群后，客户不能退出该群（「退出群」能力对客户关闭），群名旁显示橙色「官方」。
       </Note>
       <Card className="mt-4" padded={false}>
         <Table rows={rows} columns={columns} rowKey={(g) => g.id} empty="该类型下没有群" />

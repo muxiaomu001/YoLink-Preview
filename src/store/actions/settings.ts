@@ -38,8 +38,6 @@ const FIELD_LABEL: Record<string, string> = {
   push: '推送配置',
   storage: '对象存储',
   webTabs: '网站栏目',
-  defaultWelcome: '企业默认欢迎语',
-  defaultChatGroupIds: '企业默认官方群与频道',
   modules: '模块',
 }
 

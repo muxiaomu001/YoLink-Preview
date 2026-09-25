@@ -26,7 +26,6 @@ import {
   LineChart,
   Link2,
   MessageSquareQuote,
-  MessageSquareText,
   Puzzle,
   ScrollText,
   Send,
@@ -93,7 +92,6 @@ export const ADMIN_NAV: NavGroup[] = [
       { to: '/admin/invite-links', label: '邀请链接总览', icon: Link2, module: 'invite' },
       { to: '/admin/broadcasts', label: '群发管理', icon: Send, module: 'broadcast' },
       { to: '/admin/quick-replies', label: '话术库', icon: MessageSquareQuote, module: 'broadcast' },
-      { to: '/admin/assign-settings', label: '欢迎语与默认群', icon: MessageSquareText, module: 'invite' },
     ],
   },
   {

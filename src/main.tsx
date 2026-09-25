@@ -19,7 +19,6 @@ import { InviteGroupsPage } from '@/apps/admin/pages/InviteGroupsPage'
 import { InviteLinksPage } from '@/apps/admin/pages/InviteLinksPage'
 import { BroadcastsAdminPage } from '@/apps/admin/pages/BroadcastsAdminPage'
 import { QuickRepliesPage } from '@/apps/admin/pages/QuickRepliesPage'
-import { AssignSettingsPage } from '@/apps/admin/pages/AssignSettingsPage'
 import { TitlesPage } from '@/apps/admin/pages/TitlesPage'
 import { TagsPage } from '@/apps/admin/pages/TagsPage'
 import { PoliciesPage } from '@/apps/admin/pages/PoliciesPage'
@@ -80,7 +79,6 @@ const router = createBrowserRouter([
       { path: 'invite-links', element: <InviteLinksPage /> },
       { path: 'broadcasts', element: <BroadcastsAdminPage /> },
       { path: 'quick-replies', element: <QuickRepliesPage /> },
-      { path: 'assign-settings', element: <AssignSettingsPage /> },
       // 内部标签与头衔
       { path: 'titles', element: <TitlesPage /> },
       { path: 'tags', element: <TagsPage /> },

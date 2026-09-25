@@ -302,20 +302,14 @@ function GroupEditor({ group, onClose }: { group?: InviteGroup; onClose: () => v
         </div>
 
         <div>
-          <div className="mb-1 text-xs font-medium text-zinc-600">附带入群（在企业默认官方群之上叠加）</div>
+          <div className="mb-1 text-xs font-medium text-zinc-600">附带入群</div>
           <div className="flex flex-wrap gap-3">
             {s.chatGroups.map((g) => (
               <Checkbox
                 key={g.id}
-                checked={chatGroupIds.includes(g.id) || s.enterprise.defaultChatGroupIds.includes(g.id)}
-                disabled={s.enterprise.defaultChatGroupIds.includes(g.id)}
+                checked={chatGroupIds.includes(g.id)}
                 onChange={(v) => setChatGroupIds((l) => (v ? [...l, g.id] : l.filter((x) => x !== g.id)))}
-                label={
-                  <span>
-                    {g.name}
-                    {s.enterprise.defaultChatGroupIds.includes(g.id) && <span className="ml-1 text-[10px] text-zinc-400">企业默认</span>}
-                  </span>
-                }
+                label={g.name}
               />
             ))}
           </div>
@@ -366,7 +360,7 @@ function BackfillButton({ groupId, seatId }: { groupId: string; seatId: string }
       variant="secondary"
       onClick={() => {
         const n = s.backfillSeat(groupId, seatId, s.session.adminStaffId!)
-        toast(`已补加到 ${n} 位已有客户，并发出该坐席的欢迎语`)
+        toast(`已补加到 ${n} 位已有客户${s.seats.find((item) => item.id === seatId)?.welcome.trim() ? '，并发出该坐席的欢迎语' : '；未配置欢迎语，不发送问候'}`)
       }}
     >
       补加到已有客户（{missing}）

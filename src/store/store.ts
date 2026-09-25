@@ -51,7 +51,7 @@ import { providerLicensingActions, type ProviderLicensingActions } from './actio
 import { clearStartupSeen } from '@/domain/startupSeen'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
-export const STORAGE_KEY = 'yolink-demo-v15'
+export const STORAGE_KEY = 'yolink-demo-v16'
 
 const now = () => iso(Date.now())
 
@@ -239,29 +239,38 @@ export const useStore = create<DemoStore>()(
           const seat = seatById[seatId]
           customerSeats.push({ customerId: customer.id, seatId, primary: seatId === primarySeatId, addedAt: at, source: 'register' })
           const conv: Conversation = { id: newId('conv'), kind: 'dm', customerId: customer.id, seatId, lastMessageAt: at }
-          // 欢迎语在注册时已产生，不能标成未来时间压过客户随后的提问。
-          const welcomeAt = at
-          conv.lastMessageAt = welcomeAt
           conversations.push(conv)
-          messages.push({
-            id: newId('msg'),
-            convId: conv.id,
-            senderKind: 'seat',
-            senderId: seatId,
-            seatId,
-            operatorId: seat.operatorStaffId,
-            kind: 'text',
-            text: renderWelcome(seat.welcome || s.enterprise.defaultWelcome, customer.nickname, seat.displayName),
-            at: welcomeAt,
-            isWelcome: true,
-          })
+          if (seat.welcome.trim()) {
+            messages.push({
+              id: newId('msg'),
+              convId: conv.id,
+              senderKind: 'seat',
+              senderId: seatId,
+              seatId,
+              operatorId: seat.operatorStaffId,
+              kind: 'text',
+              text: renderWelcome(seat.welcome, customer.nickname, seat.displayName),
+              at,
+              isWelcome: true,
+            })
+          }
         })
-        const joinGroupIds = Array.from(new Set([...s.enterprise.defaultChatGroupIds, ...group.chatGroupIds, ...(link?.chatGroupIds ?? [])])).filter((gid) => s.chatGroups.some((g) => g.id === gid))
+        const fullGroupNames: string[] = []
+        const joinGroupIds = Array.from(new Set([...group.chatGroupIds, ...(link?.chatGroupIds ?? [])])).filter((groupId) => {
+          const chatGroup = s.chatGroups.find((item) => item.id === groupId)
+          if (!chatGroup) return false
+          const memberCount = chatGroup.memberCustomerIds.length + chatGroup.memberSeatIds.length + chatGroup.memberBotIds.length
+          if (memberCount >= (chatGroup.maxMembers ?? s.policyNumbers.groupMaxMembers)) {
+            fullGroupNames.push(chatGroup.name)
+            return false
+          }
+          return true
+        })
         const chatGroups = s.chatGroups.map((g) => (joinGroupIds.includes(g.id) ? { ...g, memberCustomerIds: [...g.memberCustomerIds, customer.id] } : g))
         for(const gid of joinGroupIds){const g=s.chatGroups.find((x)=>x.id===gid),conv=s.conversations.find((x)=>x.chatGroupId===gid);if(g&&conv)messages.push(...groupWelcomeMessages(g,conv.id,[customer],at))}
         const inviteLinks = link ? s.inviteLinks.map((l) => (l.id === link!.id ? { ...l, uses: l.uses + 1 } : l)) : s.inviteLinks
         const auditEntries = [
-          { id: newId('au'), at, actorStaffId: null, type: 'customer.register' as AuditType, detail: `客户「${customer.nickname}」通过${link ? `邀请链接「${link.name}」（${group.name}）` : `邀请组「${group.name}」`}注册，轮询分配接待员：${primarySeatId ? seatById[primarySeatId]?.displayName : '无'}；自动添加：${usable.map((id) => seatById[id]?.displayName).join('、')}${skipped.length ? `；跳过（停用或暂停接新）：${skipped.map((id) => seatById[id]?.displayName).join('、')}` : ''}${joinGroupIds.length ? `；自动入群：${joinGroupIds.map((gid) => s.chatGroups.find((g) => g.id === gid)?.name).join('、')}` : ''}${nick.auto ? '；昵称未填，发默认昵称' : ''}${watchUntil ? `；新号观察期至 ${watchUntil.slice(0, 16).replace('T', ' ')}` : ''}` },
+          { id: newId('au'), at, actorStaffId: null, type: 'customer.register' as AuditType, detail: `客户「${customer.nickname}」通过${link ? `邀请链接「${link.name}」（${group.name}）` : `邀请组「${group.name}」`}注册，轮询分配接待员：${primarySeatId ? seatById[primarySeatId]?.displayName : '无'}；自动添加：${usable.map((id) => seatById[id]?.displayName).join('、')}${skipped.length ? `；跳过（停用或暂停接新）：${skipped.map((id) => seatById[id]?.displayName).join('、')}` : ''}${joinGroupIds.length ? `；自动入群：${joinGroupIds.map((gid) => s.chatGroups.find((g) => g.id === gid)?.name).join('、')}` : ''}${nick.auto ? '；昵称未填，发默认昵称' : ''}${watchUntil ? `；新号观察期至 ${watchUntil.slice(0, 16).replace('T', ' ')}` : ''}${fullGroupNames.length ? `；因满员未加入：${fullGroupNames.join('、')}` : ''}` },
         ]
         set({
           customers: [customer, ...s.customers],
@@ -688,7 +697,9 @@ export const useStore = create<DemoStore>()(
           cs.push({ customerId: c.id, seatId, primary: false, addedAt: at, source: 'backfill' })
           const conv: Conversation = { id: newId('conv'), kind: 'dm', customerId: c.id, seatId, lastMessageAt: at }
           convs.push(conv)
-          msgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: seatId, seatId, operatorId: seat.operatorStaffId ?? undefined, kind: 'text', text: renderWelcome(seat.welcome || s.enterprise.defaultWelcome, c.nickname, seat.displayName), at, isWelcome: true })
+          if (seat.welcome.trim()) {
+            msgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: seatId, seatId, operatorId: seat.operatorStaffId ?? undefined, kind: 'text', text: renderWelcome(seat.welcome, c.nickname, seat.displayName), at, isWelcome: true })
+          }
         })
         set({
           customerSeats: [...s.customerSeats, ...cs],

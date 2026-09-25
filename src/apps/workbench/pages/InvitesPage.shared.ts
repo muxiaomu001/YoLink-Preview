@@ -1,12 +1,12 @@
 import type { ChatGroup, DemoState, InviteLink } from '@/domain/types'
 
-export type AttachLayer = 'enterprise' | 'group' | 'link'
+export type AttachLayer = 'group' | 'link'
 export const LINK_HOST = 'https://hxwm.example/i/'
 export const MAX_USES_LIMIT = 99999
 
 export function attachedGroups(s: DemoState, link: Pick<InviteLink, 'inviteGroupId' | 'chatGroupIds'>): { group: ChatGroup; layer: AttachLayer }[] {
   const ig = s.inviteGroups.find((g) => g.id === link.inviteGroupId)
-  const layers: [string, AttachLayer][] = [...s.enterprise.defaultChatGroupIds.map((id): [string, AttachLayer] => [id, 'enterprise']), ...(ig?.chatGroupIds ?? []).map((id): [string, AttachLayer] => [id, 'group']), ...link.chatGroupIds.map((id): [string, AttachLayer] => [id, 'link'])]
+  const layers: [string, AttachLayer][] = [...(ig?.chatGroupIds ?? []).map((id): [string, AttachLayer] => [id, 'group']), ...link.chatGroupIds.map((id): [string, AttachLayer] => [id, 'link'])]
   const seen = new Set<string>()
   return layers
     .filter(([id]) => (seen.has(id) ? false : (seen.add(id), true)))

@@ -152,7 +152,7 @@ export function SeatEditModal({ seat, onClose }: { seat?: Seat; onClose: () => v
               ))}
           </Select>
         </Field>
-        <Field label="欢迎语" hint="支持 {{customer.nickname}}、{{seat.name}}；留空用企业默认">
+        <Field label="欢迎语" hint="支持 {{customer.nickname}}、{{seat.name}}；留空则不发欢迎语">
           <Textarea rows={3} value={form.welcome} onChange={(e) => set('welcome', e.target.value)} />
         </Field>
         <div className="flex items-center justify-between rounded-md border border-zinc-200 px-3 py-2">

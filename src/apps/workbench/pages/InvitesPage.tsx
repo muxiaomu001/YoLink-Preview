@@ -1,5 +1,5 @@
 /**
- * 我的邀请链接（04 文档）：表格列按 PRD，附带动作显示三层入群叠加；生成弹窗在 InvitesPage.parts。
+ * 我的邀请链接（04 文档）：表格列按 PRD，附带动作显示邀请组与本链接的群；生成弹窗在 InvitesPage.parts。
  */
 import { useState } from 'react'
 import { Copy, Plus } from 'lucide-react'
@@ -28,7 +28,6 @@ export function InvitesPage() {
   const [creating, setCreating] = useState(false)
   const mine = s.inviteLinks.filter((l) => l.creatorStaffId === staff?.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const myGroups = s.inviteGroups.filter((g) => g.enabled && seat && seatIdsOf(g).includes(seat.id))
-  const defaults = s.enterprise.defaultChatGroupIds.map((id) => s.chatGroups.find((g) => g.id === id)?.name).filter(Boolean)
 
   const copy = (l: InviteLink) => {
     void navigator.clipboard?.writeText(`${LINK_HOST}${l.code}`)
@@ -48,7 +47,7 @@ export function InvitesPage() {
         desc={
           <span className="inline-flex items-center gap-1.5">
             链接是邀请组下面的渠道码，落点由组决定。
-            <HelpTip text={<span>想要「只加我一个」的推广码，让管理员建一个只放本坐席的组。注册时自动入群按三层叠加取并集：企业默认（{defaults.length ? defaults.join('、') : '无'}）→ 邀请组的群 → 本链接的附带动作；表格「附带动作」列标明来源。</span>} />
+            <HelpTip text="想要「只加我一个」的推广码，让管理员建一个只放本坐席的组。新客户会自动加入邀请组和本链接附带的群，重复的群只加一次，满员的群跳过；表格「附带动作」列标明来源。" />
           </span>
         }
         extra={
