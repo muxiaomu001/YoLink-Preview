@@ -75,7 +75,11 @@ export function CustomerControlSection({ c }: { c: Customer }) {
     toast('已关闭影子模式，之后发的消息恢复正常可见')
   }
   const confirmShadow = () => {
-    s.setCustomerShadowMode(c.id, true, shadowReason, admin)
+    const result = s.setCustomerShadowMode(c.id, true, shadowReason, admin)
+    if (!result.ok) {
+      toast(result.error, 'warn')
+      return
+    }
     setShadowing(false)
     toast('已开启影子模式，客户端无任何提示')
   }
@@ -146,7 +150,7 @@ export function CustomerControlSection({ c }: { c: Customer }) {
         footer={
           <>
             <Button onClick={() => setShadowing(false)}>取消</Button>
-            <Button variant="danger" onClick={confirmShadow}>
+            <Button variant="danger" disabled={!shadowReason.trim()} onClick={confirmShadow}>
               开启影子模式
             </Button>
           </>

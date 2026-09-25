@@ -9,7 +9,8 @@ import type { Customer } from '@/domain/types'
 import { fmtAgo, fmtDate, fmtDateTime } from '@/domain/time'
 import { customerById, seatsOfCustomer, staffById } from '@/store/selectors'
 import { KV, SeatAvatar, TagChip, TitleChip } from '@/ui/display'
-import { Textarea } from '@/ui/primitives'
+import { Button, Input, Textarea } from '@/ui/primitives'
+import { toast } from '@/ui/overlay'
 import { useWorkbench } from '../../useWorkbench'
 import { CollapsibleSection, type SectionCtl } from './CollapsibleSection'
 
@@ -180,6 +181,42 @@ export function PurchasesSection({ c, ctl }: SectionProps) {
           ]}
         />
       </div>
+    </CollapsibleSection>
+  )
+}
+
+export function BusinessProfileSection({ c, ctl }: SectionProps) {
+  const { s, staff } = useWorkbench()
+  const [number, setNumber] = useState(c.businessSystemCustomerNumber ?? '')
+  const record = s.businessProfileRecords.find((item) => item.customerId === c.id)
+  const bind = () => {
+    if (!staff) return
+    const result = s.bindCustomerBusinessRecord(c.id, number, staff.id)
+    toast(result.ok ? `已绑定业务系统客户编号「${result.record.customerNumber}」` : result.error, result.ok ? 'ok' : 'warn')
+    if (result.ok) setNumber(result.record.customerNumber)
+  }
+  const unbind = () => {
+    if (!staff) return
+    const result = s.unbindCustomerBusinessRecord(c.id, staff.id)
+    toast(result.ok ? '已解除业务系统绑定' : result.error, result.ok ? 'ok' : 'warn')
+    if (result.ok) setNumber('')
+  }
+  return (
+    <CollapsibleSection title="业务系统" ctl={ctl} summary={record ? record.customerNumber : '未绑定'} help="只匹配已同步的业务记录，绑定关系不会把业务系统数据展示给客户。">
+      {record ? (
+        <div className="space-y-2">
+          <KV items={[{ k: '客户编号', v: record.customerNumber }, { k: '角色', v: record.roleLabel ?? '-' }, { k: '购买记录', v: `${record.purchases.length} 笔` }]} />
+          <Button size="sm" variant="ghost" onClick={unbind}>解绑</Button>
+        </div>
+      ) : (
+        <div className="flex items-end gap-2">
+          <label className="min-w-0 flex-1">
+            <span className="mb-1 block text-[11px] text-zinc-500">业务系统客户编号</span>
+            <Input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="如：HX-0099" />
+          </label>
+          <Button size="sm" variant="secondary" disabled={!number.trim()} onClick={bind}>绑定</Button>
+        </div>
+      )}
     </CollapsibleSection>
   )
 }

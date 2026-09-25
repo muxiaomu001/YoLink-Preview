@@ -10,6 +10,9 @@ import { useStore } from '@/store/store'
 import { Button } from '@/ui/primitives'
 import { Card, Note, PageHeader, Stat } from '@/ui/display'
 import { HelpTip } from '@/ui/help'
+import { DemoNote } from '@/ui/DemoNote'
+import { confirm } from '@/ui/confirm'
+import { toast } from '@/ui/overlay'
 import { BroadcastAdminDetailModal, BroadcastCreateModal, BroadcastsAdminTable } from './BroadcastsAdminPage.parts'
 
 export function BroadcastsAdminPage() {
@@ -25,6 +28,13 @@ export function BroadcastsAdminPage() {
   const perStaff = s.enterprise.broadcastPerStaffPerDay
   const perCustomer = s.enterprise.broadcastPerCustomerPerDay
 
+  const cancel = async (broadcast: Broadcast) => {
+    const ok = await confirm({ title: `取消定时群发「${broadcast.name}」？`, body: '取消后不会产生消息，名单快照和审计记录仍保留。', okText: '取消定时群发', danger: true })
+    if (!ok || !s.session.adminStaffId) return
+    const result = s.cancelBroadcast(broadcast.id, s.session.adminStaffId)
+    toast(result.ok ? '定时群发已取消' : result.error, result.ok ? 'ok' : 'warn')
+  }
+
   if (!s.enterprise.modules.broadcast) return <Note tone="amber">企业已停用「群发」模块，在「模块启停」里开启后再用。</Note>
 
   return (
@@ -37,7 +47,7 @@ export function BroadcastsAdminPage() {
             <HelpTip
               text={
                 <span>
-                  频控：每个实操员工每天 {perStaff} 个任务（跨其持有的坐席合并），每客户每天最多收 {perCustomer} 条（跨坐席、跨任务合并）。目标人群在发送时计算；自动跳过已注销、已封禁、屏蔽该坐席、当日已达频控的客户。
+                  频控：每个实操员工每天 {perStaff} 个任务（跨其持有的坐席合并），每客户每天最多收 {perCustomer} 条（跨坐席、跨任务合并）。名单在预览时锁定，之后新加的客户不在这次名单里；发送时仍自动跳过已注销、已封禁、屏蔽该坐席、当日已达频控的客户。
                   <b className="ml-1">多坐席全覆盖只算发起人一个任务</b>，不去扣各坐席实操员工的额度——否则管理员发一条全员通知，坐席们当天的营销群发就全发不出去了。
                   <Link to="/admin/settings" className="ml-1 text-brand-700 hover:underline">
                     去企业设置 › 群发与话术 改
@@ -54,12 +64,13 @@ export function BroadcastsAdminPage() {
         }
       />
       <div className="mb-4 grid grid-cols-3 gap-3">
-        <Stat label="今日群发任务" value={todayRows.length} sub="按创建时间算，含定时任务" />
+        <Stat label="今日群发任务" value={todayRows.filter((b) => b.status === 'done').length} sub="按实际完成任务算" />
         <Stat label="今日送达人数" value={todaySent} sub="各任务送达数之和" />
-        <Stat label="待发送" value={scheduled} tone={scheduled ? 'warn' : 'default'} sub="定时任务，到点按当时人群发" />
+        <Stat label="待发送" value={scheduled} tone={scheduled ? 'warn' : 'default'} sub="定时群发，演示里不实际投递" />
       </div>
+      {scheduled > 0 && <DemoNote compact className="mb-3">定时群发可以查看和取消，演示里不实际投递。</DemoNote>}
       <Card title={`群发记录（${rows.length} 条）`} padded={false}>
-        <BroadcastsAdminTable s={s} rows={rows} onDetail={setDetail} />
+        <BroadcastsAdminTable s={s} rows={rows} onDetail={setDetail} onCancel={cancel} />
       </Card>
       {detail && <BroadcastAdminDetailModal s={s} b={detail} onClose={() => setDetail(null)} />}
       {creating && <BroadcastCreateModal s={s} onClose={() => setCreating(false)} />}

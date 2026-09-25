@@ -214,7 +214,7 @@ export function QuickReplyEditor({ item, cats, defaultCategoryId, onClose }: { i
             </div>
           </Field>
         )}
-        <Field label={needMedia ? '随附说明' : '正文'} required={!needMedia} hint={needMedia ? '可空；和附件一起发出' : '支持 {{customer.nickname}} {{staff.name}} {{company.name}}，发送时替换'}>
+        <Field label={needMedia ? '随附说明' : '正文'} required={!needMedia} hint={needMedia ? '可空；和附件一起发出' : '支持 {{customer.nickname}} {{seat.name}} {{company.name}}，发送时替换'}>
           <Textarea rows={needMedia ? 2 : 5} value={text} onChange={(e) => setText(e.target.value)} placeholder={needMedia ? '如：清单在附件里，按上面准备就行' : ''} />
         </Field>
         {reason && <div className="text-[11px] text-zinc-400">{reason}</div>}

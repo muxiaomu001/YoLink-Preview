@@ -24,7 +24,8 @@ import { ForwardSheet } from './ChatScreen.actions'
 import { GroupInfoScreen } from './GroupInfoScreen'
 
 export function ChatScreen({ convId, customerId, onBack }: { convId: string; customerId: string; onBack: () => void }) {
-  const s = useStore()
+  useStore()
+  const s = useStore.getState()
   const conv = s.conversations.find((c) => c.id === convId)
   const customer = customerById(s, customerId)
   const actor=useMemo(()=>({kind:'customer' as const,id:customerId}),[customerId])
@@ -52,6 +53,11 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
 
   const seat = conv.kind === 'dm' ? seatById(s, conv.seatId) : undefined
   const gid = group?.id ?? null
+  const emptyState = conv.clearedThroughByViewer?.[actorKey(actor)]
+    ? '已清空本方历史，新消息会显示在这里'
+    : group && !group.settings.historyVisible
+      ? '入群前的消息不对新成员显示'
+      : '还没有消息，发一条开始聊天'
 
   if (group && showInfo) return <GroupInfoScreen g={group} customerId={customerId} onBack={() => setShowInfo(false)} onLeft={onBack} />
 
@@ -93,7 +99,7 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
           const mine = m.senderKind === 'customer' && m.senderId === customerId
           return <Bubble customerId={customerId} key={m.id} m={m} mine={mine} inGroup={!!group} canReply={group?.kind!=='channel'} onReply={() => setReplyTo(m)} onDelete={()=>setDeleting([m.id])} onForward={()=>setForwarding(m)} onEdit={mine && customerCan(s, customerId, 'dm.edit', gid) ? () => setEditing(m) : undefined} />
         })}
-        {!msgs.length&&<p className="py-12 text-center text-sm text-zinc-400">暂无可见消息</p>}
+        {!msgs.length&&<p className="py-12 text-center text-sm text-zinc-400">{emptyState}</p>}
         </div>
       </div>
       {!timeline.atBottom&&<button className="self-end rounded-full bg-white px-3 py-2 text-xs text-brand-700" onClick={timeline.jumpLatest}><ArrowDown size={14}/>{timeline.newCount?`${timeline.newCount} 条新消息`:'回到最新'}</button>}

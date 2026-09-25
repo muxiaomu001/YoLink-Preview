@@ -2,8 +2,8 @@
  * 「我的」页的子页：个人资料、外观、通知、以及若干说明型页面。每个入口的可见性在 MeScreen 里按策略判。
  */
 import { useState } from 'react'
-import type { ThemeKey } from '@/domain/types'
 import { THEME_LABEL } from '@/domain/labels'
+import { defaultCustomerPrefs } from '@/domain/seed-groups'
 import { useStore } from '@/store/store'
 import { customerById } from '@/store/selectors'
 import { customerCan } from '@/store/policy'
@@ -94,8 +94,10 @@ export function AppearanceScreen({ customerId, onBack }: { customerId: string; o
   const s = useStore()
   const canTheme = customerCan(s, customerId, 'appearance.change_theme')
   const canDark = customerCan(s, customerId, 'appearance.dark_mode')
-  const [theme, setTheme] = useState<ThemeKey>(s.enterprise.defaultTheme)
-  const [dark, setDark] = useState<'off' | 'system' | 'schedule' | 'on'>('off')
+  const c = customerById(s, customerId)!
+  const prefs = c.preferences ?? defaultCustomerPrefs(s.enterprise.defaultTheme)
+  const theme = prefs.theme
+  const dark = prefs.darkMode
   const themes = s.enterprise.allowedThemes
   return (
     <div className="flex h-full flex-col bg-zinc-50">
@@ -103,7 +105,7 @@ export function AppearanceScreen({ customerId, onBack }: { customerId: string; o
       <SectionLabel>主题（企业允许 {themes.length} 款）</SectionLabel>
       <div className="bg-white">
         {themes.map((t) => (
-          <button key={t} type="button" disabled={!canTheme} onClick={() => setTheme(t)} className="flex w-full items-center justify-between border-b border-zinc-100 px-4 py-2.5 text-[13px] last:border-0 disabled:opacity-60">
+          <button key={t} type="button" disabled={!canTheme} onClick={() => s.updateCustomerPrefs(customerId, { theme: t })} className="flex w-full items-center justify-between border-b border-zinc-100 px-4 py-2.5 text-[13px] last:border-0 disabled:opacity-60">
             <span className="text-zinc-800">{THEME_LABEL[t] ?? t}</span>
             <span className={theme === t ? 'text-brand-700' : 'text-zinc-300'}>{theme === t ? '✓ 使用中' : ''}</span>
           </button>
@@ -126,7 +128,7 @@ export function AppearanceScreen({ customerId, onBack }: { customerId: string; o
                 ['on', '始终暗色'],
               ] as const
             ).map(([k, label]) => (
-              <button key={k} type="button" onClick={() => setDark(k)} className="flex w-full items-center justify-between border-b border-zinc-100 px-4 py-2.5 text-[13px] last:border-0">
+              <button key={k} type="button" onClick={() => s.updateCustomerPrefs(customerId, { darkMode: k })} className="flex w-full items-center justify-between border-b border-zinc-100 px-4 py-2.5 text-[13px] last:border-0">
                 <span className="text-zinc-800">
                   {label}
                   {k === 'schedule' && <LevelTag level="P1" />}
@@ -141,6 +143,9 @@ export function AppearanceScreen({ customerId, onBack }: { customerId: string; o
           <DemoHint>企业策略未开放暗色模式，入口不显示（appearance.dark_mode）。</DemoHint>
         </div>
       )}
+      <div className="px-4 pt-2">
+        <DemoHint>演示里只保存选择，不改变实际外观 / 通知。</DemoHint>
+      </div>
       <SectionLabel>聊天外观</SectionLabel>
       <div className="bg-white">
         <Row label="文字大小" level="P1" value="100%" onClick={() => demoToast('调整文字大小')} />
@@ -150,9 +155,12 @@ export function AppearanceScreen({ customerId, onBack }: { customerId: string; o
   )
 }
 
-export function NotificationScreen({ onBack }: { onBack: () => void }) {
-  const [v, setV] = useState({ dm: true, group: true, channel: true, preview: true, mentionException: true })
-  const toggle = (k: keyof typeof v) => (on: boolean) => setV((x) => ({ ...x, [k]: on }))
+export function NotificationScreen({ customerId, onBack }: { customerId: string; onBack: () => void }) {
+  const s = useStore()
+  const c = customerById(s, customerId)!
+  const prefs = c.preferences ?? defaultCustomerPrefs(s.enterprise.defaultTheme)
+  const v = prefs.notifications
+  const toggle = (k: keyof typeof v) => (on: boolean) => s.updateCustomerPrefs(customerId, { notifications: { [k]: on } })
   const line = (label: string, k: keyof typeof v, level?: 'P1') => <Row label={label} level={level} value={<Switch checked={v[k]} onChange={toggle(k)} />} />
   return (
     <div className="flex h-full flex-col bg-zinc-50">
@@ -170,6 +178,9 @@ export function NotificationScreen({ onBack }: { onBack: () => void }) {
         <Row label="角标计数" level="P1" value="按会话" />
         <Row label="例外列表" level="P1" value="0 个" onClick={() => demoToast('配置例外列表')} />
         <Row label="应用内声音 / 震动" level="P1" value="开" />
+      </div>
+      <div className="px-4 pt-2">
+        <DemoHint>演示里只保存选择，不改变实际外观 / 通知。</DemoHint>
       </div>
     </div>
   )

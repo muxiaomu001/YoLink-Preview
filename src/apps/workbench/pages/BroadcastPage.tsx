@@ -13,7 +13,8 @@ import { customersOfSeat, friendsOfSeat } from '@/store/selectors'
 import { Button, Checkbox, Field, Input, Select, Textarea } from '@/ui/primitives'
 import { Card, Note, SeatAvatar } from '@/ui/display'
 import { HelpTip } from '@/ui/help'
-import { toast } from '@/ui/overlay'
+import { Modal, toast } from '@/ui/overlay'
+import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 import { FileCard, ImageThumb, readFileAsMedia } from '@/ui/media'
 import { useWorkbench } from '../useWorkbench'
 import { isGlobalMutedNow } from '@/domain/customerStatus'
@@ -22,6 +23,13 @@ import { DELIVERY_RULES, TARGET_LABEL } from './BroadcastPage.shared'
 
 type ContentKind = Broadcast['contentKind']
 type SendMode = 'now' | 'scheduled'
+type BroadcastPreview = {
+  customerIds: string[]
+  targetDesc: string
+  chatGroupId?: string
+  skipCount: number
+  scheduledAt: string | null
+}
 
 const TARGET_KINDS: BroadcastTargetKind[] = ['friends', 'mine', 'tag', 'purchase', 'role', 'group']
 
@@ -48,6 +56,7 @@ export function BroadcastPage() {
   const [mode, setMode] = useState<SendMode>('now')
   const [scheduledAt, setScheduledAt] = useState('')
   const [detail, setDetail] = useState<Broadcast | null>(null)
+  const [preview, setPreview] = useState<BroadcastPreview | null>(null)
 
   // URL 参数变化时同步目标（页面已挂载时再次带参进入也能生效）
   const [seenParam, setSeenParam] = useState(paramTarget)
@@ -62,7 +71,7 @@ export function BroadcastPage() {
   const today = new Date().toISOString().slice(0, 10)
   const perStaff = s.enterprise.broadcastPerStaffPerDay
   const perCustomer = s.enterprise.broadcastPerCustomerPerDay
-  const todayCount = s.broadcasts.filter((b) => b.operatorId === staff?.id && b.sentAt.slice(0, 10) === today).length
+  const todayCount = s.broadcasts.filter((b) => b.operatorId === staff?.id && b.status === 'done' && b.sentAt.slice(0, 10) === today).length
   const overLimit = todayCount >= perStaff
 
   const friends = useMemo(() => (seat ? friendsOfSeat(s, seat.id) : []), [s, seat])
@@ -82,6 +91,8 @@ export function BroadcastPage() {
     if (targetKind === 'role') return mine.filter((c) => c.roleLabel === role)
     return []
   }, [friends, mine, targetKind, tagIds, product, role])
+
+  const previewCustomerIds = targetKind === 'group' ? (group?.memberCustomerIds ?? []) : targets.map((customer) => customer.id)
 
   /** 发送前预估会被跳过的人：注销 / 封禁 / 全部禁言 / 屏蔽本坐席 / 今日已达每客户频控 */
   const willSkip = useMemo(() => {
@@ -111,6 +122,10 @@ export function BroadcastPage() {
   const contentOk = needMedia ? !!media : !!text.trim()
   const canSend = !overLimit && !!name.trim() && contentOk && targetOk && scheduleOk
   const reason = overLimit ? `今日群发任务已达上限（${perStaff} 个）` : !name.trim() ? '填任务名称' : needMedia && !media ? (contentKind === 'image' ? '选一张图片' : '选一个文件') : !needMedia && !text.trim() ? '填内容' : targetKind === 'group' && groupBlockText ? groupBlockText : !targetOk ? '目标没有命中任何人' : !scheduleOk ? '定时时间要晚于现在' : ''
+
+  useEffect(() => {
+    if (preview) setPreview(null)
+  }, [name, targetKind, tagIds, product, role, groupId, contentKind, text, media, mode, scheduledAt])
 
   const pickTarget = (k: BroadcastTargetKind) => {
     setTargetKind(k)
@@ -147,15 +162,27 @@ export function BroadcastPage() {
     setMedia(r.media)
   }
 
-  const send = () => {
+  const openPreview = () => {
     if (!seat || !staff || !canSend) return
     if (mode === 'scheduled' && new Date(scheduledAt).getTime() <= Date.now()) return toast('定时时间要晚于现在', 'warn')
-    const r = s.sendBroadcast({ name: name.trim(), seatId: seat.id, operatorId: staff.id, targetKind, targetDesc, contentKind, media: needMedia ? media : undefined, text: text.trim(), customerIds: targets.map((c) => c.id), chatGroupId: targetKind === 'group' ? groupId : undefined, scheduledAt: mode === 'scheduled' ? new Date(scheduledAt).toISOString() : null })
+    setPreview({
+      customerIds: [...previewCustomerIds],
+      targetDesc,
+      chatGroupId: targetKind === 'group' ? groupId : undefined,
+      skipCount: targetKind === 'group' ? 0 : willSkip,
+      scheduledAt: mode === 'scheduled' ? new Date(scheduledAt).toISOString() : null,
+    })
+  }
+
+  const send = () => {
+    if (!seat || !staff || !preview) return
+    const r = s.sendBroadcast({ name: name.trim(), seatId: seat.id, operatorId: staff.id, targetKind, targetDesc: preview.targetDesc, contentKind, media: needMedia ? media : undefined, text: text.trim(), customerIds: preview.customerIds, chatGroupId: preview.chatGroupId, scheduledAt: preview.scheduledAt })
     if (!r) return toast(`超过频控：每个实操员工每天 ${perStaff} 个任务，明天再发`, 'warn')
     if (r.reason) return toast(r.reason, 'warn')
-    if (mode === 'scheduled') toast('已创建定时任务，到点按当时人群发送', 'info')
+    if (preview.scheduledAt) toast('已创建定时任务（演示里不实际投递）', 'info')
     else if (targetKind === 'group') toast(r.sent ? `已以「${seat.displayName}」身份往群「${group?.name}」发了一条群消息` : '未发送，目标会话当前不可发送', r.sent ? 'ok' : 'warn')
     else toast(`已以「${seat.displayName}」身份发给 ${r.sent} 位客户${r.skipped ? `，跳过 ${r.skipped} 位` : ''}`)
+    setPreview(null)
     setName('')
     setText('')
     setMedia(undefined)
@@ -267,7 +294,7 @@ export function BroadcastPage() {
                     <option value="file">文件</option>
                   </Select>
                 </Field>
-                <Field label="发送方式">
+                  <Field label={<span>发送方式 <DemoLevelTag level="P1" /></span>}>
                   <Select value={mode} onChange={(e) => setMode(e.target.value as SendMode)}>
                     <option value="now">立即发送</option>
                     <option value="scheduled">定时发送</option>
@@ -275,7 +302,7 @@ export function BroadcastPage() {
                 </Field>
               </div>
               {mode === 'scheduled' && (
-                <Field label="定时时间" required hint="到点按当时人群计算再发">
+                <Field label="定时时间" required hint="名单在预览时锁定，之后新加的客户不在这次名单里">
                   <Input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
                 </Field>
               )}
@@ -309,12 +336,12 @@ export function BroadcastPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-[12px] text-zinc-500">
-                    命中 <b className="text-zinc-900">{targetKind === 'group' ? (group?.memberCustomerIds.length ?? 0) : targets.length}</b> 人
+                    <span className="text-[12px] text-zinc-500">
+                      命中 <b className="text-zinc-900">{targetKind === 'group' ? (group?.memberCustomerIds.length ?? 0) : targets.length}</b> 人
                     {willSkip > 0 && targetKind !== 'group' && <span className="text-amber-700">（预计跳过 {willSkip}）</span>} · 今日已用 {todayCount}/{perStaff}
                   </span>
-                  <Button variant="primary" disabled={!canSend} title={reason} onClick={send}>
-                    <Send size={13} /> {mode === 'scheduled' ? '创建定时任务' : '立即发送'}
+                  <Button variant="primary" disabled={!canSend} title={reason} onClick={openPreview}>
+                    <Send size={13} /> 预览
                   </Button>
                 </div>
               </div>
@@ -332,7 +359,33 @@ export function BroadcastPage() {
         </Card>
       </div>
       {detail && <BroadcastDetailModal b={detail} onClose={() => setDetail(null)} />}
-      {picking && <QuickReplyPickerModal onPick={pickQuickReply} onClose={() => setPicking(false)} />}
+      {picking && <QuickReplyPickerModal broadcast onPick={pickQuickReply} onClose={() => setPicking(false)} />}
+      {preview && (
+        <Modal
+          open
+          onClose={() => setPreview(null)}
+          title="群发预览"
+          width={460}
+          footer={
+            <>
+              <Button onClick={() => setPreview(null)}>返回修改</Button>
+              <Button variant="primary" onClick={send}>
+                {preview.scheduledAt ? '确认创建定时任务' : `确认发送给 ${preview.customerIds.length} 人`}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            <div className="rounded-md border border-brand-200 bg-brand-50/60 px-3 py-2 text-[13px] text-brand-900">
+              名单已锁定，共 <b className="tabular-nums">{preview.customerIds.length}</b> 人。
+            </div>
+            <div className="text-[12px] text-zinc-600">目标：{preview.targetDesc}</div>
+            {preview.skipCount > 0 && <div className="text-[12px] text-amber-700">按当前状态预计跳过 {preview.skipCount} 人，发送时仍会再次校验。</div>}
+            <div className="text-[12px] leading-relaxed text-zinc-500">名单在预览时锁定，之后新加的客户不在这次名单里。</div>
+            {preview.scheduledAt && <DemoNote compact>定时群发在演示里不实际投递。</DemoNote>}
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

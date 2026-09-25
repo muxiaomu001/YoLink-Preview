@@ -8,7 +8,7 @@ import { useWorkbench } from '../useWorkbench'
 import type { SectionCtl } from './customer/CollapsibleSection'
 import { SECTION_DEFAULTS, type SectionKey } from './customer/sectionPrefs'
 import { CustomerHeader } from './customer/CustomerHeader'
-import { BasicSection, NoteSection, OfficialsSection, PurchasesSection, TagsSection, TitlesSection } from './customer/CustomerSections'
+import { BasicSection, BusinessProfileSection, NoteSection, OfficialsSection, PurchasesSection, TagsSection, TitlesSection } from './customer/CustomerSections'
 import { QuickActions } from './customer/QuickActions'
 import { CheckinSection, GroupsSection, ReferralSection, WalletSection } from './CustomerCard.parts'
 
@@ -38,6 +38,7 @@ export function CustomerCard({ customerId }: { customerId: string }) {
       <TagsSection c={c} ctl={ctl('tags')} />
       <TitlesSection c={c} ctl={ctl('titles')} />
       <PurchasesSection c={c} ctl={ctl('purchases')} />
+      <BusinessProfileSection c={c} ctl={ctl('business')} />
       <BasicSection c={c} ctl={ctl('basic')} />
       <OfficialsSection c={c} ctl={ctl('officials')} />
       <GroupsSection c={c} ctl={ctl('groups')} />

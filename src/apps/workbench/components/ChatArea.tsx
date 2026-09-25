@@ -73,6 +73,11 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
   const isDm = row.conv.kind === 'dm'
   const customer = row.customer
   const group = !isDm ? s.chatGroups.find((g) => g.id === row.conv.chatGroupId) : undefined
+  const emptyState = row.conv.clearedThroughByViewer?.[actorKey(actor)]
+    ? '已清空本方历史，新消息会显示在这里'
+    : group && !group.settings.historyVisible
+      ? '入群前的消息不对新成员显示'
+      : '还没有消息，发一条开始聊天'
   const canPin = !!group && seatGroupPerm(s, group, seat.id, staff?.id ?? null, 'can_pin_messages')
   const disabledReason = sendBlockReason(s, row, seat, staff?.id ?? null)
 
@@ -181,7 +186,7 @@ export function ChatArea({ ref, row, seat, rightOpen, onToggleRight, onGroupInfo
           ) })()}
           </div>
         ))}
-        {!msgs.length&&<p className="py-12 text-center text-sm text-zinc-400">暂无可见消息</p>}
+        {!msgs.length&&<p className="py-12 text-center text-sm text-zinc-400">{emptyState}</p>}
         </div>
       </div>
       {(!timeline.atBottom||timeline.hasReturn)&&<div className="flex justify-end gap-2 px-4 py-1"><button className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs text-brand-700" onClick={timeline.jumpLatest}><ArrowDown size={14}/>{timeline.newCount?`${timeline.newCount} 条新消息`:'回到最新'}</button>{timeline.hasReturn&&<button className="text-xs text-brand-700" onClick={timeline.goBack}><CornerUpLeft size={14}/>返回阅读位置</button>}</div>}

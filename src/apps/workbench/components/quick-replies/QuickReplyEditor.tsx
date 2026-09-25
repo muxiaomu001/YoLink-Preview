@@ -132,7 +132,7 @@ export function QuickReplyEditor({ initial, onClose }: { initial?: QuickReply; o
             </div>
           </Field>
         )}
-        <Field label={isText ? '正文' : '说明'} required={isText} hint={isText ? '支持 {{customer.nickname}} {{staff.name}} {{company.name}}，发送时替换' : '随附件一起发出的文字，可留空'}>
+        <Field label={isText ? '正文' : '说明'} required={isText} hint={isText ? '支持 {{customer.nickname}} {{seat.name}} {{company.name}}，发送时替换' : '随附件一起发出的文字，可留空'}>
           <Textarea rows={isText ? 5 : 2} value={form.text} maxLength={500} onChange={(e) => patch({ text: e.target.value })} />
         </Field>
       </div>

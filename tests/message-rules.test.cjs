@@ -444,6 +444,77 @@ test('指定群群发同样检查词库', () => {
   assert.match(current().sendBroadcast(input)?.reason ?? '', /合规词库拦截/)
   assert.equal(current().messages.length, n)
 })
+
+test('第十批任务 05：群发预览名单锁定，预览后新增客户不进入本次任务', () => {
+  const original = dm().customerId
+  const added = { ...current().customers[0], id: 'cus_preview_new', accountId: 'preview-new', nickname: '预览后新增客户' }
+  store.setState({ customers: [...current().customers, added] })
+  const result = current().sendBroadcast({ ...singleInput('锁定名单'), customerIds: [original] })
+  assert.ok(result && !result.reason)
+  assert.deepEqual(structuredClone(current().broadcasts[0].recipientCustomerIds), [original])
+  assert.equal(current().messages.filter(message => message.isBroadcast && message.text === '锁定名单').some(message => current().conversations.find(conversation => conversation.id === message.convId)?.customerId === added.id), false)
+})
+
+test('第十批任务 05：定时群发只登记、可取消、写审计且不占当天额度', () => {
+  store.setState({ enterprise: { ...current().enterprise, broadcastPerStaffPerDay: 1 } })
+  const before = current().messages.length
+  const scheduled = current().sendBroadcast({ ...singleInput('稍后处理'), scheduledAt: new Date(Date.now() + 3600000).toISOString() })
+  assert.ok(scheduled && !scheduled.reason)
+  const task = current().broadcasts[0]
+  assert.equal(task.status, 'scheduled')
+  assert.deepEqual(structuredClone(task.recipientCustomerIds), [dm().customerId])
+  assert.equal(current().messages.length, before)
+  const immediate = current().sendBroadcast({ ...singleInput('现在处理') })
+  assert.ok(immediate && !immediate.reason)
+  const cancelled = current().cancelBroadcast(task.id, 'st_admin')
+  assert.deepEqual(structuredClone(cancelled), { ok: true })
+  assert.equal(current().broadcasts.find(item => item.id === task.id).status, 'cancelled')
+  assert.equal(current().audit[0].type, 'broadcast.cancel')
+})
+
+test('第十批任务 05：业务系统客户编号绑定、拒绝无效编号并支持解绑', () => {
+  const customer = current().customers.find(item => !item.businessSystemCustomerNumber)
+  assert.ok(customer)
+  assert.match(current().bindCustomerBusinessRecord(customer.id, '   ', 'st_admin').error, /请输入业务系统客户编号/)
+  assert.match(current().bindCustomerBusinessRecord(customer.id, 'HX-NOT-FOUND', 'st_admin').error, /未找到已同步/)
+  const result = current().bindCustomerBusinessRecord(customer.id, 'HX-0099', 'st_admin')
+  assert.ok(result.ok)
+  assert.equal(current().customers.find(item => item.id === customer.id).businessSystemCustomerNumber, 'HX-0099')
+  assert.equal(current().businessProfileRecords.find(item => item.customerNumber === 'HX-0099').customerId, customer.id)
+  assert.equal(current().audit[0].type, 'profile.bind')
+  assert.deepEqual(structuredClone(current().unbindCustomerBusinessRecord(customer.id, 'st_admin')), { ok: true })
+  assert.equal(current().customers.find(item => item.id === customer.id).businessSystemCustomerNumber, undefined)
+})
+
+test('第十批任务 05：影子模式原因不能为空，客户偏好保存后仍在状态里', () => {
+  const customer = current().customers.find(item => !item.shadowModeAt)
+  assert.ok(customer)
+  assert.equal(current().setCustomerShadowMode(customer.id, true, '  ', 'st_admin').ok, false)
+  assert.equal(current().customers.find(item => item.id === customer.id).shadowModeAt, undefined)
+  assert.equal(current().setCustomerShadowMode(customer.id, true, '多次发送引流链接', 'st_admin').ok, true)
+  current().updateCustomerPrefs(customer.id, { theme: 'dark', darkMode: 'on', notifications: { dm: false } })
+  const saved = current().customers.find(item => item.id === customer.id).preferences
+  assert.equal(saved.theme, 'dark')
+  assert.equal(saved.darkMode, 'on')
+  assert.equal(saved.notifications.dm, false)
+})
+
+test('第十批任务 05：群发变量话术在选择器中灰置，私聊选择器仍可用', () => {
+  store.setState({ quickReplies: [...current().quickReplies, { id: 'qr_test_variable', scope: 'enterprise', categoryId: null, kind: 'text', title: '变量测试', text: '{{customer.nickname}} 您好', enabled: true, useCount: 0 }] })
+  const broadcastHtml = renderPage('src/apps/workbench/pages/BroadcastPage.parts.tsx', 'QuickReplyPickerModal', { broadcast: true, onPick() {}, onClose() {} })
+  assert.match(broadcastHtml, /群发不支持变量，请改成完整正文/)
+  assert.match(broadcastHtml, /disabled=""/)
+  const privateHtml = renderPage('src/apps/workbench/pages/BroadcastPage.parts.tsx', 'QuickReplyPickerModal', { onPick() {}, onClose() {} })
+  assert.doesNotMatch(privateHtml, /群发不支持变量，请改成完整正文/)
+})
+
+test('第十批任务 05：清空本方历史后使用明确空状态文案', () => {
+  const conversation = dm()
+  assert.equal(current().clearChatFor(conversation.id, { kind: 'customer', id: conversation.customerId }), true)
+  const html = renderPage('src/apps/phone/screens/ChatScreen.tsx', 'ChatScreen', { convId: conversation.id, customerId: conversation.customerId, onBack() {} })
+  assert.match(html, /已清空本方历史，新消息会显示在这里/)
+  assert.doesNotMatch(html, /暂无可见消息/)
+})
 test('频道没有发布权限时，群发跳过且不影响其他任务', () => {
   // 种子里林晓明在「恒信官方通知」就没有发布权，不用再改状态
   const channel = current().chatGroups.find(g => g.kind === 'channel' && g.memberSeatIds.includes(seat.id))

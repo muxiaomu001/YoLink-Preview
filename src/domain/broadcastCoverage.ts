@@ -55,9 +55,10 @@ function broadcastsReceivedToday(s: DemoState, customerId: string, today: string
  * @param seatIds 参与覆盖的坐席，顺序即挑选优先级（主归属仍然优先于顺序）
  * @param at 计划的执行时间，用来判断当天频控
  */
-export function planCoverage(s: DemoState, seatIds: string[], at: string): CoveragePlan {
+export function planCoverage(s: DemoState, seatIds: string[], at: string, recipientCustomerIds?: string[]): CoveragePlan {
   const today = at.slice(0, 10)
   const seatSet = new Set(seatIds)
+  const recipientSet = recipientCustomerIds ? new Set(recipientCustomerIds) : undefined
   const rank = new Map(seatIds.map((id, i) => [id, i]))
   const deliveries: CoverageDelivery[] = []
   const skips: CoveragePlan['skips'] = []
@@ -74,6 +75,7 @@ export function planCoverage(s: DemoState, seatIds: string[], at: string): Cover
   })
 
   s.customers.forEach((c) => {
+    if (recipientSet && !recipientSet.has(c.id)) return
     if (c.deletedAt) return skipWith(c, 'deleted')
     const mine = reach.get(c.id)
     if (!mine?.length) return

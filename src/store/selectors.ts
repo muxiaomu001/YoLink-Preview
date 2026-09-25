@@ -337,6 +337,6 @@ export function matchQuickReplies(s: DemoState, staffId: string | null, query: s
 }
 
 /** 话术正文里的变量替换（发送前） */
-export function renderQuickReplyVars(text: string, vars: { customer?: string; staff: string; company: string }): string {
-  return text.replaceAll('{{customer.nickname}}', vars.customer ?? '各位').replaceAll('{{staff.name}}', vars.staff).replaceAll('{{company.name}}', vars.company)
+export function renderQuickReplyVars(text: string, vars: { customer?: string; seat: string; company: string }): string {
+  return text.replaceAll('{{customer.nickname}}', vars.customer ?? '各位').replaceAll('{{seat.name}}', vars.seat).replaceAll('{{company.name}}', vars.company)
 }

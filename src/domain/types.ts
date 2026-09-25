@@ -246,15 +246,33 @@ export interface Customer {
   watchUntil?: ISODate
   /** 客户关掉了注册后的完善资料引导，关了就不再出现 */
   profileGuideDismissedAt?: ISODate
+  /** 客户端外观与通知偏好；只保存选择，演示不改变实际系统效果 */
+  preferences?: CustomerPrefs
   /** 客户级影子模式：他发的每条群消息只有他自己和坐席看得见，与踩没踩敏感词无关 */
   shadowModeAt?: ISODate
   /** 为什么把他放进影子模式，后台列表与审计都读这一句 */
   shadowModeReason?: string
   /** 通用字段值（P1） */
   customFields?: Record<string, string>
+  /** 已匹配的业务系统客户编号；只代表绑定关系，不代表客户可见信息 */
+  businessSystemCustomerNumber?: string
 }
 
 export type LastSeenVisibility = 'everyone' | 'friends' | 'nobody'
+
+export interface CustomerNotificationPrefs {
+  dm: boolean
+  group: boolean
+  channel: boolean
+  preview: boolean
+  mentionException: boolean
+}
+
+export interface CustomerPrefs {
+  theme: ThemeKey
+  darkMode: 'off' | 'system' | 'schedule' | 'on'
+  notifications: CustomerNotificationPrefs
+}
 
 export interface CustomerSeat {
   customerId: string
@@ -583,6 +601,7 @@ export type AuditType =
   | 'customer.reassign'
   | 'customer.delete'
   | 'broadcast.send'
+  | 'broadcast.cancel'
   | 'quick_reply.library'
   | 'message.delete'
   | 'report.handle'
@@ -599,6 +618,7 @@ export type AuditType =
   | 'announcement.update'
   | 'profile.sync'
   | 'profile.import'
+  | 'profile.bind'
   | 'automation.update'
   | 'daily_report.settings'
   | 'plugin.update'
@@ -705,7 +725,7 @@ export interface SensitiveHit {
 
 /** friends：本坐席全部好友（所有添加了该坐席的客户），一键群发的默认目标；mine：只算主归属 */
 export type BroadcastTargetKind = 'friends' | 'mine' | 'tag' | 'title' | 'purchase' | 'role' | 'group' | 'coverage'
-export type BroadcastStatus = 'scheduled' | 'sending' | 'done' | 'failed'
+export type BroadcastStatus = 'scheduled' | 'sending' | 'done' | 'failed' | 'cancelled'
 
 export interface Broadcast {
   id: string
@@ -731,6 +751,17 @@ export interface Broadcast {
   coverage?: { seatId: string; count: number }[]
   /** 跳过原因分布，键见 domain/broadcastCoverage 的 SkipReason */
   skipReasons?: Record<string, number>
+  /** 预览时锁定的收件人名单；定时任务也不在发送时重新计算 */
+  recipientCustomerIds?: string[]
+}
+
+/** 已同步但可能尚未绑定到客户的业务系统客户记录 */
+export interface BusinessProfileRecord {
+  id: string
+  customerNumber: string
+  customerId?: string
+  roleLabel?: string
+  purchases: Purchase[]
 }
 
 // ---------- 话术库（易歪歪式：分类 + 文字 / 图片 / 文件 + 全文匹配，不设关键词字段） ----------
@@ -1168,6 +1199,7 @@ export interface DemoState {
   seats: Seat[]
   handovers: SeatHandover[]
   customers: Customer[]
+  businessProfileRecords: BusinessProfileRecord[]
   customerSeats: CustomerSeat[]
   inviteGroups: InviteGroup[]
   inviteLinks: InviteLink[]

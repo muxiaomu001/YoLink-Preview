@@ -27,7 +27,7 @@ export function MeScreen({ customerId, onLoggedOut }: { customerId: string; onLo
 
   if (sub === 'profile') return <ProfileScreen customerId={customerId} onBack={back} />
   if (sub === 'appearance') return <AppearanceScreen customerId={customerId} onBack={back} />
-  if (sub === 'notification') return <NotificationScreen onBack={back} />
+  if (sub === 'notification') return <NotificationScreen customerId={customerId} onBack={back} />
   if (sub === 'privacy') return <PrivacyScreen customerId={customerId} onBack={back} />
   if (sub === 'storage') return <InfoScreen title="数据与存储" onBack={back} rows={[{ label: '存储用量', value: '128 MB', level: 'P1' }, { label: '清理缓存', level: 'P1' }, { label: '自动下载媒体', value: 'Wi-Fi', level: 'P1' }]} />
   if (sub === 'security') return <InfoScreen title="账号安全" onBack={back} rows={[{ label: '修改密码', level: 'P1' }, { label: '设备管理', value: `最多 ${s.policyNumbers.maxDevices} 台在线`, level: 'P1' }, { label: '两步验证', value: '未开启', level: 'P1' }]} note={c.mustChangePassword ? '客服为你重置过密码，请尽快修改。' : `同一账号最多 ${s.policyNumbers.maxDevices} 台设备同时在线。`} />
