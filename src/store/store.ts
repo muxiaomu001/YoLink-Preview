@@ -24,6 +24,7 @@ import type {
   Staff,
   Tag,
   Title,
+  CustomerPrefs,
 } from '@/domain/types'
 import { groupWelcomeMessages } from '@/domain/groupWelcome'
 import { buildSeed } from '@/domain/seed'
@@ -51,6 +52,7 @@ import { dExtraActions, type DExtraActions } from './actions/D-extra'
 import { quickReplyActions, type QuickReplyActions } from './actions/quickReplies'
 import { providerLicensingActions, type ProviderLicensingActions } from './actions/providerLicensing'
 import { clearStartupSeen } from '@/domain/startupSeen'
+import { defaultCustomerPrefs } from '@/domain/seed-groups'
 
 /** localStorage 键；模型变了就升版本号，旧数据直接作废 */
 export const STORAGE_KEY = 'yolink-demo-v17'
@@ -103,6 +105,7 @@ export interface CoreActions {
   updateCustomerAvatar: (customerId: string) => void
   /** 最后上线时间只控制对外可见范围，不影响企业侧已读数据 */
   setCustomerLastSeenVisibility: (customerId: string, visibility: LastSeenVisibility) => void
+  updateCustomerPrefs: (customerId: string, patch: Partial<Omit<CustomerPrefs, 'notifications'>> & { notifications?: Partial<CustomerPrefs['notifications']> }) => void
   // 工作台
   assignTitle: (customerId: string, titleId: string, byStaffId: string) => void
   removeTitle: (customerId: string, titleId: string, byStaffId: string) => void
@@ -115,7 +118,8 @@ export interface CoreActions {
   /** 群发：返回实际发送数与因频控/封禁/注销跳过数；频控超限返回 null（按钮应禁用） */
   sendBroadcast: (input: { name: string; seatId: string; operatorId: string; targetKind: BroadcastTargetKind; targetDesc: string; contentKind?: 'text' | 'image' | 'file'; media?: MessageMedia; text: string; customerIds: string[]; chatGroupId?: string; scheduledAt?: string | null }) => { sent: number; skipped: number; reason?: string } | null
   /** 多坐席全覆盖群发：每个客户只收一条，发送身份优先用他的主归属坐席。频控超限返回 null */
-  sendCoverageBroadcast: (input: { name: string; seatIds: string[]; operatorId: string; text: string; scheduledAt?: string | null }) => { sent: number; skipped: number; reason?: string } | null
+  sendCoverageBroadcast: (input: { name: string; seatIds: string[]; operatorId: string; text: string; customerIds?: string[]; scheduledAt?: string | null }) => { sent: number; skipped: number; reason?: string } | null
+  cancelBroadcast: (id: string, byStaffId: string) => { ok: true } | { ok: false; error: string }
   /** code 留空则随机生成；自定义码重复或不合法时返回 error */
   createInviteLink: (input: { name: string; inviteGroupId: string; creatorStaffId: string; expiresAt: string | null; maxUses: number | null; chatGroupIds?: string[]; code?: string }) => { ok: true; link: InviteLink } | { ok: false; error: string }
   revokeInviteLink: (id: string, byStaffId: string) => void
@@ -320,6 +324,15 @@ export const useStore = create<DemoStore>()(
       setCustomerLastSeenVisibility: (customerId, visibility) =>
         set((s) => ({ customers: s.customers.map((c) => (c.id === customerId ? { ...c, lastSeenVisibility: visibility } : c)) })),
 
+      updateCustomerPrefs: (customerId, patch) =>
+        set((s) => ({
+          customers: s.customers.map((c) => {
+            if (c.id !== customerId) return c
+            const current = c.preferences ?? defaultCustomerPrefs(s.enterprise.defaultTheme)
+            return { ...c, preferences: { ...current, ...patch, notifications: { ...current.notifications, ...(patch.notifications ?? {}) } } }
+          }),
+        })),
+
       dismissProfileGuide: (customerId) =>
         set((s) => ({ customers: s.customers.map((c) => (c.id === customerId ? { ...c, profileGuideDismissedAt: now() } : c)) })),
 
@@ -380,7 +393,7 @@ export const useStore = create<DemoStore>()(
         }
         const seat = s.seats.find((x) => x.id === input.seatId)
         // 频控一：每个实操员工每天任务数，跨其持有的坐席合并
-        const myToday = s.broadcasts.filter((b) => b.operatorId === input.operatorId && b.sentAt.slice(0, 10) === today).length
+        const myToday = s.broadcasts.filter((b) => b.operatorId === input.operatorId && b.status === 'done' && b.sentAt.slice(0, 10) === today).length
         if (myToday >= s.enterprise.broadcastPerStaffPerDay) return null
         const newMsgs: Message[] = []
         const convs = s.conversations.map((c) => ({ ...c }))
@@ -427,6 +440,7 @@ export const useStore = create<DemoStore>()(
             newMsgs.push({ id: newId('msg'), convId: conv.id, senderKind: 'seat', senderId: input.seatId, seatId: input.seatId, operatorId: input.operatorId, kind: input.contentKind ?? 'text', text, media: input.media, at, isBroadcast: true })
           })
         }
+        const recipientCustomerIds = [...input.customerIds]
         const record: Broadcast = {
           id: newId('bc'),
           name: input.name,
@@ -444,6 +458,7 @@ export const useStore = create<DemoStore>()(
           skippedCount: skipped,
           readCount: 0,
           skipReasons,
+          recipientCustomerIds,
         }
         set({
           sensitiveHits: input.scheduledAt ? s.sensitiveHits : [...s.sensitiveHits, ...newMsgs.flatMap((m) => gate.hits.map((h) => ({ ...h, id: newId('sh'), senderId: m.senderId, convId: m.convId })))],
@@ -469,9 +484,9 @@ export const useStore = create<DemoStore>()(
         // 频控归属：全覆盖只算发起人（后台管理员）的一个任务。
         // 若按投递坐席去扣各自实操员工的额度，管理员发一条全员通知就会把所有坐席当天的
         // 群发额度吃光，他们自己的营销群发全发不出去——那是运营事故，不是风控。
-        const myToday = s.broadcasts.filter((b) => b.operatorId === input.operatorId && b.sentAt.slice(0, 10) === today).length
+        const myToday = s.broadcasts.filter((b) => b.operatorId === input.operatorId && b.status === 'done' && b.sentAt.slice(0, 10) === today).length
         if (myToday >= s.enterprise.broadcastPerStaffPerDay) return null
-        const plan = planCoverage(s, input.seatIds, at)
+        const plan = planCoverage(s, input.seatIds, at, input.customerIds)
         const convIds = new Set(plan.deliveries.map((d) => d.convId))
         const newMsgs: Message[] = plan.deliveries.map((d) => ({
           id: newId('msg'),
@@ -503,6 +518,7 @@ export const useStore = create<DemoStore>()(
           readCount: 0,
           coverage: plan.bySeat,
           skipReasons: plan.skipReasons,
+          recipientCustomerIds: input.customerIds ? [...input.customerIds] : plan.deliveries.map((delivery) => delivery.customer.id),
         }
         set({
           sensitiveHits: input.scheduledAt ? s.sensitiveHits : [...s.sensitiveHits, ...newMsgs.flatMap((m) => gate.hits.map((h) => ({ ...h, id: newId('sh'), senderId: m.senderId, convId: m.convId })))],
@@ -512,6 +528,18 @@ export const useStore = create<DemoStore>()(
           audit: [{ id: newId('au'), at, actorStaffId: input.operatorId, type: 'broadcast.send', detail: `多坐席覆盖群发「${input.name}」，坐席：${seatNames}，${input.scheduledAt ? `定时 ${input.scheduledAt.slice(0, 16).replace('T', ' ')}` : `${newMsgs.length} 人，跳过 ${plan.skips.length} 人`}`, ip: DEMO_IP }, ...s.audit],
         })
         return { sent: newMsgs.length, skipped: plan.skips.length }
+      },
+
+      cancelBroadcast: (id, byStaffId) => {
+        const s = get()
+        const broadcast = s.broadcasts.find((item) => item.id === id)
+        if (!broadcast) return { ok: false, error: '群发记录不存在' }
+        if (broadcast.status !== 'scheduled') return { ok: false, error: '只有待发送的定时群发可以取消' }
+        set({
+          broadcasts: s.broadcasts.map((item) => (item.id === id ? { ...item, status: 'cancelled' } : item)),
+          audit: [{ id: newId('au'), at: now(), actorStaffId: byStaffId, type: 'broadcast.cancel', detail: `取消定时群发「${broadcast.name}」`, ip: DEMO_IP }, ...s.audit],
+        })
+        return { ok: true }
       },
 
       createInviteLink: (input) => {

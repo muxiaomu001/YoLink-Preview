@@ -13,7 +13,8 @@ import type { QuickReplyMatch, QuickReplySnippet } from '@/store/selectors'
 import { Highlight } from '@/apps/workbench/components/quick-replies/shared'
 import { Button, Input } from '@/ui/primitives'
 import { Empty, KV, Pill, Table } from '@/ui/display'
-import { Modal } from '@/ui/overlay'
+import { Modal, toast } from '@/ui/overlay'
+import { DemoNote } from '@/ui/DemoNote'
 import { FileCard, ImageThumb } from '@/ui/media'
 import { useWorkbench } from '../useWorkbench'
 import { CONTENT_KIND_LABEL, PREVIEW_LEN, TARGET_LABEL } from './BroadcastPage.shared'
@@ -23,6 +24,7 @@ const STATUS_META: Record<BroadcastStatus, { label: string; tone: 'zinc' | 'gree
   sending: { label: '发送中', tone: 'amber' },
   done: { label: '已完成', tone: 'green' },
   failed: { label: '失败', tone: 'red' },
+  cancelled: { label: '已取消', tone: 'zinc' },
 }
 
 function skipSummary(reasons: Record<string, number> | undefined): string {
@@ -68,6 +70,7 @@ export function BroadcastRecords({ rows, onDetail }: { rows: Broadcast[]; onDeta
               <div className="tabular-nums text-zinc-800">{fmtDateTime(b.status === 'scheduled' && b.scheduledAt ? b.scheduledAt : b.sentAt)}</div>
               <div className="text-[11px] text-zinc-400">
                 {seatById(s, b.seatId)?.displayName} · {staffById(s, b.operatorId)?.name}
+                {b.status === 'scheduled' && <DemoNote compact>演示里不实际投递</DemoNote>}
               </div>
             </div>
           ),
@@ -103,9 +106,25 @@ export function BroadcastRecords({ rows, onDetail }: { rows: Broadcast[]; onDeta
           title: '操作',
           align: 'right',
           render: (b) => (
-            <Button size="sm" variant="ghost" onClick={() => onDetail(b)}>
-              查看详情
-            </Button>
+            <span className="inline-flex items-center gap-1">
+              <Button size="sm" variant="ghost" onClick={() => onDetail(b)}>
+                查看详情
+              </Button>
+              {b.status === 'scheduled' && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const staff = s.staff.find((item) => item.id === s.session.workbenchStaffId)
+                    if (!staff) return
+                    const result = s.cancelBroadcast(b.id, staff.id)
+                    toast(result.ok ? '定时群发已取消' : result.error, result.ok ? 'ok' : 'warn')
+                  }}
+                >
+                  取消
+                </Button>
+              )}
+            </span>
           ),
         },
       ]}
@@ -153,7 +172,7 @@ function titleSnippetOf(m: QuickReplyMatch): QuickReplySnippet | null {
 }
 
 /** 从话术库选一条作为群发内容：启用的企业话术 + 本人个人话术，全文搜索（标题 / 正文 / 附件文件名） */
-export function QuickReplyPickerModal({ onPick, onClose }: { onPick: (q: QuickReply) => void; onClose: () => void }) {
+export function QuickReplyPickerModal({ onPick, onClose, broadcast = false }: { onPick: (q: QuickReply) => void; onClose: () => void; broadcast?: boolean }) {
   const { s, staff } = useWorkbench()
   const [keyword, setKeyword] = useState('')
   const all = useMemo(() => quickRepliesForStaff(s, staff?.id ?? null), [s, staff])
@@ -174,8 +193,10 @@ export function QuickReplyPickerModal({ onPick, onClose }: { onPick: (q: QuickRe
       </div>
       <div className="thin-scroll max-h-[420px] space-y-1 overflow-y-auto">
         {rows.length === 0 && <Empty text={all.length ? '没有匹配的话术' : '话术库是空的'} />}
-        {rows.map((m) => (
-          <button key={m.item.id} type="button" onClick={() => onPick(m.item)} className="flex w-full items-start gap-3 rounded-md border border-transparent px-2.5 py-2 text-left hover:border-zinc-200 hover:bg-zinc-50">
+        {rows.map((m) => {
+          const variableBlocked = broadcast && /\{\{[^}]+\}\}/.test(m.item.text)
+          return (
+          <button key={m.item.id} type="button" disabled={variableBlocked} title={variableBlocked ? '群发不支持变量，请改成完整正文' : undefined} onClick={() => onPick(m.item)} className={`flex w-full items-start gap-3 rounded-md border border-transparent px-2.5 py-2 text-left hover:border-zinc-200 hover:bg-zinc-50 ${variableBlocked ? 'cursor-not-allowed opacity-45 hover:border-transparent hover:bg-transparent' : ''}`}>
             <span className="w-12 shrink-0">
               {m.item.kind === 'image' && m.item.media ? (
                 <img src={mediaUrl(m.item.media.url)} alt={m.item.media.name} className="h-12 w-12 rounded-md border border-zinc-200 bg-white object-cover" />
@@ -195,9 +216,11 @@ export function QuickReplyPickerModal({ onPick, onClose }: { onPick: (q: QuickRe
                 fallback={m.item.kind === 'text' ? m.item.text : `${m.item.media?.name ?? ''}${m.item.text ? ` · ${m.item.text}` : ''}`}
                 className="mt-0.5 block truncate text-[12px] text-zinc-500"
               />
+              {variableBlocked && <span className="mt-1 block text-[11px] text-amber-700">群发不支持变量，请改成完整正文</span>}
             </span>
           </button>
-        ))}
+          )
+        })}
       </div>
     </Modal>
   )

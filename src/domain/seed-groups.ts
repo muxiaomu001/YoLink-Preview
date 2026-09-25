@@ -1,10 +1,16 @@
 /**
  * 群与频道的管理数据（群内角色、设置、公告、限制、群邀请链接、管理员日志）。所有数据均为虚构。
  */
-import type { ChatGroup, GroupLog, StaffPrefs } from './types'
+import type { ChatGroup, CustomerNotificationPrefs, CustomerPrefs, GroupLog, StaffPrefs, ThemeKey } from './types'
 import { ago, iso } from './time'
 
 export const DEFAULT_STAFF_PREFS: StaffPrefs = { theme: 'auto', desktopNotify: true, sound: false, language: 'zh', quickMatch: true }
+
+export const DEFAULT_CUSTOMER_NOTIFICATION_PREFS: CustomerNotificationPrefs = { dm: true, group: true, channel: true, preview: true, mentionException: true }
+
+export function defaultCustomerPrefs(theme: ThemeKey): CustomerPrefs {
+  return { theme, darkMode: 'off', notifications: { ...DEFAULT_CUSTOMER_NOTIFICATION_PREFS } }
+}
 
 /** 新建群的默认管理字段 */
 export function groupDefaults(): Pick<ChatGroup, 'customerJoinedAt' | 'admins' | 'settings' | 'announcement' | 'pinnedMessageIds' | 'restrictions' | 'inviteLinks'> {

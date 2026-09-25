@@ -14,13 +14,24 @@ import { friendsOfSeat, seatById, staffById } from '@/store/selectors'
 import { Button, Checkbox, Field, Input, Select, Textarea } from '@/ui/primitives'
 import { KV, Note, Pill, SeatAvatar, Table } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
-import { confirm } from '@/ui/confirm'
+import { DemoLevelTag, DemoNote } from '@/ui/DemoNote'
 import { ContentKindPill, MediaPreview, StatusPill } from '@/apps/workbench/pages/BroadcastPage.parts'
-import { CONTENT_KIND_LABEL, PREVIEW_LEN, TARGET_LABEL } from '@/apps/workbench/pages/BroadcastPage.shared'
+import { CONTENT_KIND_LABEL, PREVIEW_LEN, TARGET_LABEL, broadcastPreviewFingerprint, isBroadcastPreviewStale } from '@/apps/workbench/pages/BroadcastPage.shared'
 
 type SendMode = 'now' | 'scheduled'
 /** 发送方式：一个坐席发给自己的好友，或多个坐席合起来覆盖到人 */
 type Reach = 'single' | 'coverage'
+type BroadcastPreview = {
+  customerIds: string[]
+  seatIds: string[]
+  reach: Reach
+  reachCount: number
+  skipCount: number
+  skipReasons?: Record<string, number>
+  targetDesc: string
+  scheduledAt: string | null
+  conditionFingerprint: string
+}
 
 function skipLabel(key: string): string {
   return SKIP_REASON_LABEL[key as SkipReason] ?? key
@@ -33,7 +44,7 @@ function skipSummary(reasons: Record<string, number> | undefined): string {
 }
 
 /** 记录表：全部坐席的群发，倒序 */
-export function BroadcastsAdminTable({ s, rows, onDetail }: { s: DemoState; rows: Broadcast[]; onDetail: (b: Broadcast) => void }) {
+export function BroadcastsAdminTable({ s, rows, onDetail, onCancel }: { s: DemoState; rows: Broadcast[]; onDetail: (b: Broadcast) => void; onCancel: (b: Broadcast) => void }) {
   return (
     <Table
       rows={rows}
@@ -96,7 +107,27 @@ export function BroadcastsAdminTable({ s, rows, onDetail }: { s: DemoState; rows
             </span>
           ),
         },
-        { key: 'status', title: '状态', render: (b) => <StatusPill status={b.status} /> },
+        {
+          key: 'status',
+          title: '状态',
+          render: (b) => (
+            <div className="space-y-1">
+              <StatusPill status={b.status} />
+              {b.status === 'scheduled' && <DemoNote compact>演示里不实际投递</DemoNote>}
+            </div>
+          ),
+        },
+        {
+          key: 'ops',
+          title: '操作',
+          align: 'right',
+          render: (b) => (
+            <span className="inline-flex items-center gap-1">
+              <Button size="sm" variant="ghost" onClick={() => onDetail(b)}>查看详情</Button>
+              {b.status === 'scheduled' && <Button size="sm" variant="ghost" onClick={() => onCancel(b)}>取消</Button>}
+            </span>
+          ),
+        },
       ]}
     />
   )
@@ -160,6 +191,7 @@ export function BroadcastCreateModal({ s, onClose }: { s: DemoStore; onClose: ()
   const [text, setText] = useState('')
   const [mode, setMode] = useState<SendMode>('now')
   const [scheduledAt, setScheduledAt] = useState('')
+  const [preview, setPreview] = useState<BroadcastPreview | null>(null)
 
   const seat = seats.find((x) => x.id === seatId)
   const friends = useMemo(() => (seatId ? friendsOfSeat(s, seatId) : []), [s, seatId])
@@ -185,43 +217,39 @@ export function BroadcastCreateModal({ s, onClose }: { s: DemoStore; onClose: ()
           : ''
   const formError = error || (!name.trim() ? '填任务名称' : !text.trim() ? '填内容' : !scheduleOk ? '定时时间要晚于现在' : '')
 
+  const currentPreviewFingerprint = broadcastPreviewFingerprint([reach, seatId, coverIds, name, text, mode, scheduledAt])
+  const previewStale = !!preview && isBroadcastPreviewStale(preview.conditionFingerprint, currentPreviewFingerprint)
+
   const toggleCover = (id: string, on: boolean) => setCoverIds(on ? [...coverIds, id] : coverIds.filter((x) => x !== id))
 
-  const submit = async () => {
+  const openPreview = () => {
     if (formError || !operatorId) return
     if (mode === 'scheduled' && new Date(scheduledAt).getTime() <= Date.now()) return toast('定时时间要晚于现在', 'warn')
-    const body = (
-      <>
-        <div>
-          发送身份：<b>{reach === 'single' ? seat!.displayName : `${coverIds.length} 个坐席覆盖（主力 ${seatById(s, plan!.bySeat.slice().sort((a, b) => b.count - a.count)[0].seatId)?.displayName ?? '-'}）`}</b>
-        </div>
-        <div className="mt-1">
-          触达 <b className="tabular-nums">{reachCount}</b> 人{reach === 'coverage' && '（已去重，一人只收一条）'}
-          {skipCount > 0 && (
-            <>
-              ，跳过 <b className="tabular-nums">{skipCount}</b> 人（{skipSummary(plan?.skipReasons)}）
-            </>
-          )}
-        </div>
-        <div className="mt-2 rounded-md bg-zinc-50 px-2.5 py-2 text-[12px] leading-relaxed whitespace-pre-wrap text-zinc-700">
-          {text.trim().slice(0, PREVIEW_LEN)}
-          {text.trim().length > PREVIEW_LEN && '…'}
-        </div>
-        <div className="mt-2 text-[11px] text-zinc-500">{mode === 'scheduled' ? '到点按当时人群重新计算再发，人数可能变。' : '发出后不可撤回。'}</div>
-      </>
-    )
-    const ok = await confirm({ title: mode === 'scheduled' ? `创建定时群发「${name.trim()}」？` : `立即发送给 ${reachCount} 人？`, body, okText: mode === 'scheduled' ? '创建定时任务' : '立即发送', danger: mode === 'now' })
-    if (!ok) return
+    setPreview({
+      customerIds: reach === 'single' ? friends.map((customer) => customer.id) : (plan?.deliveries.map((delivery) => delivery.customer.id) ?? []),
+      seatIds: reach === 'single' ? [seat!.id] : [...coverIds],
+      reach,
+      reachCount,
+      skipCount,
+      skipReasons: plan?.skipReasons,
+      targetDesc: reach === 'single' ? `全部好友（${seat!.displayName}）` : `多坐席覆盖（${coverIds.length} 个坐席）`,
+      scheduledAt: mode === 'scheduled' ? new Date(scheduledAt).toISOString() : null,
+      conditionFingerprint: currentPreviewFingerprint,
+    })
+  }
 
-    const at = mode === 'scheduled' ? new Date(scheduledAt).toISOString() : null
+  const submit = () => {
+    if (!preview || !operatorId) return
+    if (previewStale) return toast('条件变了，请重新预览', 'warn')
     const r =
-      reach === 'single'
-        ? s.sendBroadcast({ name: name.trim(), seatId: seat!.id, operatorId, targetKind: 'friends', targetDesc: '全部好友', text: text.trim(), customerIds: friends.map((c) => c.id), scheduledAt: at })
-        : s.sendCoverageBroadcast({ name: name.trim(), seatIds: coverIds, operatorId, text: text.trim(), scheduledAt: at })
+      preview.reach === 'single'
+        ? s.sendBroadcast({ name: name.trim(), seatId: preview.seatIds[0], operatorId, targetKind: 'friends', targetDesc: preview.targetDesc, text: text.trim(), customerIds: preview.customerIds, scheduledAt: preview.scheduledAt })
+        : s.sendCoverageBroadcast({ name: name.trim(), seatIds: preview.seatIds, operatorId, text: text.trim(), customerIds: preview.customerIds, scheduledAt: preview.scheduledAt })
     if (!r) return toast(`该实操员工今天的群发任务已达上限 ${perStaff}`, 'warn')
     if (r.reason) return toast(r.reason, 'warn')
-    if (mode === 'scheduled') toast('已创建定时任务，到点按当时人群计算再发', 'info')
+    if (preview.scheduledAt) toast('已创建定时任务（演示里不实际投递）', 'info')
     else toast(`已发送 ${r.sent} 人${r.skipped ? `，跳过 ${r.skipped} 人` : ''}`)
+    setPreview(null)
     onClose()
   }
 
@@ -234,14 +262,14 @@ export function BroadcastCreateModal({ s, onClose }: { s: DemoStore; onClose: ()
       footer={
         <>
           <Button onClick={onClose}>取消</Button>
-          <Button variant="primary" disabled={!!formError} title={formError || undefined} onClick={() => void submit()}>
-            <Send size={13} /> {mode === 'scheduled' ? '创建定时任务' : `立即发送（${reachCount} 人）`}
+          <Button variant="primary" disabled={!!formError} title={formError || undefined} onClick={openPreview}>
+            <Send size={13} /> 预览
           </Button>
         </>
       }
     >
       <div className="space-y-3">
-        <Field label="发送方式" hint="全覆盖用来发全员通知：同时加了几个号的客户也只收一条">
+        <Field label={<span>发送方式 <DemoLevelTag level="P1" /></span>} hint="全覆盖用来发全员通知：同时加了几个号的客户也只收一条">
           <div className="flex gap-2">
             {(
               [
@@ -318,14 +346,14 @@ export function BroadcastCreateModal({ s, onClose }: { s: DemoStore; onClose: ()
           <Textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="发送时机">
+          <Field label={<span>发送时机 <DemoLevelTag level="P1" /></span>}>
             <Select value={mode} onChange={(e) => setMode(e.target.value as SendMode)}>
               <option value="now">立即发送</option>
               <option value="scheduled">定时发送</option>
             </Select>
           </Field>
           {mode === 'scheduled' && (
-            <Field label="定时时间" required hint="到点按当时人群计算再发">
+            <Field label="定时时间" required hint="名单在预览时锁定，之后新加的客户不在这次名单里">
               <Input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
             </Field>
           )}
@@ -338,6 +366,33 @@ export function BroadcastCreateModal({ s, onClose }: { s: DemoStore; onClose: ()
           {reach === 'coverage' && '全覆盖只算他一个任务，不占各坐席实操员工的额度。'}
           {formError && <span className="ml-1 text-zinc-500">{formError}</span>}
         </div>
+        {preview && (
+          <Modal
+            open
+            onClose={() => setPreview(null)}
+            title="群发预览"
+            width={460}
+            footer={
+              <>
+                <Button onClick={() => setPreview(null)}>返回修改</Button>
+                <Button variant="primary" disabled={previewStale} title={previewStale ? '条件变了，请重新预览' : undefined} onClick={submit}>
+                  {preview.scheduledAt ? '确认创建定时任务' : `确认发送给 ${preview.reachCount} 人`}
+                </Button>
+              </>
+            }
+          >
+            <div className="space-y-3">
+              <div className="rounded-md border border-brand-200 bg-brand-50/60 px-3 py-2 text-[13px] text-brand-900">
+                名单已锁定，共 <b className="tabular-nums">{preview.reachCount}</b> 人。
+              </div>
+              <div className="text-[12px] text-zinc-600">目标：{preview.targetDesc}</div>
+              {previewStale && <div className="text-[12px] text-amber-700">条件变了，请重新预览</div>}
+              {preview.skipCount > 0 && <div className="text-[12px] text-amber-700">按当前状态预计跳过 {preview.skipCount} 人（{skipSummary(preview.skipReasons)}），发送时仍会再次校验。</div>}
+              <div className="text-[12px] leading-relaxed text-zinc-500">名单在预览时锁定，之后新加的客户不在这次名单里。</div>
+              {preview.scheduledAt && <DemoNote compact>定时群发在演示里不实际投递。</DemoNote>}
+            </div>
+          </Modal>
+        )}
       </div>
     </Modal>
   )

@@ -27,7 +27,7 @@ export function MeScreen({ customerId, onLoggedOut }: { customerId: string; onLo
 
   if (sub === 'profile') return <ProfileScreen customerId={customerId} onBack={back} />
   if (sub === 'appearance') return <AppearanceScreen customerId={customerId} onBack={back} />
-  if (sub === 'notification') return <NotificationScreen onBack={back} />
+  if (sub === 'notification') return <NotificationScreen customerId={customerId} onBack={back} />
   if (sub === 'privacy') return <PrivacyScreen customerId={customerId} onBack={back} onOpenBlocked={() => setSub('blocked')} />
   if (sub === 'blocked') return <BlockedListScreen customerId={customerId} onBack={back} />
   if (sub === 'storage') return <InfoScreen title="数据与存储" onBack={back} rows={[{ label: '存储用量', value: '128 MB', level: 'P1' }, { label: '清理缓存', level: 'P1' }, { label: '自动下载媒体', value: 'Wi-Fi', level: 'P1' }]} />

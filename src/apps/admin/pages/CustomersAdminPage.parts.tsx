@@ -9,7 +9,7 @@ import { fmtDateTime } from '@/domain/time'
 import { customerStatusFlags } from '@/domain/customerStatus'
 import { useStore } from '@/store/store'
 import { customerById, seatsOfCustomer } from '@/store/selectors'
-import { Button, Field, Select } from '@/ui/primitives'
+import { Button, Field, Input, Select } from '@/ui/primitives'
 import { KV, Note, Pill, SeatAvatar, TagChip, TitleChip } from '@/ui/display'
 import { Modal, toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
@@ -27,6 +27,7 @@ export function CustomerDetailModal({ customerId, onClose }: { customerId: strin
   // 改主归属只能选坐席，排除当前主归属
   const candidates = s.seats.filter((x) => x.id !== primary?.seatId)
   const [newSeatId, setNewSeatId] = useState('')
+  const [businessNumber, setBusinessNumber] = useState(c?.businessSystemCustomerNumber ?? '')
 
   if (!c) return null
   const deleted = !!c.deletedAt
@@ -34,6 +35,7 @@ export function CustomerDetailModal({ customerId, onClose }: { customerId: strin
   const flags = customerStatusFlags(c)
   const titles = c.titleIds.map((id) => s.titles.find((t) => t.id === id)).filter((t) => !!t)
   const tags = c.tagIds.map((id) => s.tags.find((t) => t.id === id)).filter((t) => !!t)
+  const businessRecord = s.businessProfileRecords.find((record) => record.customerId === c.id)
 
   const reassign = async () => {
     const seat = s.seats.find((x) => x.id === newSeatId)
@@ -64,6 +66,18 @@ export function CustomerDetailModal({ customerId, onClose }: { customerId: strin
     s.deleteCustomer(customerId, admin)
     toast(`客户「${c.nickname}」已注销，数据保留、不再出现在工作台`)
     onClose()
+  }
+
+  const bindBusiness = () => {
+    const result = s.bindCustomerBusinessRecord(c.id, businessNumber, admin)
+    toast(result.ok ? `已绑定业务系统客户编号「${result.record.customerNumber}」` : result.error, result.ok ? 'ok' : 'warn')
+    if (result.ok) setBusinessNumber(result.record.customerNumber)
+  }
+
+  const unbindBusiness = () => {
+    const result = s.unbindCustomerBusinessRecord(c.id, admin)
+    toast(result.ok ? '已解除业务系统绑定' : result.error, result.ok ? 'ok' : 'warn')
+    if (result.ok) setBusinessNumber('')
   }
 
   return (
@@ -102,6 +116,26 @@ export function CustomerDetailModal({ customerId, onClose }: { customerId: strin
               },
             ]}
           />
+        </section>
+
+        <section className="rounded-md border border-zinc-200 p-3">
+          <h4 className="mb-1.5 text-xs font-semibold text-zinc-700">业务系统</h4>
+          <p className="mb-2 text-[11px] text-zinc-500">只匹配已同步的业务记录，绑定关系不会把业务系统数据展示给客户。</p>
+          {businessRecord ? (
+            <div className="space-y-2">
+              <KV items={[{ k: '客户编号', v: businessRecord.customerNumber }, { k: '角色', v: businessRecord.roleLabel ?? '-' }, { k: '购买记录', v: `${businessRecord.purchases.length} 笔` }]} />
+              <Button size="sm" variant="ghost" onClick={unbindBusiness}>解绑</Button>
+            </div>
+          ) : (
+            <div className="flex items-end gap-2">
+              <div className="min-w-0 flex-1">
+                <Field label="业务系统客户编号">
+                  <Input value={businessNumber} onChange={(e) => setBusinessNumber(e.target.value)} placeholder="如：HX-0099" />
+                </Field>
+              </div>
+              <Button size="sm" variant="secondary" disabled={!businessNumber.trim()} onClick={bindBusiness}>绑定</Button>
+            </div>
+          )}
         </section>
 
         <section>

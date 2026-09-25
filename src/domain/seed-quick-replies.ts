@@ -44,7 +44,7 @@ export const QUICK_REPLIES: QuickReply[] = [
   { id: 'qr_img_poster', scope: 'enterprise', categoryId: 'qrc_event', kind: 'image', title: '四季度策略会海报', text: '10 月 12 日线下策略会，席位有限，想去的话我帮您报名登记。', media: MEDIA.poster, enabled: true, useCount: 61, lastUsedAt: ago(0, 2) },
   { id: 'qr_event_signup', scope: 'enterprise', categoryId: 'qrc_event', kind: 'text', title: '策略会报名', text: '{{customer.nickname}}，10 月 12 日"四季度全球配置展望"线下策略会开放报名，回复"报名"我帮您登记席位。', enabled: true, useCount: 27, lastUsedAt: ago(0, 7) },
   // 未分类
-  { id: 'qr_greeting', scope: 'enterprise', categoryId: null, kind: 'text', title: '问候开场', text: '{{customer.nickname}} 您好，我是 {{company.name}} 的 {{staff.name}}，很高兴为您服务。', enabled: true, useCount: 73, lastUsedAt: ago(0, 1) },
+  { id: 'qr_greeting', scope: 'enterprise', categoryId: null, kind: 'text', title: '问候开场', text: '{{customer.nickname}} 您好，我是 {{company.name}} 的 {{seat.name}}，很高兴为您服务。', enabled: true, useCount: 73, lastUsedAt: ago(0, 1) },
   // 林薇个人
   { id: 'qr_5', scope: 'personal', staffId: 'st_lin', categoryId: 'qrc_lin_daily', kind: 'text', title: '约时间', text: '您看明天下午 3 点或 5 点，哪个时间方便？我们电话过一遍，20 分钟左右。', enabled: true, useCount: 19, lastUsedAt: ago(0, 9) },
   { id: 'qr_6', scope: 'personal', staffId: 'st_lin', categoryId: 'qrc_lin_daily', kind: 'text', title: '稍后回复', text: '好的，我看一下再回您，大概 10 分钟。', enabled: true, useCount: 31, lastUsedAt: ago(0, 2) },

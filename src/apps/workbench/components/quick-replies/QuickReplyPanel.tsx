@@ -47,7 +47,7 @@ export function QuickReplyPanel({ target }: { target: QuickReplyTarget }) {
   const images = useMemo(() => tabItems.filter((x) => x.kind === 'image' && x.media), [tabItems])
   const others = useMemo(() => tabItems.filter((x) => !(x.kind === 'image' && x.media)), [tabItems])
 
-  const render = (text: string) => renderQuickReplyVars(text, { customer: target.customerName, staff: seat?.displayName ?? staff?.name ?? '', company: s.enterprise.name })
+  const render = (text: string) => renderQuickReplyVars(text, { customer: target.customerName, seat: seat?.displayName ?? '', company: s.enterprise.name })
 
   const send = (item: QuickReply) => {
     if (reason) return toast(reason, 'warn')

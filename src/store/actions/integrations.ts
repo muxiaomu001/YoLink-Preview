@@ -1,7 +1,7 @@
 /**
  * 客户画像同步、自动化规则（P1）、插件、开放 API 凭据、Webhook（P1）。
  */
-import type { ApiKey, ApiScope, AutomationRule, CustomField, ProfileSyncSettings, SyncRecord, Webhook, WebhookLog } from '@/domain/types'
+import type { ApiKey, ApiScope, AutomationRule, BusinessProfileRecord, CustomField, ProfileSyncSettings, SyncRecord, Webhook, WebhookLog } from '@/domain/types'
 import { newId } from '@/domain/ids'
 import { type Get, type Set, now, randomHex, withAudit } from './helpers'
 
@@ -24,6 +24,8 @@ export interface IntegrationActions {
   /** CSV 导入：按手机号匹配客户，返回结果记录 */
   importPurchasesCsv: (rows: CsvPurchaseRow[], byStaffId: string) => SyncRecord
   importReferralsCsv: (rows: CsvReferralRow[], byStaffId: string) => SyncRecord
+  bindCustomerBusinessRecord: (customerId: string, customerNumber: string, byStaffId: string) => { ok: true; record: BusinessProfileRecord } | { ok: false; error: string }
+  unbindCustomerBusinessRecord: (customerId: string, byStaffId: string) => { ok: true } | { ok: false; error: string }
   saveCustomField: (field: CustomField, byStaffId: string) => void
   deleteCustomField: (id: string, byStaffId: string) => void
   saveAutomationRule: (rule: AutomationRule, byStaffId: string) => void
@@ -97,6 +99,38 @@ export function integrationActions(set: Set, get: Get): IntegrationActions {
       const rec: SyncRecord = { id: newId('sr'), at: now(), kind: 'referral', source: 'csv', count: matched, failed, failReason: failed ? '推荐人手机号在客户库中不存在' : undefined, unmatched }
       set({ customers, syncRecords: [rec, ...s.syncRecords], audit: withAudit(s.audit, 'profile.import', `CSV 导入邀请关系：匹配 ${matched} 条，失败 ${failed} 条，未匹配 ${unmatched} 条`, byStaffId) })
       return rec
+    },
+
+    bindCustomerBusinessRecord: (customerId, customerNumber, byStaffId) => {
+      const s = get()
+      const customer = s.customers.find((item) => item.id === customerId)
+      const number = customerNumber.trim()
+      if (!customer) return { ok: false, error: '客户不存在' }
+      if (!number) return { ok: false, error: '请输入业务系统客户编号' }
+      if (customer.businessSystemCustomerNumber) return { ok: false, error: '该客户已经绑定业务记录' }
+      const record = s.businessProfileRecords.find((item) => item.customerNumber === number)
+      if (!record) return { ok: false, error: '未找到已同步的业务记录，请检查客户编号' }
+      if (record.customerId) return { ok: false, error: '这个业务系统客户编号已经绑定其他客户' }
+      set({
+        customers: s.customers.map((item) => (item.id === customerId ? { ...item, businessSystemCustomerNumber: record.customerNumber, roleLabel: record.roleLabel, purchases: record.purchases.map((purchase) => ({ ...purchase })) } : item)),
+        businessProfileRecords: s.businessProfileRecords.map((item) => (item.id === record.id ? { ...item, customerId } : item)),
+        audit: withAudit(s.audit, 'profile.bind', `把客户「${customer.nickname}」绑定到业务系统客户编号「${record.customerNumber}」`, byStaffId),
+      })
+      return { ok: true, record: { ...record, customerId } }
+    },
+
+    unbindCustomerBusinessRecord: (customerId, byStaffId) => {
+      const s = get()
+      const customer = s.customers.find((item) => item.id === customerId)
+      if (!customer) return { ok: false, error: '客户不存在' }
+      const number = customer.businessSystemCustomerNumber
+      if (!number) return { ok: false, error: '该客户还没有绑定业务记录' }
+      set({
+        customers: s.customers.map((item) => (item.id === customerId ? { ...item, businessSystemCustomerNumber: undefined } : item)),
+        businessProfileRecords: s.businessProfileRecords.map((item) => (item.customerId === customerId ? { ...item, customerId: undefined } : item)),
+        audit: withAudit(s.audit, 'profile.bind', `解除客户「${customer.nickname}」与业务系统客户编号「${number}」的绑定`, byStaffId),
+      })
+      return { ok: true }
     },
 
     saveCustomField: (field, byStaffId) =>

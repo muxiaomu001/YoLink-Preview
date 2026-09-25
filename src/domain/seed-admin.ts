@@ -8,6 +8,7 @@ import type {
   ApiKey,
   AppVersion,
   AutomationRule,
+  BusinessProfileRecord,
   Backup,
   Banner,
   CheckinRecord,
@@ -572,6 +573,18 @@ export function buildAdminSeed(ctx: AdminSeedContext) {
     { id: aid('ra'), customerId: customers[18].id, type: 'burst_register', relatedIds: [customers[19]?.id, customers[20]?.id, customers[22]?.id].filter(Boolean), cancelled: true },
   ]
 
+  const businessProfileRecords: BusinessProfileRecord[] = customers.slice(0, 6).map((customer, index) => ({
+    id: `bpr_${index + 1}`,
+    customerNumber: `HX-${String(index + 1).padStart(4, '0')}`,
+    customerId: customer.id,
+    roleLabel: ['私享会员', '普通客户', '高净值客户'][index % 3],
+    purchases: customer.purchases.slice(0, 2).map((purchase) => ({ ...purchase })),
+  }))
+  businessProfileRecords.push({ id: 'bpr_unbound', customerNumber: 'HX-0099', roleLabel: '待分配客户', purchases: [] })
+  customers.slice(0, 6).forEach((customer, index) => {
+    customer.businessSystemCustomerNumber = businessProfileRecords[index].customerNumber
+  })
+
   return {
     policyItems: POLICY_ITEMS,
     policyPresets: POLICY_PRESETS,
@@ -596,6 +609,7 @@ export function buildAdminSeed(ctx: AdminSeedContext) {
     announcements: ANNOUNCEMENTS,
     profileSync: PROFILE_SYNC,
     syncRecords: SYNC_RECORDS,
+    businessProfileRecords,
     customFields: CUSTOM_FIELDS,
     automationRules: AUTOMATION_RULES,
     dailyReport: DAILY_REPORT,

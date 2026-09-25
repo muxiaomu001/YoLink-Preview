@@ -5,7 +5,7 @@
  * - `/` 话术（matchQuickReplies），Enter / Tab 选中：文字插入光标处，图片 / 文件直接发出
  * - 打字自动匹配（staff.prefs.quickMatch）：光标前最后一段 ≥ 2 字就在全库找（标题 / 正文 / 文件名），长的先试、没结果再往短里退；
  *   Tab / 点击选中，Enter 仍是发送，Esc 关闭后同一个词不再弹；选中文字话术用正文替换整个输入框
- * 变量 {{customer.nickname}} {{staff.name}} {{company.name}} 发送时替换；附件按钮按策略 canMedia 显示，按文件类型自动分图片 / 视频 / 文件，进预览后再发。
+ * 变量 {{customer.nickname}} {{seat.name}} {{company.name}} 发送时替换；附件按钮按策略 canMedia 显示，按文件类型自动分图片 / 视频 / 文件，进预览后再发。
  */
 import { useMemo, useRef, useState } from 'react'
 import { AtSign, Mic, Paperclip, Send, Smile, X, Zap } from 'lucide-react'
@@ -160,7 +160,7 @@ export function ChatInput({
     setPop({ kind: 'auto', query: word, start: caret - word.length })
   }
 
-  const renderVars = (t: string) => renderQuickReplyVars(t, { customer: customer?.nickname, staff: seat.displayName, company: s.enterprise.name })
+  const renderVars = (t: string) => renderQuickReplyVars(t, { customer: customer?.nickname, seat: seat.displayName, company: s.enterprise.name })
 
   const pick = (c: Candidate) => {
     if (c.mentionKind) setSelectedMembers((items) => [...items.filter((x) => x.id !== c.id), c])
