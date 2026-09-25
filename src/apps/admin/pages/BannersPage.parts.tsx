@@ -70,7 +70,7 @@ export function BannerModal({ banner, onClose }: { banner?: Banner; onClose: () 
           : !form.start || !form.end || form.start > form.end
             ? '起止时间不合法'
             : form.audience === 'tags' && form.tagIds.length === 0
-              ? '按标签投放至少选一个标签'
+              ? '按内部标签投放至少选一个内部标签'
               : ''
 
   const submit = () => {
@@ -161,7 +161,7 @@ export function BannerModal({ banner, onClose }: { banner?: Banner; onClose: () 
               <input type="radio" className="accent-brand-700" checked={form.audience === 'all'} onChange={() => set('audience', 'all')} /> 全部
             </label>
             <label className="flex items-center gap-1.5">
-              <input type="radio" className="accent-brand-700" checked={form.audience === 'tags'} onChange={() => set('audience', 'tags')} /> 按标签
+              <input type="radio" className="accent-brand-700" checked={form.audience === 'tags'} onChange={() => set('audience', 'tags')} /> 按内部标签
             </label>
           </div>
         </Field>

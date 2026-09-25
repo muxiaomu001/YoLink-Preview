@@ -94,7 +94,7 @@ export function GroupBulkAddModal({ group: g, actor, canViewAll, onClose }: Pick
             </Select>
           </Field>
           <div>
-            <div className="mb-1 text-xs font-medium text-zinc-600">按标签（同时满足）</div>
+            <div className="mb-1 text-xs font-medium text-zinc-600">按内部标签（同时满足）</div>
             <div className="flex flex-wrap gap-1">
               {s.tags.map((t) => (
                 <button key={t.id} type="button" onClick={() => toggleTag(t.id)} className={tagIds.includes(t.id) ? 'ring-2 ring-brand-300 rounded-md' : 'opacity-70 hover:opacity-100'}>

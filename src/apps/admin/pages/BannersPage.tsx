@@ -78,7 +78,7 @@ function BannersTab() {
   return (
     <div className="space-y-4">
       <Note>排序数字越小越靠前，同一位置只展示排在最前的一条。</Note>
-      <DemoNote>正式产品的排序可以直接拖动，演示里用上移 / 下移代替。目标人群按标签投放、曝光与点击统计排在第二版<DemoLevelTag level="P1" />。</DemoNote>
+      <DemoNote>正式产品的排序可以直接拖动，演示里用上移 / 下移代替。目标人群按内部标签投放、曝光与点击统计排在第二版<DemoLevelTag level="P1" />。</DemoNote>
       <Card
         title="横幅列表"
         padded={false}
@@ -118,7 +118,7 @@ function BannersTab() {
             {
               key: 'audience',
               title: <>目标人群<DemoLevelTag level="P1" /></>,
-              render: (b) => <span className="whitespace-nowrap">{b.audience === 'all' ? '全部' : `按标签：${b.tagIds.map((id) => s.tags.find((t) => t.id === id)?.name ?? id).join('、') || '未选'}`}</span>,
+              render: (b) => <span className="whitespace-nowrap">{b.audience === 'all' ? '全部' : `按内部标签：${b.tagIds.map((id) => s.tags.find((t) => t.id === id)?.name ?? id).join('、') || '未选'}`}</span>,
             },
             { key: 'status', title: '状态', render: (b) => timeStatus(b.startAt, b.endAt) },
             { key: 'imp', title: <>曝光<DemoLevelTag level="P1" /></>, align: 'right', render: (b) => <span className="tabular-nums">{b.impressions.toLocaleString('zh-CN')}</span> },
