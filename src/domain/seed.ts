@@ -809,6 +809,9 @@ function buildGroupMessages(customers: Customer[], chatGroups: ChatGroup[]) {
   community.memberCustomerIds = customers.map((c) => c.id)
   strategy.memberCustomerIds = customers.map((c) => c.id)
   vip.memberCustomerIds = customers.filter((c) => c.titleIds.includes('t_vip')).map((c) => c.id)
+  for (const group of [community, strategy, vip]) {
+    group.customerJoinedAt = Object.fromEntries(group.memberCustomerIds.map((customerId) => [customerId, group.createdAt]))
+  }
 
   // 频道：承接原私聊通知的历史消息
   const convStrategy: Conversation = { id: sid('conv'), kind: 'channel', chatGroupId: strategy.id, lastMessageAt: ago(30) }
@@ -902,7 +905,7 @@ function buildAudit(): AuditEvent[] {
 export function buildSeed(): DemoState {
   seq = 0
   rand = mulberry32(SEED)
-  const chatGroups = CHAT_GROUPS.map((g) => ({ ...g, memberCustomerIds: [...g.memberCustomerIds], pinnedMessageIds: [...g.pinnedMessageIds], restrictions: [...g.restrictions] }))
+  const chatGroups = CHAT_GROUPS.map((g) => ({ ...g, memberCustomerIds: [...g.memberCustomerIds], customerJoinedAt: { ...g.customerJoinedAt }, pinnedMessageIds: [...g.pinnedMessageIds], restrictions: [...g.restrictions] }))
   const c = buildCustomers()
   const g = buildGroupMessages(c.customers, chatGroups)
   const conversations = [...c.conversations, ...g.conversations]

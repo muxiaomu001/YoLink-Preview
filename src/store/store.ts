@@ -35,6 +35,7 @@ import { planCoverage, type SkipReason } from '@/domain/broadcastCoverage'
 import { inviteCodeError, newInviteCode, normalizeInviteCode } from '@/domain/inviteCode'
 import { iso } from '@/domain/time'
 import { seatBroadcastSkipReason } from '@/domain/messageRules'
+import { customerCan } from './policy'
 import { DEMO_IP } from './actions/helpers'
 import { settingsActions, type SettingsActions } from './actions/settings'
 import { peopleActions, type PeopleActions } from './actions/people'
@@ -93,8 +94,7 @@ export interface CoreActions {
   setSession: (patch: Partial<DemoState['session']>) => string | null
   // 客户端
   registerCustomer: (input: RegisterInput) => RegisterResult
-  customerSend: (convId: string, text: string) => void
-  customerBlockSeat: (customerId: string, seatId: string, block: boolean) => void
+  customerBlockSeat: (customerId: string, seatId: string, block: boolean) => { ok: boolean; reason?: string }
   /** 客户关掉注册后的完善资料引导；软引导只提醒一次，关了就不再出现 */
   dismissProfileGuide: (customerId: string) => void
   /** 客户自己改昵称。改完就不再是系统发的默认名，软引导里那一条随之消失 */
@@ -104,7 +104,6 @@ export interface CoreActions {
   /** 最后上线时间只控制对外可见范围，不影响企业侧已读数据 */
   setCustomerLastSeenVisibility: (customerId: string, visibility: LastSeenVisibility) => void
   // 工作台
-  seatSend: (convId: string, seatId: string, operatorId: string, text: string) => void
   assignTitle: (customerId: string, titleId: string, byStaffId: string) => void
   removeTitle: (customerId: string, titleId: string, byStaffId: string) => void
   setPrimaryTitle: (customerId: string, titleId: string) => void
@@ -278,7 +277,7 @@ export const useStore = create<DemoStore>()(
           if (chatGroup && check.reason === 'missing_title') missingTitleGroupNames.push(chatGroup.name)
           return false
         })
-        const chatGroups = s.chatGroups.map((g) => (joinGroupIds.includes(g.id) ? { ...g, memberCustomerIds: [...g.memberCustomerIds, customer.id] } : g))
+        const chatGroups = s.chatGroups.map((g) => (joinGroupIds.includes(g.id) ? { ...g, memberCustomerIds: [...g.memberCustomerIds, customer.id], customerJoinedAt: { ...(g.customerJoinedAt ?? {}), [customer.id]: at } } : g))
         for(const gid of joinGroupIds){const g=s.chatGroups.find((x)=>x.id===gid),conv=s.conversations.find((x)=>x.chatGroupId===gid);if(g&&conv)messages.push(...groupWelcomeMessages(g,conv.id,[customer],at))}
         const inviteLinks = link ? s.inviteLinks.map((l) => (l.id === link!.id ? { ...l, uses: l.uses + 1 } : l)) : s.inviteLinks
         const auditEntries = [
@@ -299,29 +298,14 @@ export const useStore = create<DemoStore>()(
         return { ok: true, customerId: customer.id, addedSeatIds: usable, addedGroupIds: joinGroupIds, nicknameAuto: nick.auto, watchUntil }
       },
 
-      customerSend: (convId, text) => {
+      customerBlockSeat: (customerId, seatId, block) => {
         const s = get()
-        const conv = s.conversations.find((c) => c.id === convId)
-        if (!conv) return
-        const customerId = conv.customerId ?? s.session.phoneCustomerId
-        if (!customerId) return
-        const at = now()
-        const seatNames = s.seats.map((x) => x.displayName)
-        const mentions = s.seats.filter((x) => text.includes(`@${x.displayName}`)).map((x) => x.id)
-        void seatNames
-        set({
-          messages: [...s.messages, { id: newId('msg'), convId, senderKind: 'customer', senderId: customerId, kind: 'text', text, at, mentionSeatIds: mentions.length ? mentions : undefined }],
-          conversations: s.conversations.map((c) => (c.id === convId ? { ...c, lastMessageAt: at } : c)),
-          customers: s.customers.map((c) => (c.id === customerId ? { ...c, lastActiveAt: at } : c)),
-        })
+        const customer = s.customers.find((c) => c.id === customerId)
+        if (!customer || !s.seats.some((seat) => seat.id === seatId)) return { ok: false, reason: '联系人不存在' }
+        if (block && !customerCan(s, customerId, 'friend.block')) return { ok: false, reason: '当前策略不允许拉黑联系人' }
+        set({ customers: s.customers.map((c) => c.id === customerId ? { ...c, blockedSeatIds: block ? Array.from(new Set([...c.blockedSeatIds, seatId])) : c.blockedSeatIds.filter((id) => id !== seatId) } : c) })
+        return { ok: true }
       },
-
-      customerBlockSeat: (customerId, seatId, block) =>
-        set((s) => ({
-          customers: s.customers.map((c) =>
-            c.id === customerId ? { ...c, blockedSeatIds: block ? Array.from(new Set([...c.blockedSeatIds, seatId])) : c.blockedSeatIds.filter((x) => x !== seatId) } : c,
-          ),
-        })),
 
       renameCustomer: (customerId, nickname) => {
         const v = nickname.trim()
@@ -338,14 +322,6 @@ export const useStore = create<DemoStore>()(
 
       dismissProfileGuide: (customerId) =>
         set((s) => ({ customers: s.customers.map((c) => (c.id === customerId ? { ...c, profileGuideDismissedAt: now() } : c)) })),
-
-      seatSend: (convId, seatId, operatorId, text) => {
-        const at = now()
-        set((s) => ({
-          messages: [...s.messages, { id: newId('msg'), convId, senderKind: 'seat', senderId: seatId, seatId, operatorId, kind: 'text', text, at }],
-          conversations: s.conversations.map((c) => (c.id === convId ? { ...c, lastMessageAt: at } : c)),
-        }))
-      },
 
       assignTitle: (customerId, titleId, byStaffId) => {
         const s = get()

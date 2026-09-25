@@ -8,7 +8,7 @@ import { useStore } from '@/store/store'
 import { customerById } from '@/store/selectors'
 import { customerCan } from '@/store/policy'
 import { NICKNAME_MAX, NICKNAME_MIN } from '@/domain/register'
-import { Avatar, TitleChip } from '@/ui/display'
+import { Avatar, SeatAvatar, TitleChip } from '@/ui/display'
 import { Button, Input, Switch } from '@/ui/primitives'
 import { toast } from '@/ui/overlay'
 import { demoToast } from '@/ui/DemoNote'
@@ -86,6 +86,34 @@ export function ProfileScreen({ customerId, onBack }: { customerId: string; onBa
           <DemoHint>企业策略未开放修改昵称与头像，所以这里只读（account.edit_profile）。</DemoHint>
         )}
       </div>
+    </div>
+  )
+}
+
+export function BlockedListScreen({ customerId, onBack }: { customerId: string; onBack: () => void }) {
+  const s = useStore()
+  const c = customerById(s, customerId)!
+  const canBlock = customerCan(s, customerId, 'friend.block')
+  const blocked = c.blockedSeatIds.map((id) => s.seats.find((seat) => seat.id === id)).filter((seat): seat is NonNullable<typeof seat> => !!seat)
+
+  return (
+    <div className="flex h-full flex-col bg-zinc-50">
+      <ScreenHeader onBack={onBack} title="阻止列表" />
+      <SectionLabel>已阻止的官方联系人</SectionLabel>
+      <div className="bg-white">
+        {blocked.length === 0 && <p className="px-4 py-4 text-sm text-zinc-400">还没有阻止任何官方联系人</p>}
+        {blocked.map((seat) => (
+          <div key={seat.id} className="flex items-center gap-3 border-b border-zinc-100 px-4 py-2.5 last:border-0">
+            <SeatAvatar seat={seat} size={36} />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[13px] text-zinc-900">{seat.displayName}</div>
+              <div className="truncate text-[11px] text-zinc-500">官方</div>
+            </div>
+            <button type="button" className="text-[12px] text-brand-700" onClick={() => { const result = s.customerBlockSeat(customerId, seat.id, false); toast(result.ok ? '已解除拉黑' : (result.reason ?? '操作失败'), result.ok ? 'ok' : 'warn') }}>解除</button>
+          </div>
+        ))}
+      </div>
+      {!canBlock && blocked.length === 0 && <div className="px-4 py-3"><DemoHint>当前企业未开放阻止官方联系人的功能。</DemoHint></div>}
     </div>
   )
 }

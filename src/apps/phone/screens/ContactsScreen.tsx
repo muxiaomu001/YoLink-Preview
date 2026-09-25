@@ -10,6 +10,7 @@ import { SeatAvatar } from '@/ui/display'
 import { GroupAvatar, SectionLabel, TabTitle } from '../parts'
 import { groupKindLabel } from '../shared'
 import { SocialSheet } from './SocialSheets'
+import { SeatProfileScreen } from './SeatProfileScreen'
 
 /** 关系链 5 项 */
 const RELATION_KEYS = ['friend.add', 'friend.accept', 'friend.search_user', 'friend.view_profile', 'friend.block']
@@ -20,7 +21,10 @@ export function ContactsScreen({ customerId, onOpen }: { customerId: string; onO
   const groups = s.chatGroups.filter((g) => g.memberCustomerIds.includes(customerId))
   const canAdd = customerCan(s, customerId, 'friend.add')
   const [adding, setAdding] = useState(false)
+  const [profileSeatId, setProfileSeatId] = useState<string | null>(null)
   const relation = RELATION_KEYS.map((k) => ({ key: k, label: s.policyItems.find((p) => p.key === k)?.label ?? k, on: customerCan(s, customerId, k) }))
+
+  if (profileSeatId) return <SeatProfileScreen seatId={profileSeatId} customerId={customerId} onBack={() => setProfileSeatId(null)} />
 
   return (
     <div className="relative flex h-full flex-col">
@@ -37,17 +41,20 @@ export function ContactsScreen({ customerId, onOpen }: { customerId: string; onO
       <div className="thin-scroll flex-1 overflow-y-auto">
         <SectionLabel>官方</SectionLabel>
         {officials.map((o) => (
-          <button key={o.seatId} type="button" onClick={() => o.conv && onOpen(o.conv.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left active:bg-zinc-50">
-            <SeatAvatar seat={o.seat} size={40} />
-            <div className="min-w-0 flex-1 border-b border-zinc-100 pb-2.5">
-              <div className="flex items-center gap-1 text-[14px] text-zinc-900">
-                {o.seat.displayName}
-                <span className="rounded bg-brand-50 px-1 text-[9px] text-brand-700">官方</span>
-                {o.primary && <span className="rounded bg-zinc-100 px-1 text-[9px] text-zinc-500">主联系人</span>}
+          <div key={o.seatId} className="flex w-full items-center gap-3 px-4 py-2.5">
+            <button type="button" onClick={() => o.conv && onOpen(o.conv.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left active:bg-zinc-50">
+              <SeatAvatar seat={o.seat} size={40} />
+              <div className="min-w-0 flex-1 border-b border-zinc-100 pb-2.5">
+                <div className="flex items-center gap-1 text-[14px] text-zinc-900">
+                  {o.seat.displayName}
+                  <span className="rounded bg-brand-50 px-1 text-[9px] text-brand-700">官方</span>
+                  {o.primary && <span className="rounded bg-zinc-100 px-1 text-[9px] text-zinc-500">主联系人</span>}
+                </div>
+                <div className="truncate text-xs text-zinc-500">{o.seat.roleDesc}</div>
               </div>
-              <div className="truncate text-xs text-zinc-500">{o.seat.roleDesc}</div>
-            </div>
-          </button>
+            </button>
+            <button type="button" onClick={() => setProfileSeatId(o.seatId)} className="shrink-0 border-b border-zinc-100 pb-2.5 text-[12px] text-brand-700">资料</button>
+          </div>
         ))}
         <SectionLabel>群与频道（{groups.length}）</SectionLabel>
         {groups.length === 0 && <p className="px-4 py-3 text-xs text-zinc-400">还没有加入任何群</p>}

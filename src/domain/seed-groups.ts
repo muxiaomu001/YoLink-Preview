@@ -7,8 +7,9 @@ import { ago, iso } from './time'
 export const DEFAULT_STAFF_PREFS: StaffPrefs = { theme: 'auto', desktopNotify: true, sound: false, language: 'zh', quickMatch: true }
 
 /** 新建群的默认管理字段 */
-export function groupDefaults(): Pick<ChatGroup, 'admins' | 'settings' | 'announcement' | 'pinnedMessageIds' | 'restrictions' | 'inviteLinks'> {
+export function groupDefaults(): Pick<ChatGroup, 'customerJoinedAt' | 'admins' | 'settings' | 'announcement' | 'pinnedMessageIds' | 'restrictions' | 'inviteLinks'> {
   return {
+    customerJoinedAt: {},
     admins: [],
     settings: { allMuted: false, membersVisible: false, slowModeSeconds: null, historyVisible: true },
     announcement: null,

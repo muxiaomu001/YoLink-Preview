@@ -20,10 +20,10 @@ interface NumberField {
 
 /** 顺序与 PRD 05 数值型策略表一致 */
 const FIELDS: NumberField[] = [
-  { key: 'seatRecallSeconds', label: '坐席「为所有人删除」时限', unit: '秒', defaultValue: 120 },
-  { key: 'seatEditSeconds', label: '坐席编辑时限', unit: '秒', defaultValue: 900 },
+  { key: 'seatRecallSeconds', label: '坐席「为所有人删除」时限', unit: '秒', defaultValue: 0 },
+  { key: 'seatEditSeconds', label: '坐席编辑时限', unit: '秒', defaultValue: 0 },
   { key: 'customerRecallSeconds', label: '客户「为所有人删除」时限', unit: '秒', defaultValue: 120 },
-  { key: 'customerEditSeconds', label: '客户编辑时限', unit: '秒', defaultValue: 900 },
+  { key: 'customerEditSeconds', label: '客户编辑时限', unit: '秒', defaultValue: 120 },
   { key: 'groupMaxMembers', label: '单群上限', unit: '人', defaultValue: 10000 },
   { key: 'slowModeSeconds', label: '发言限流默认间隔', unit: '秒', defaultValue: 0, hint: '0 为关闭' },
   { key: 'retentionDays', label: '消息保留天数', unit: '天', defaultValue: 0, hint: '0 为永久' },
@@ -84,7 +84,7 @@ export function NumbersTab() {
             <Field
               key={f.key}
               label={timeLimit ? f.label : `${f.label}（${f.unit}）`}
-              hint={timeLimit ? `私聊与群聊共用；填 0 表示不限时间 · 默认 ${f.defaultValue} 秒${dirty ? ` · 当前 ${s.policyNumbers[f.key]}` : ''}` : `默认 ${f.defaultValue}${dirty ? ` · 当前 ${s.policyNumbers[f.key]}` : ''}`}
+              hint={timeLimit ? `私聊与群聊共用；填 0 表示不限时间${dirty ? ` · 当前 ${s.policyNumbers[f.key]}` : ''}` : `默认 ${f.defaultValue}${dirty ? ` · 当前 ${s.policyNumbers[f.key]}` : ''}`}
             >
               <div className="flex items-center gap-2">
                 {timeLimit && <Select aria-label={`${f.label}方式`} className="w-32" value={draft[f.key] !== '' && Number(draft[f.key]) === 0 ? 'unlimited' : 'limited'} onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value === 'unlimited' ? '0' : String(unit) }))}><option value="unlimited">不限时间</option><option value="limited">限制时长</option></Select>}

@@ -1,6 +1,6 @@
 import type { ChatActor, DemoState, Message } from './types'
 import { fmtDuration } from './time'
-import { customerCan, customerCanSpeakIn, groupPerm, seatCan, seatGroupPerm } from '@/store/policy'
+import { customerCan, customerCanSpeakIn, groupPerm, groupRoleOf, seatCan, seatGroupPerm } from '@/store/policy'
 import { globalMuteReason, isGlobalMutedNow } from './customerStatus'
 import type { SkipReason } from './broadcastCoverage'
 
@@ -132,6 +132,11 @@ export function messageShadow(s: DemoState, m: Message): Pick<Message, 'shadowed
 export function messageVisibleFor(s: DemoState, m: Message, actor: ChatActor) {
   const conv = s.conversations.find((c) => c.id === m.convId)
   if(m.recipientCustomerId && (actor.kind!=='customer'||actor.id!==m.recipientCustomerId))return false
+  const group = conv?.chatGroupId ? s.chatGroups.find((g) => g.id === conv.chatGroupId) : undefined
+  if (actor.kind === 'customer' && group && !group.settings.historyVisible) {
+    const joinedAt = group.customerJoinedAt?.[actor.id] ?? group.createdAt
+    if (m.at < joinedAt) return false
+  }
   // 影子屏蔽：发的人自己看得见（他不知道被屏蔽了），坐席看得见（要能判断这人在干什么），
   // 其他客户看不见。私聊里没有「其他客户」，所以影子屏蔽实际只在群和频道里起作用。
   if (actor.kind === 'customer') {
@@ -170,7 +175,12 @@ export function deleteAllBlock(s: DemoState, m: Message, actor: ChatActor) {
 
 export function sendFailure(s: DemoState, convId: string, actor: ChatActor, media = false) {
   if (!actorCanView(s, convId, actor)) return '当前身份已无权访问此会话'
-  if (actor.kind === 'seat') return seatMessageSendAllowed(s, convId, actor.id, actor.staffId ?? '', media) ? undefined : '当前身份或策略不允许发送'
+  if (actor.kind === 'seat') {
+    const conv = s.conversations.find((c) => c.id === convId)
+    const customer = conv?.kind === 'dm' ? s.customers.find((c) => c.id === conv.customerId) : undefined
+    if (customer?.blockedSeatIds.includes(actor.id)) return '对方已将你拉黑'
+    return seatMessageSendAllowed(s, convId, actor.id, actor.staffId ?? '', media) ? undefined : '当前身份或策略不允许发送'
+  }
   const conv = s.conversations.find((c) => c.id === convId)!
   const customer = s.customers.find((c) => c.id === actor.id)!
   if (customer.bannedAt) return '账号已被封禁'
@@ -183,6 +193,16 @@ export function sendFailure(s: DemoState, convId: string, actor: ChatActor, medi
     const group = s.chatGroups.find((g) => g.id === conv.chatGroupId)!
     const result = customerCanSpeakIn(s, group, actor.id, new Date().toISOString())
     if (!result.ok) return result.reason
+    const interval = group.settings.slowModeSeconds ?? s.policyNumbers.slowModeSeconds
+    if (interval > 0 && groupRoleOf(group, 'customer', actor.id) === 'member') {
+      const last = s.messages
+        .filter((m) => m.convId === convId && m.senderKind === 'customer' && m.senderId === actor.id && !m.deletedAt && m.delivery !== 'failed')
+        .sort((a, b) => b.at.localeCompare(a.at))[0]
+      if (last) {
+        const remaining = Math.ceil((new Date(last.at).getTime() + interval * 1000 - Date.now()) / 1000)
+        if (remaining > 0) return `发言太快了，请 ${remaining} 秒后再试`
+      }
+    }
     if (media && !customerCan(s, actor.id, 'group.send_media', group.id)) return '当前不允许发送附件'
   }
   return undefined

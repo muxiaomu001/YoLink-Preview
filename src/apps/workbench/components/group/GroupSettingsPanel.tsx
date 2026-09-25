@@ -4,7 +4,8 @@
  * 官方标记只有员工角色 manage_groups 或管理后台能改（officialEditable）。
  */
 import { Pill } from '@/ui/display'
-import { Select, Switch } from '@/ui/primitives'
+import { Switch } from '@/ui/primitives'
+import { DemoLevelTag } from '@/ui/DemoNote'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { useStore } from '@/store/store'
@@ -31,7 +32,7 @@ export function GroupSettingsPanel({ group: g, actor, perm, compact, officialEdi
     s.setGroupOfficial(g.id, v, actor.staffId)
     toast(v ? '已标记为官方群，客户不可退出' : '已取消官方标记')
   }
-  const slowValue = g.settings.slowModeSeconds == null ? 'policy' : String(g.settings.slowModeSeconds)
+  const slowLabel = SLOW_MODE_OPTIONS.find((o) => o.value === (g.settings.slowModeSeconds == null ? 'policy' : String(g.settings.slowModeSeconds)))?.label ?? `${g.settings.slowModeSeconds} 秒`
 
   return (
     <Section title="群设置" compact={compact}>
@@ -39,18 +40,8 @@ export function GroupSettingsPanel({ group: g, actor, perm, compact, officialEdi
         <Row label="全员禁言" desc={g.settings.allMuted ? '开启中：普通客户成员不能发言，管理员与坐席不受限' : '开启后仅管理员与坐席可发言'} disabledReason={canRestrict ? undefined : '需要「限制成员」权限'}>
           <Switch checked={g.settings.allMuted} disabled={!canRestrict} onChange={(v) => patch({ allMuted: v }, v ? '已开启全员禁言，管理员不受限' : '已关闭全员禁言')} />
         </Row>
-        <Row label="慢速模式" desc={`当前企业策略 ${s.policyNumbers.slowModeSeconds} 秒`} disabledReason={canRestrict ? undefined : '需要「限制成员」权限'}>
-          <Select
-            className="h-7 w-32 text-[12px]"
-            value={slowValue}
-            disabled={!canRestrict}
-            onChange={(e) => {
-              const v = e.target.value
-              patch({ slowModeSeconds: v === 'policy' ? null : Number(v) }, `慢速模式：${SLOW_MODE_OPTIONS.find((o) => o.value === v)?.label}`)
-            }}
-          >
-            {SLOW_MODE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </Select>
+        <Row label={<>慢速模式 <DemoLevelTag level="P2" /></>} desc={`当前设置：${slowLabel}；企业默认间隔 ${s.policyNumbers.slowModeSeconds} 秒`} disabledReason={canRestrict ? undefined : '需要「限制成员」权限'}>
+          <span className="rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-[12px] text-zinc-600">{slowLabel}</span>
         </Row>
         <Row label="成员列表对客户可见" desc={g.settings.membersVisible ? '客户手机端能看到成员列表' : '关闭中：客户看不到成员列表'} disabledReason={canInfo ? undefined : '需要「修改群信息」权限'}>
           <Switch checked={g.settings.membersVisible} disabled={!canInfo} onChange={(v) => patch({ membersVisible: v }, v ? '客户现在可以看到成员列表' : '客户看不到成员列表了')} />

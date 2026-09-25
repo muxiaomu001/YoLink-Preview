@@ -84,7 +84,7 @@ export interface ConvRow {
 export function conversationsForSeat(s: DemoState, seatId: string): ConvRow[] {
   const groupIds = s.chatGroups.filter((g) => g.memberSeatIds.includes(seatId)).map((g) => g.id)
   return s.conversations
-    .filter((c) => (c.kind === 'dm' ? c.seatId === seatId : groupIds.includes(c.chatGroupId!)))
+    .filter((c) => (c.kind === 'dm' ? c.seatId === seatId && !customerById(s, c.customerId)?.deletedAt : groupIds.includes(c.chatGroupId!)))
     .map((conv) => {
       const actor = { kind: 'seat' as const, id: seatId, staffId: s.seats.find((x) => x.id === seatId)?.operatorStaffId ?? undefined }
       const visibleMessages = messagesOf(s,conv.id).filter((m)=>messageVisibleFor(s,m,actor))
@@ -163,7 +163,7 @@ export function activeCustomers(s: DemoState): Customer[] {
 /** 某坐席主归属的客户 */
 export function customersOfSeat(s: DemoState, seatId: string): Customer[] {
   const ids = new Set(s.customerSeats.filter((cs) => cs.seatId === seatId && cs.primary).map((cs) => cs.customerId))
-  return s.customers.filter((c) => ids.has(c.id))
+  return s.customers.filter((c) => ids.has(c.id) && !c.deletedAt)
 }
 
 /**

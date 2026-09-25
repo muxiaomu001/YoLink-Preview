@@ -171,12 +171,12 @@ export const POLICY_PRESETS: PolicyPreset[] = [
 ]
 
 export const POLICY_NUMBERS: PolicyNumbers = {
-  seatRecallSeconds: 120,
-  seatEditSeconds: 900,
+  seatRecallSeconds: 0,
+  seatEditSeconds: 0,
   customerRecallSeconds: 120,
-  customerEditSeconds: 900,
+  customerEditSeconds: 120,
   recallSeconds: 120,
-  editSeconds: 900,
+  editSeconds: 120,
   groupMaxMembers: 10000,
   slowModeSeconds: 0,
   retentionDays: 0,

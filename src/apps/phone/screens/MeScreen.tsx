@@ -12,10 +12,10 @@ import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
 import { demoToast } from '@/ui/DemoNote'
 import { DemoHint, LevelTag, Row, ScreenHeader, SectionLabel, Sheet, TabTitle } from '../parts'
-import { AppearanceScreen, InfoScreen, NotificationScreen, ProfileScreen } from './MeSubScreens'
+import { AppearanceScreen, BlockedListScreen, InfoScreen, NotificationScreen, ProfileScreen } from './MeSubScreens'
 import type { LastSeenVisibility } from '@/domain/types'
 
-type Sub = 'profile' | 'appearance' | 'notification' | 'privacy' | 'storage' | 'security' | 'language' | 'help' | 'about' | 'wallet' | 'referral' | null
+type Sub = 'profile' | 'appearance' | 'notification' | 'privacy' | 'blocked' | 'storage' | 'security' | 'language' | 'help' | 'about' | 'wallet' | 'referral' | null
 
 export function MeScreen({ customerId, onLoggedOut }: { customerId: string; onLoggedOut: () => void }) {
   const s = useStore()
@@ -28,7 +28,8 @@ export function MeScreen({ customerId, onLoggedOut }: { customerId: string; onLo
   if (sub === 'profile') return <ProfileScreen customerId={customerId} onBack={back} />
   if (sub === 'appearance') return <AppearanceScreen customerId={customerId} onBack={back} />
   if (sub === 'notification') return <NotificationScreen onBack={back} />
-  if (sub === 'privacy') return <PrivacyScreen customerId={customerId} onBack={back} />
+  if (sub === 'privacy') return <PrivacyScreen customerId={customerId} onBack={back} onOpenBlocked={() => setSub('blocked')} />
+  if (sub === 'blocked') return <BlockedListScreen customerId={customerId} onBack={back} />
   if (sub === 'storage') return <InfoScreen title="数据与存储" onBack={back} rows={[{ label: '存储用量', value: '128 MB', level: 'P1' }, { label: '清理缓存', level: 'P1' }, { label: '自动下载媒体', value: 'Wi-Fi', level: 'P1' }]} />
   if (sub === 'security') return <InfoScreen title="账号安全" onBack={back} rows={[{ label: '修改密码', level: 'P1' }, { label: '设备管理', value: `最多 ${s.policyNumbers.maxDevices} 台在线`, level: 'P1' }, { label: '两步验证', value: '未开启', level: 'P1' }]} note={c.mustChangePassword ? '客服为你重置过密码，请尽快修改。' : `同一账号最多 ${s.policyNumbers.maxDevices} 台设备同时在线。`} />
   if (sub === 'language') return <InfoScreen title="语言" onBack={back} rows={[{ label: '中文', value: '✓' }, { label: 'English' }]} />
@@ -45,7 +46,7 @@ export function MeScreen({ customerId, onLoggedOut }: { customerId: string; onLo
   const deleteAccount = async () => {
     const ok = await confirm({ title: '注销账号？', body: '注销后数据保留但不再出现在工作台，需要重新注册才能使用。', okText: '注销', danger: true })
     if (!ok) return
-    s.deleteCustomer(customerId, s.session.adminStaffId ?? 'customer_self')
+    s.deleteCustomer(customerId, 'customer_self')
     toast('账号已注销')
     onLoggedOut()
   }
@@ -116,7 +117,7 @@ const LAST_SEEN_LABEL: Record<LastSeenVisibility, string> = {
   nobody: '无人',
 }
 
-function PrivacyScreen({ customerId, onBack }: { customerId: string; onBack: () => void }) {
+function PrivacyScreen({ customerId, onBack, onOpenBlocked }: { customerId: string; onBack: () => void; onOpenBlocked: () => void }) {
   const s = useStore()
   const c = customerById(s, customerId)!
   const [choosingLastSeen, setChoosingLastSeen] = useState(false)
@@ -130,6 +131,7 @@ function PrivacyScreen({ customerId, onBack }: { customerId: string; onBack: () 
         <Row label="最后上线时间" value={LAST_SEEN_LABEL[lastSeenVisibility]} level="P1" onClick={() => setChoosingLastSeen(true)} />
         <Row label="头像可见" value="所有人" level="P1" />
         <Row label="谁可以拉我入群" value="我的好友" level="P1" />
+        <Row label="阻止列表" value={`${c.blockedSeatIds.length} 人`} onClick={onOpenBlocked} />
         <Row label="已读回执" value="企业侧使用，不提供关闭" />
       </div>
       {choosingLastSeen && (
