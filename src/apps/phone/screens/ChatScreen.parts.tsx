@@ -1,5 +1,5 @@
 /**
- * 聊天页零件：消息气泡（回复条、图片 / 文件附件、机器人不标）、置顶条、公告层、输入区。
+ * 聊天页零件：消息气泡（回复条、图片 / 文件附件）、置顶条、公告层、输入区。
  * 消息操作统一走长按唤出的菜单，见 ChatScreen.actions.tsx；气泡旁不放常驻按钮。
  */
 import { useRef, useState } from 'react'
@@ -11,7 +11,7 @@ import { MessageDelivery } from '@/ui/MessageDelivery'
 import { fmtTime } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { customerById, seatById } from '@/store/selectors'
-import { botById, senderName } from '@/store/policy'
+import { senderName } from '@/store/policy'
 import { Avatar, SeatAvatar, TitleChip } from '@/ui/display'
 import { restoreLocalFile } from '@/domain/localMedia'
 import { toast } from '@/ui/overlay'
@@ -52,10 +52,6 @@ function SenderAvatar({ m }: { m: Message }) {
   if (m.senderKind === 'seat') {
     const seat = seatById(s, m.seatId)
     return seat ? <SeatAvatar seat={seat} size={30} /> : <Avatar text="坐" size={30} />
-  }
-  if (m.senderKind === 'bot') {
-    const b = botById(s, m.senderId)
-    return <Avatar text={b?.nickname ?? '成'} color={b?.avatarColor} size={30} />
   }
   return <Avatar text={customerById(s, m.senderId)?.nickname ?? '?'} size={30} />
 }

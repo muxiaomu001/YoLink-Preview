@@ -1,5 +1,5 @@
 /**
- * 输入区：回复条 → 工具栏（表情 / 附件 / 语音 / 话术 / @ 提及 / AI 推荐）→ 多行输入框 → 底部「发送」。
+ * 输入区：回复条 → 工具栏（表情 / 附件 / 语音 / 话术 / @ 提及）→ 多行输入框 → 底部「发送」。
  * 三种候选浮层共用 CandidatePopover：
  * - `@` 成员选择（坐席 + 客户成员 + 「所有人」按策略），Enter / Tab 插入
  * - `/` 话术（matchQuickReplies），Enter / Tab 选中：文字插入光标处，图片 / 文件直接发出
@@ -8,7 +8,7 @@
  * 变量 {{customer.nickname}} {{staff.name}} {{company.name}} 发送时替换；附件按钮按策略 canMedia 显示，按文件类型自动分图片 / 视频 / 文件，进预览后再发。
  */
 import { useMemo, useRef, useState } from 'react'
-import { AtSign, Mic, Paperclip, Send, Smile, Sparkles, X, Zap } from 'lucide-react'
+import { AtSign, Mic, Paperclip, Send, Smile, X, Zap } from 'lucide-react'
 import type { ChatGroup, Customer, Message, MessageMedia, QuickReply, Seat } from '@/domain/types'
 import { DEFAULT_STAFF_PREFS } from '@/domain/seed-groups'
 import { seatCan, senderName, visibleText } from '@/store/policy'
@@ -66,7 +66,6 @@ export function ChatInput({
   disabledReason,
   onSend,
   onSendMedia,
-  onAiSuggest,
   onBlurText,
 }: {
   seat: Seat
@@ -82,8 +81,6 @@ export function ChatInput({
   onSend: (text: string, mentionAll: boolean, selected: { mentionSeatIds: string[]; mentionCustomerIds: string[] }) => void
   /** 图片 / 文件消息：工具栏选本机文件、话术里选到图片 / 文件时直接发出 */
   onSendMedia: (kind: ChatMediaKind, media: MessageMedia, text: string) => boolean
-  /** 不传则不显示「AI 推荐」按钮（策略不允许） */
-  onAiSuggest?: () => void
   /** 失焦时把输入框内容落进草稿（平时按防抖写，避免逐键持久化） */
   onBlurText?: () => void
 }) {
@@ -273,7 +270,6 @@ export function ChatInput({
         )}
         <Tool label="话术（输入 / 也可打开；右栏「话术」页签可浏览全部）" onClick={() => openPop('quick')} disabled={disabled}><Zap size={16} /></Tool>
         <Tool label="@ 提及（输入 @ 也可打开）" onClick={() => openPop('mention')} disabled={disabled}><AtSign size={16} /></Tool>
-        {onAiSuggest && <Tool label="AI 推荐：根据客户最后一句生成回复草稿" onClick={onAiSuggest} disabled={disabled}><Sparkles size={16} /></Tool>}
         {group?.kind === 'channel' && !disabledReason && <span className="ml-auto text-[11px] text-zinc-400">以频道身份发布，客户只读</span>}
       </div>
 

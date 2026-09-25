@@ -60,12 +60,6 @@ export function LicensePage() {
             columns={[
               { key: 'name', title: '模块', render: (m) => <span className="font-medium text-zinc-900">{m.name}</span> },
               { key: 'enabled', title: '启用状态', render: (m) => (m.enabled ? <Pill tone="green">已授权</Pill> : <Pill tone="red">未授权</Pill>) },
-              {
-                key: 'bots',
-                title: '活跃角色 上限 / 已用',
-                align: 'right',
-                render: (m) => (m.botLimit ? <span className="tabular-nums">{m.botUsed} / {m.botLimit}</span> : <span className="text-zinc-400">不适用</span>),
-              },
               { key: 'expires', title: '本期到期日', render: (m) => <ExpiryCell at={m.expiresAt} /> },
             ]}
           />

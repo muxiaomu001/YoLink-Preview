@@ -140,7 +140,7 @@ export const ADMIN_NAV: NavGroup[] = [
   },
   {
     group: 'AI',
-    items: [{ to: '/admin/ai', label: 'AI 模块', icon: Bot }],
+    items: [{ to: '/admin/ai', label: 'AI 模块', icon: Bot, demoOnly: true }],
   },
   {
     group: '插件',

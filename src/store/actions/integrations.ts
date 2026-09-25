@@ -1,7 +1,7 @@
 /**
- * AI 模块、客户画像同步、自动化规则（P1）、插件、开放 API 凭据、Webhook（P1）。
+ * 客户画像同步、自动化规则（P1）、插件、开放 API 凭据、Webhook（P1）。
  */
-import type { AiSettings, ApiKey, ApiScope, AutomationRule, CustomField, KnowledgeItem, ProfileSyncSettings, SyncRecord, Webhook, WebhookLog } from '@/domain/types'
+import type { ApiKey, ApiScope, AutomationRule, CustomField, ProfileSyncSettings, SyncRecord, Webhook, WebhookLog } from '@/domain/types'
 import { newId } from '@/domain/ids'
 import { type Get, type Set, now, randomHex, withAudit } from './helpers'
 
@@ -18,10 +18,6 @@ export interface CsvReferralRow {
 }
 
 export interface IntegrationActions {
-  updateAiSettings: (patch: Partial<AiSettings>, byStaffId: string) => void
-  testAiConnection: () => boolean
-  saveKnowledge: (item: KnowledgeItem, byStaffId: string) => void
-  deleteKnowledge: (id: string, byStaffId: string) => void
   updateProfileSync: (patch: Partial<ProfileSyncSettings>, byStaffId: string) => void
   /** 重新生成画像 API Key，返回完整 Key 一次 */
   regenerateProfileApiKey: (byStaffId: string) => string
@@ -45,33 +41,6 @@ export interface IntegrationActions {
 
 export function integrationActions(set: Set, get: Get): IntegrationActions {
   return {
-    updateAiSettings: (patch, byStaffId) =>
-      set((s) => ({ aiSettings: { ...s.aiSettings, ...patch }, audit: withAudit(s.audit, 'ai.settings', `修改 AI 设置：${Object.keys(patch).join('、')}`, byStaffId) })),
-
-    testAiConnection: () => {
-      const s = get()
-      const ok = !!(s.aiSettings.endpoint && s.aiSettings.keyConfigured)
-      set({ aiSettings: { ...s.aiSettings, lastTestAt: now(), lastTestOk: ok } })
-      return ok
-    },
-
-    saveKnowledge: (item, byStaffId) =>
-      set((s) => {
-        const previous = s.knowledge.find((k) => k.id === item.id)
-        const exists = !!previous
-        const saved = { ...item, version: previous ? (previous.version ?? 1) + 1 : 1 }
-        return {
-          knowledge: exists ? s.knowledge.map((k) => (k.id === item.id ? saved : k)) : [...s.knowledge, saved],
-          audit: withAudit(s.audit, 'knowledge.update', `${exists ? '修改' : '新增'}知识库条目「${item.title}」`, byStaffId),
-        }
-      }),
-
-    deleteKnowledge: (id, byStaffId) =>
-      set((s) => {
-        const k = s.knowledge.find((x) => x.id === id)
-        return { knowledge: s.knowledge.filter((x) => x.id !== id), audit: withAudit(s.audit, 'knowledge.update', `删除知识库条目「${k?.title}」`, byStaffId) }
-      }),
-
     updateProfileSync: (patch, byStaffId) =>
       set((s) => ({ profileSync: { ...s.profileSync, ...patch }, audit: withAudit(s.audit, 'profile.sync', `修改画像同步设置：${Object.keys(patch).join('、')}`, byStaffId) })),
 

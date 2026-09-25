@@ -4,7 +4,7 @@
  * 裁决顺序（03 文档）：模块授权 → 角色硬边界 → 策略矩阵（企业默认 → 群级覆盖 → 用户级覆盖）→ 员工角色能力与群内角色。
  * 群级覆盖只作用于客户在该群里的能力；用户级覆盖作用在客户或坐席上（坐席不是员工）。
  */
-import type { BotAccount, ChatGroup, DemoState, GroupAdminPerm, GroupMemberKind, Message, PolicyCol } from '@/domain/types'
+import type { ChatGroup, DemoState, GroupAdminPerm, GroupMemberKind, Message, PolicyCol } from '@/domain/types'
 import { WATCH_LIMIT_TEXT, isWatching } from '@/domain/register'
 import { allGroupsMuteReason, globalMuteReason } from '@/domain/customerStatus'
 
@@ -135,17 +135,12 @@ export function groupCapacity(s: DemoState, g: ChatGroup): number {
 
 // ---------- 发送者 ----------
 
-export function botById(s: DemoState, id: string | null | undefined): BotAccount | undefined {
-  return id ? s.bots.find((b) => b.id === id) : undefined
-}
-
-/** 消息发送者的显示名（客户 / 坐席 / 机器人 / 系统） */
+/** 消息发送者的显示名（客户 / 坐席 / 系统） */
 export function senderName(s: DemoState, m: Message): string {
   const channelId=m.channelId??s.conversations.find((c)=>c.id===m.convId&&c.kind==='channel')?.chatGroupId
   if(m.senderKind==='seat'&&channelId)return s.chatGroups.find((g)=>g.id===channelId)?.name??'频道'
   if (m.senderKind === 'seat') return s.seats.find((x) => x.id === m.seatId)?.displayName ?? '坐席'
   if (m.senderKind === 'customer') return s.customers.find((x) => x.id === m.senderId)?.nickname ?? '客户'
-  if (m.senderKind === 'bot') return botById(s, m.senderId)?.nickname ?? '成员'
   return '系统'
 }
 

@@ -48,7 +48,7 @@ export function waitingSince(s: DemoState, conv: Conversation): string | null {
   return last && last.senderKind === 'customer' ? last.at : null
 }
 
-/** 坐席视角的未读：坐席上次读到之后（或最后一条坐席消息之后）客户与机器人发的条数；手动标未读算 1 */
+/** 坐席视角的未读：坐席上次读到之后（或最后一条坐席消息之后）其他成员发的条数；手动标未读算 1 */
 export function unreadForSeat(s: DemoState, conv: Conversation, seatId?: string): number {
   const list = messagesOf(s, conv.id).filter((m) => !seatId || messageVisibleFor(s,m,{kind:'seat',id:seatId,staffId:s.seats.find((x)=>x.id===seatId)?.operatorStaffId??undefined}))
   const readAt = seatId ? conv.readAtBySeat?.[seatId] : undefined
@@ -56,7 +56,7 @@ export function unreadForSeat(s: DemoState, conv: Conversation, seatId?: string)
   for (let i = list.length - 1; i >= 0; i -= 1) {
     const m = list[i]
     if (readAt && m.at <= readAt) break
-    if (m.senderKind === 'customer' || m.senderKind === 'bot') n += 1
+    if (m.senderKind === 'customer') n += 1
     else if (!readAt && m.senderKind === 'seat' && (!seatId || m.seatId === seatId)) break
     else if (m.senderKind === 'seat' && m.seatId !== seatId) n += 1
   }
@@ -229,8 +229,6 @@ export function dashboardNumbers(s: DemoState) {
   const todaySeatMsgs = s.messages.filter((m) => m.senderKind === 'seat' && isToday(m.at) && !m.isWelcome)
   const repliedCustomers = new Set(todaySeatMsgs.map((m) => s.conversations.find((c) => c.id === m.convId)?.customerId).filter(Boolean)).size
   const onlineStaff = s.staff.filter((x) => x.status === 'active' && x.lastLoginAt && Date.now() - new Date(x.lastLoginAt).getTime() < 8 * 3600000).length
-  const aiToday = s.aiEvents.filter((e) => isToday(e.at))
-  const adopted = aiToday.filter((e) => e.result !== 'ignored').length
   // 首次响应中位数：客户消息到坐席下一条回复
   const gaps: number[] = []
   s.conversations.filter((c) => c.kind === 'dm').forEach((conv) => {
@@ -253,9 +251,6 @@ export function dashboardNumbers(s: DemoState) {
     onlineStaff,
     perStaff: onlineStaff ? (repliedCustomers / onlineStaff).toFixed(1) : '0',
     medianMin: Math.round(median),
-    aiDrafts: aiToday.length,
-    aiAdopted: adopted,
-    aiPct: aiToday.length ? Math.round((adopted / aiToday.length) * 100) : 0,
   }
 }
 

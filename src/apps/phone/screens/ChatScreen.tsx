@@ -67,7 +67,7 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
   const clear=async()=>{const ok=await confirm({title:'清空聊天？',body:'仅清空你的可见历史，其他参与者不受影响；联系人和群成员关系保留。',okText:'清空',danger:true});if(ok){s.clearChatFor(convId,actor);setToolsOpen(false)}}
 
   const pinned = group?.pinnedMessageIds[0] ? msgs.find((m)=>m.id===group.pinnedMessageIds[0]) : undefined
-  const memberCount = group ? group.memberCustomerIds.length + group.memberSeatIds.length + group.memberBotIds.length : 0
+  const memberCount = group ? group.memberCustomerIds.length + group.memberSeatIds.length : 0
 
   return (
     <div className="relative flex h-full flex-col bg-zinc-50">

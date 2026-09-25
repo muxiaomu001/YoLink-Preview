@@ -1,10 +1,10 @@
 /**
- * 成员列表：坐席（群主 / 管理员 / 成员，标"官方"）、活跃角色、客户（管理员在前），可搜索。
+ * 成员列表：坐席（群主 / 管理员 / 成员，标"官方"）、客户（管理员在前），可搜索。
  * 每项操作按 12 文档权限：任免管理员 can_promote_members；移出 / 禁言 / 封禁 / 解除 can_restrict_members；
  * 加坐席与批量拉人 can_invite_users。客户也可被设为管理员（"助教"）。
  */
 import { useMemo, useState } from 'react'
-import { Bot, Crown, MoreHorizontal, Shield } from 'lucide-react'
+import { Crown, MoreHorizontal, Shield } from 'lucide-react'
 import type { Customer, GroupMemberKind } from '@/domain/types'
 import { useStore } from '@/store/store'
 import { groupRoleOf } from '@/store/policy'
@@ -38,7 +38,6 @@ export function GroupMembers({ group: g, actor, perm, compact, canViewAll }: Gro
     const rank = (id: string) => (id === g.ownerSeatId ? 0 : groupRoleOf(g, 'seat', id) === 'admin' ? 1 : 2)
     return g.memberSeatIds.map((id) => seatById(s, id)).filter((x) => !!x).sort((a, b) => rank(a.id) - rank(b.id))
   }, [g, s])
-  const bots = g.memberBotIds.map((id) => s.bots.find((b) => b.id === id)).filter((x) => !!x)
   const customers = useMemo(() => {
     const kw = q.trim()
     const rank = (id: string) => (groupRoleOf(g, 'customer', id) === 'admin' ? 0 : 1)
@@ -50,7 +49,6 @@ export function GroupMembers({ group: g, actor, perm, compact, canViewAll }: Gro
   const banned = g.restrictions.filter((r) => r.kind === 'ban' && isRestrictionActive(r, nowIso)).map((r) => ({ r, c: customerById(s, r.customerId) })).filter((x) => !!x.c)
   const kw = q.trim()
   const shownSeats = kw ? seats.filter((x) => x.displayName.includes(kw)) : seats
-  const shownBots = kw ? bots.filter((b) => b.nickname.includes(kw)) : bots
 
   const demote = (t: Target) => {
     s.demoteGroupAdmin(g.id, t.kind, t.id, actor)
@@ -65,7 +63,7 @@ export function GroupMembers({ group: g, actor, perm, compact, canViewAll }: Gro
   return (
     <Section
       id="group-members"
-      title={`成员（${g.memberSeatIds.length + g.memberCustomerIds.length + g.memberBotIds.length}）`}
+      title={`成员（${g.memberSeatIds.length + g.memberCustomerIds.length}）`}
       compact={compact}
       hint={g.settings.membersVisible ? '客户可见' : '客户端按策略不可见'}
       extra={
@@ -98,9 +96,6 @@ export function GroupMembers({ group: g, actor, perm, compact, canViewAll }: Gro
             </Row>
           )
         })}
-        {shownBots.map((b) => (
-          <Row key={b.id} avatar={<Avatar text={b.nickname} size={22} color={b.avatarColor} />} name={b.nickname} role="bot" extra={<Pill tone="purple"><Bot size={10} className="mr-0.5" />活跃角色</Pill>} perms={[]} menuOpen={false} onMenu={() => toast('活跃角色在「群活跃助手」页管理', 'info')} />
-        ))}
         {customers.slice(0, limit).map((c) => {
           const role = groupRoleOf(g, 'customer', c.id)
           const r = g.restrictions.find((x) => x.customerId === c.id && isRestrictionActive(x, nowIso))
@@ -128,7 +123,7 @@ export function GroupMembers({ group: g, actor, perm, compact, canViewAll }: Gro
             <Button size="sm" variant="ghost" onClick={() => setLimit((n) => n + PAGE)}>还有 {customers.length - limit} 位，显示更多</Button>
           </li>
         )}
-        {!shownSeats.length && !shownBots.length && !customers.length && <li className="text-[12px] text-zinc-400">没有匹配的成员</li>}
+        {!shownSeats.length && !customers.length && <li className="text-[12px] text-zinc-400">没有匹配的成员</li>}
       </ul>
       {banned.length > 0 && (
         <div className="mt-3">
@@ -154,11 +149,10 @@ export function GroupMembers({ group: g, actor, perm, compact, canViewAll }: Gro
   )
 }
 
-const ROLE_TEXT: Record<string, { label: string; tone: 'amber' | 'blue' | 'zinc' | 'purple' }> = {
+const ROLE_TEXT: Record<string, { label: string; tone: 'amber' | 'blue' | 'zinc' }> = {
   owner: { label: '群主', tone: 'amber' },
   admin: { label: '管理员', tone: 'blue' },
   member: { label: '成员', tone: 'zinc' },
-  bot: { label: '活跃角色', tone: 'purple' },
 }
 
 function Row({ avatar, name, role, extra, status, perms, menuOpen, onMenu, children }: { avatar: React.ReactNode; name: string; role: string; extra?: React.ReactNode; status?: string; perms: string[]; menuOpen: boolean; onMenu: () => void; children?: React.ReactNode }) {

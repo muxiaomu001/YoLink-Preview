@@ -33,7 +33,6 @@ export function messageText(m: Message): string {
 export function senderLabel(s: DemoState, m: Message): string {
   if (m.senderKind === 'seat') return `${seatById(s, m.seatId)?.displayName ?? '未知坐席'}（坐席）`
   if (m.senderKind === 'system') return '系统'
-  if (m.senderKind === 'bot') return `${s.bots.find((b) => b.id === m.senderId)?.nickname ?? '未知活跃角色'}（活跃角色）`
   const c = customerById(s, m.senderId)
   return c ? `${c.nickname}（${c.accountId}）` : '未知客户'
 }

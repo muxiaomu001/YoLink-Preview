@@ -43,7 +43,7 @@ export const LINK_EXPIRY_OPTIONS: { days: number | null; label: string }[] = [
 export const GROUP_LINK_BASE = 'https://yolink.app/j/'
 
 export function memberTotal(g: ChatGroup): number {
-  return g.memberSeatIds.length + g.memberCustomerIds.length + g.memberBotIds.length
+  return g.memberSeatIds.length + g.memberCustomerIds.length
 }
 
 export function restrictionLabel(r: GroupRestriction): string {

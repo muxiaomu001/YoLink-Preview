@@ -122,7 +122,6 @@ function buildPreviewLines(s: DemoState): string[] {
     `此刻等待超过 ${th.waitingOverMinutes} 分钟未回复的客户 ${waitingOver} 位。`,
     `沉默超过 ${th.idleDays} 天的客户 ${idle} 位。`,
     n.lastBc ? `最近一次群发「${n.lastBc.name}」送达 ${n.lastBc.sentCount}，已读 ${n.lastBc.readCount}。` : '尚未群发。',
-    `AI 今日起草 ${n.aiDrafts} 条，采纳 ${n.aiAdopted} 条（${n.aiPct}%）。`,
   ]
 }
 

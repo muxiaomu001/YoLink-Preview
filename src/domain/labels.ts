@@ -57,8 +57,6 @@ export const AUDIT_LABEL: Record<AuditType, string> = {
   'referral.cancel': '取消推荐奖励',
   'banner.update': '横幅',
   'announcement.update': '公告',
-  'ai.settings': 'AI 设置',
-  'knowledge.update': '知识库',
   'profile.sync': '画像同步设置',
   'profile.import': 'CSV 导入',
   'automation.update': '自动化规则',
@@ -85,8 +83,6 @@ export const AUDIT_LABEL: Record<AuditType, string> = {
   'customer.mute_all': '全群禁言客户',
   'customer.reset_password': '重置客户密码',
   'customer.force_logout': '强制下线客户',
-  'bot.update': '群活跃助手',
-  'bot.run': '活跃角色发言',
   'quick_reply.update': '个人话术',
   'quick_reply.library': '企业话术库',
   'staff.prefs': '个人设置',
@@ -135,7 +131,6 @@ export const CAPABILITIES: CapabilityMeta[] = [
   { cat: '管理后台', key: 'manage_settings', desc: '管理企业设置', level: 'P0' },
   { cat: '管理后台', key: 'view_audit_logs', desc: '查看审计日志', level: 'P0' },
   { cat: '管理后台', key: 'export_data', desc: '导出数据', level: 'P1' },
-  { cat: '工作台', key: 'manage_bots', desc: '管理群活跃助手：活跃角色、剧本与规则', level: 'P0' },
   { cat: '工作台', key: 'manage_automation', desc: '配置客户画像自动化规则', level: 'P1' },
 ]
 

@@ -1,14 +1,14 @@
 /**
  * 单条消息：系统消息灰色居中；文本 URL 自动成链接；图片消息显示缩略图（点开大图）、文件消息显示文件卡，说明文字在下方；
- * 回复条可跳转；已删除的消息不进列表、不留占位；活跃角色、群发、转发、AI 草稿、欢迎语小标；菜单按权限显示（回复、复制、转发、编辑、置顶、选择多条、删除）。
+ * 回复条可跳转；已删除的消息不进列表、不留占位；群发、转发、欢迎语小标；菜单按权限显示（回复、复制、转发、编辑、置顶、选择多条、删除）。
  */
 import { useCallback, useState } from 'react'
 import { clsx } from 'clsx'
-import { Bot, CheckSquare, Copy, Forward, MoreHorizontal, Pencil, Pin, Reply, Trash2 } from 'lucide-react'
+import { CheckSquare, Copy, Forward, MoreHorizontal, Pencil, Pin, Reply, Trash2 } from 'lucide-react'
 import type { ChatGroup, Message, Seat } from '@/domain/types'
 import { channelOf, messageShadow, messageVisibleFor } from '@/domain/messageRules'
 import { fmtDateTime, fmtTime } from '@/domain/time'
-import { botById, seatCan, seatGroupPerm, senderName } from '@/store/policy'
+import { seatCan, seatGroupPerm, senderName } from '@/store/policy'
 import { customerById, seatById, staffById } from '@/store/selectors'
 import { Avatar, Pill, SeatAvatar, TitleChip } from '@/ui/display'
 import { PlayableMedia } from '@/ui/PlayableMedia'
@@ -62,13 +62,12 @@ export function MessageItem({
   const mine = m.senderKind === 'seat' && m.seatId === seat.id
   const otherSeat = m.senderKind === 'seat' && !mine ? seatById(s, m.seatId) : undefined
   const customer = m.senderKind === 'customer' ? customerById(s, m.senderId) : undefined
-  const bot = m.senderKind === 'bot' ? botById(s, m.senderId) : undefined
   const op = m.senderKind === 'seat' ? staffById(s, m.operatorId) : undefined
   const senderTitle = customer?.primaryTitleId ? s.titles.find((t) => t.id === customer.primaryTitleId && t.enabled) : undefined
   const replyTo = m.replyToId ? s.messages.find((x) => x.id === m.replyToId && messageVisibleFor(s,x,actor)) : undefined
   const pinned = !!group?.pinnedMessageIds.includes(m.id)
   const hasMedia = (m.kind === 'image' || m.kind === 'file' || m.kind === 'video' || m.kind === 'voice') && !!m.media
-  const bubbleCls = channel ? 'bg-white text-zinc-800 shadow-sm' : mine ? 'bg-brand-700 text-white' : otherSeat ? 'bg-brand-50 text-brand-900' : bot ? 'bg-purple-50 text-purple-950' : 'bg-white text-zinc-800 shadow-sm'
+  const bubbleCls = channel ? 'bg-white text-zinc-800 shadow-sm' : mine ? 'bg-brand-700 text-white' : otherSeat ? 'bg-brand-50 text-brand-900' : 'bg-white text-zinc-800 shadow-sm'
 
   // 操作权限
   const showForward = seatCan(s, seat.id, isGroup ? 'group.forward' : 'dm.forward', group?.id)
@@ -101,14 +100,13 @@ export function MessageItem({
     <div id={`msg-${m.id}`} data-message-id={m.id} className={clsx('rounded-md transition-shadow', current && 'ring-2 ring-amber-300', selected && 'bg-brand-100/60 ring-1 ring-brand-300')}>
       {showDate && <div className="my-3 text-center text-[11px] text-zinc-400">{fmtDateTime(m.at).slice(0, 10)}</div>}
       <div onContextMenu={(e) => { e.preventDefault(); const selection=window.getSelection();const text=selection?.toString().trim()??'';setQuoteSelection(selection?.anchorNode&&e.currentTarget.contains(selection.anchorNode)&&text&&m.text.includes(text)?text.slice(0,1024):'');positionMenu(e.clientX, e.clientY); setMenuOpen(true) }} className={clsx('group relative mb-3.5 flex gap-2.5', mine && !channel && 'flex-row-reverse')}>
-        {channel ? <Avatar text={channel.name} color="#b45309" size={30} official={channel.official} /> : mine ? <SeatAvatar seat={seat} size={30} /> : otherSeat ? <SeatAvatar seat={otherSeat} size={30} /> : bot ? <Avatar text={bot.nickname} size={30} color={bot.avatarColor} /> : <Avatar text={customer?.nickname ?? '?'} size={30} />}
+        {channel ? <Avatar text={channel.name} color="#b45309" size={30} official={channel.official} /> : mine ? <SeatAvatar seat={seat} size={30} /> : otherSeat ? <SeatAvatar seat={otherSeat} size={30} /> : <Avatar text={customer?.nickname ?? '?'} size={30} />}
         <div className={clsx('max-w-[70%]', mine && !channel && 'items-end text-right')}>
-          {(channel || !mine && (isGroup || bot)) && (
+          {(channel || !mine && isGroup) && (
             <div className="mb-0.5 flex items-center gap-1 text-[11px] text-zinc-500">
               {senderName(s, m)}
               {senderTitle && <TitleChip title={senderTitle} size="xs" />}
               {otherSeat && <Pill tone="blue">官方</Pill>}
-              {bot && <Pill tone="purple"><Bot size={10} className="mr-0.5" />活跃角色</Pill>}
             </div>
           )}
           {replyTo && (
@@ -149,10 +147,8 @@ export function MessageItem({
                 影子屏蔽{m.shadowReason === 'customer' ? '（整号）' : ''}
               </span>
             )}
-            {m.aiDraftUsed && <span className="rounded bg-violet-50 px-1 text-violet-600">AI 草稿</span>}
             {m.mentionAll && <span className="rounded bg-amber-50 px-1 text-amber-700">@所有人</span>}
             {m.senderKind === 'seat' && can('view_seat_operator') && op && <span title="仅企业内部可见，客户看不到">实操：{op.name}</span>}
-            {bot && m.operatorId && can('view_seat_operator') && <span title="仅企业内部可见，客户看不到">手动：{staffById(s, m.operatorId)?.name}</span>}
           </div>
         </div>
         <button type="button" id={`menu-trigger-${m.id}`} aria-label="更多消息操作" aria-haspopup="menu" aria-expanded={menuOpen} title="更多消息操作（也可右键消息）" className={clsx('self-start rounded p-1 text-zinc-400 transition-opacity hover:bg-zinc-200 hover:text-zinc-700 focus-visible:opacity-100 group-hover:opacity-100', menuOpen ? 'opacity-100' : 'opacity-0')} onClick={(e) => { setQuoteSelection('');const rect = e.currentTarget.getBoundingClientRect(); positionMenu(rect.left, rect.bottom + 4); setMenuOpen((v) => !v) }}><MoreHorizontal size={16} /></button>

@@ -1,4 +1,5 @@
 import { StrictMode } from 'react'
+import { Bot, Sparkles } from 'lucide-react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import './index.css'
@@ -37,7 +38,7 @@ import { WalletPage } from '@/apps/admin/pages/WalletPage'
 import { CheckinPage } from '@/apps/admin/pages/CheckinPage'
 import { ReferralPage } from '@/apps/admin/pages/ReferralPage'
 import { BannersPage } from '@/apps/admin/pages/BannersPage'
-import { AiPage } from '@/apps/admin/pages/AiPage'
+import { DemoPendingRoute } from '@/ui/DemoPendingModule'
 import { PluginsPage } from '@/apps/admin/pages/PluginsPage'
 import { ApiKeysPage } from '@/apps/admin/pages/ApiKeysPage'
 import { WebhooksPage } from '@/apps/admin/pages/WebhooksPage'
@@ -52,7 +53,6 @@ import { CustomersPage } from '@/apps/workbench/pages/CustomersPage'
 import { InvitesPage } from '@/apps/workbench/pages/InvitesPage'
 import { BroadcastPage } from '@/apps/workbench/pages/BroadcastPage'
 import { WbSettingsPage } from '@/apps/workbench/pages/WbSettingsPage'
-import { BotsPage } from '@/apps/workbench/pages/BotsPage'
 import { WithdrawalsPage } from '@/apps/workbench/pages/WithdrawalsPage'
 import { PhoneApp } from '@/apps/phone/PhoneApp'
 import { ProviderApp } from '@/apps/provider/ProviderApp'
@@ -105,7 +105,10 @@ const router = createBrowserRouter([
       { path: 'referral', element: <ReferralPage /> },
       { path: 'banners', element: <BannersPage /> },
       // AI
-      { path: 'ai', element: <AiPage /> },
+      { path: 'ai', element: <DemoPendingRoute home="/admin/home" icon={Sparkles} title="AI 模块 · 独立板块，待设计" lines={[
+        '回复推荐、知识库、AI 写文案等能力，将整合公司现有的 AI 产品，不在 YoLink 里另起一套。',
+        '接在哪、放在哪、谁能用，都还没设计。这里只占个位置，说明将来有这个板块。',
+      ]} /> },
       // 插件
       { path: 'plugins', element: <PluginsPage /> },
       { path: 'api-keys', element: <ApiKeysPage /> },
@@ -129,7 +132,10 @@ const router = createBrowserRouter([
       { path: 'invites', element: <InvitesPage /> },
       { path: 'broadcast', element: <BroadcastPage /> },
       { path: 'settings', element: <WbSettingsPage /> },
-      { path: 'bots', element: <BotsPage /> },
+      { path: 'bots', element: <DemoPendingRoute home="/workbench/chat" icon={Bot} title="群活跃助手 · 独立板块，待设计" lines={[
+        '以真人身份参与群聊、带动气氛的能力，将整合公司现有产品。',
+        '触发条件、发言节奏、审核方式都还没设计。这里只占个位置，说明将来有这个板块。',
+      ]} /> },
       { path: 'withdrawals', element: <WithdrawalsPage /> },
     ],
   },

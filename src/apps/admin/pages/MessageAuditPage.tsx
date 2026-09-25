@@ -3,7 +3,6 @@ import { Eye, Trash2 } from 'lucide-react'
 import type { Message } from '@/domain/types'
 import { useStore } from '@/store/store'
 import { customerById, operatorAt, seatById, staffById } from '@/store/selectors'
-import { botById } from '@/store/policy'
 import { Button, Input, Select } from '@/ui/primitives'
 import { Card, Note, PageHeader, Pill, Table, type Column } from '@/ui/display'
 import { toast } from '@/ui/overlay'
@@ -23,8 +22,8 @@ export function MessageAuditPage() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [ctxId, setCtxId] = useState<string | null>(null)
-  /** 发送者类型：全部 / 只看坐席 / 只看客户 / 只看活跃角色（14 文档：消息审计可按活跃角色消息筛选） */
-  const [senderKind, setSenderKind] = useState<'' | 'seat' | 'customer' | 'bot'>('')
+  /** 发送者类型：全部 / 只看坐席 / 只看客户 */
+  const [senderKind, setSenderKind] = useState<'' | 'seat' | 'customer'>('')
 
   // 会话下拉：私聊显示「客户 ↔ 坐席」，群显示群名，按最近活跃排
   const convOptions = useMemo(
@@ -85,18 +84,6 @@ export function MessageAuditPage() {
                 <Pill tone="blue">坐席</Pill>
               </div>
               <div className="text-[11px] text-zinc-500">实操：{op?.name ?? '未记录'}</div>
-            </div>
-          )
-        }
-        if (m.senderKind === 'bot') {
-          const b = botById(s, m.senderId)
-          return (
-            <div>
-              <div className="flex items-center gap-1">
-                <span className="font-medium text-zinc-900">{b?.nickname ?? '未知活跃角色'}</span>
-                <Pill tone="purple">活跃角色</Pill>
-              </div>
-              <div className="text-[11px] text-zinc-500">{m.botRuleId ? '规则触发' : `手动：${staffById(s, m.operatorId)?.name ?? '未记录'}`}</div>
             </div>
           )
         }
@@ -174,7 +161,6 @@ export function MessageAuditPage() {
             <option value="">全部发送者</option>
             <option value="seat">只看坐席</option>
             <option value="customer">只看客户</option>
-            <option value="bot">只看活跃角色</option>
           </Select>
           <Select value={convFilter} onChange={(e) => setConvFilter(e.target.value)} className="w-56">
             <option value="">全部会话</option>

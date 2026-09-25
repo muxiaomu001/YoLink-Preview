@@ -2,7 +2,7 @@
  * 群管理页：复用工作台的群信息卡组件（perm 恒 true，以群主坐席身份、管理员实操），右侧保留"最近消息"。
  */
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Bot } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import type { ChatGroup } from '@/domain/types'
 import { fmtDateTime } from '@/domain/time'
 import { useStore } from '@/store/store'
@@ -65,7 +65,6 @@ function RecentMessagesCard({ group }: { group: ChatGroup }) {
               <span className={m.senderKind === 'seat' ? 'font-medium text-brand-800' : 'font-medium text-zinc-700'}>
                 {senderName(s, m)}
                 {m.senderKind === 'seat' && <Pill tone="blue" className="ml-1">坐席</Pill>}
-                {m.senderKind === 'bot' && <Pill tone="purple" className="ml-1"><Bot size={9} className="mr-0.5" />活跃角色</Pill>}
                 {group.pinnedMessageIds.includes(m.id) && <Pill tone="amber" className="ml-1">置顶</Pill>}
               </span>
               <span className="tabular-nums text-zinc-400">{fmtDateTime(m.at)}</span>

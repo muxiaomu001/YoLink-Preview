@@ -7,7 +7,7 @@ import type { ChatGroup } from '@/domain/types'
 import { fmtDate } from '@/domain/time'
 import { useStore } from '@/store/store'
 import { customerById, seatById } from '@/store/selectors'
-import { botById, customerCan, groupRoleOf, resolveCap } from '@/store/policy'
+import { customerCan, groupRoleOf, resolveCap } from '@/store/policy'
 import { Avatar, SeatAvatar, TitleChip } from '@/ui/display'
 import { toast } from '@/ui/overlay'
 import { confirm } from '@/ui/confirm'
@@ -28,7 +28,7 @@ export function GroupInfoScreen({ g, customerId, onBack, onLeft }: { g: ChatGrou
   const leave = resolveCap(s, { role: 'customer', key: leaveKey, groupId: g.id, userId: customerId })
   const mainLink = g.inviteLinks.find((l) => l.main && l.status === 'active')
   const myRole = groupRoleOf(g, 'customer', customerId)
-  const total = g.memberSeatIds.length + g.memberCustomerIds.length + g.memberBotIds.length
+  const total = g.memberSeatIds.length + g.memberCustomerIds.length
 
   const doLeave = async () => {
     const ok = await confirm({ title: g.kind==='channel'?`取消订阅「${g.name}」？`:`退出${kindLabel}「${g.name}」？`, body: '之后不再收到消息，需要重新通过链接加入。', okText: g.kind==='channel'?'取消订阅':'退出', danger: true })
@@ -149,16 +149,6 @@ function MemberList({ g, canViewProfile }: { g: ChatGroup; canViewProfile: boole
             <span className="flex-1 text-[13px] text-zinc-900">{seat.displayName}</span>
             <span className="rounded bg-brand-50 px-1 text-[9px] text-brand-700">官方</span>
             {ROLE_LABEL[role] && <span className="rounded bg-amber-50 px-1 text-[9px] text-amber-700">{ROLE_LABEL[role]}</span>}
-          </Wrap>
-        )
-      })}
-      {g.memberBotIds.map((id) => {
-        const b = botById(s, id)
-        if (!b) return null
-        return (
-          <Wrap key={id} name={b.nickname} canTap={canViewProfile}>
-            <Avatar text={b.nickname} color={b.avatarColor} size={30} />
-            <span className="flex-1 text-[13px] text-zinc-900">{b.nickname}</span>
           </Wrap>
         )
       })}
