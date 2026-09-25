@@ -261,6 +261,19 @@ test('第十批界面：客户只看到显示名与官方小标', () => {
   assert.doesNotMatch(html, /坐席|官方联系人|官方账号/)
 })
 
+test('消息与群规则：慢速模式展示为只读 P2', () => {
+  const { g } = groupContext()
+  const html = renderPage('src/apps/workbench/components/group/GroupSettingsPanel.tsx', 'GroupSettingsPanel', {
+    group: g,
+    actor: { seatId: g.ownerSeatId, staffId: 'st_lin' },
+    perm: () => true,
+    officialEditable: true,
+  })
+  assert.match(html, /慢速模式/)
+  assert.match(html, />P2</)
+  assert.doesNotMatch(html, /<select/)
+})
+
 test('第十批：群成员限制与解除使用新文案，账号封禁保持不变', () => {
   const { g: group, actor: customerActor } = groupContext()
   const actor = { seatId: group.ownerSeatId, staffId: 'st_admin' }
@@ -526,6 +539,126 @@ test('全部禁言的客户会被私聊群发跳过，群聊禁言不会', () =>
   const groupsResult = current().sendBroadcast({ ...singleInput('私聊群发'), customerIds: [groupsMutedCustomerId] })
   assert.equal(groupsResult.sent, 1)
   assert.equal(groupsResult.skipped, 0)
+})
+
+test('消息与群规则：群慢速模式按群设置拦截客户，间隔后恢复', () => {
+  const { g, conv, actor } = groupContext()
+  store.setState({
+    policyNumbers: { ...current().policyNumbers, slowModeSeconds: 60 },
+    chatGroups: current().chatGroups.map(item => item.id === g.id ? { ...item, settings: { ...item.settings, slowModeSeconds: 10 } } : item),
+  })
+  const first = current().queueChatMessage({ convId: conv.id, actor, text: '第一条' })
+  assert.equal(first.ok, true, first.reason)
+  const blocked = current().queueChatMessage({ convId: conv.id, actor, text: '第二条' })
+  assert.match(blocked.reason ?? '', /^发言太快了，请 \d+ 秒后再试$/)
+  store.setState({ messages: current().messages.map(message => message.id === first.id ? { ...message, at: new Date(Date.now() - 11000).toISOString(), delivery: 'sent' } : message) })
+  assert.equal(current().queueChatMessage({ convId: conv.id, actor, text: '间隔后发送' }).ok, true)
+})
+
+test('消息与群规则：群管理员和坐席不受慢速模式限制', () => {
+  const { g, conv, actor } = groupContext()
+  store.setState({
+    policyNumbers: { ...current().policyNumbers, slowModeSeconds: 60 },
+    chatGroups: current().chatGroups.map(item => item.id === g.id ? {
+      ...item,
+      settings: { ...item.settings, slowModeSeconds: 10 },
+      admins: [...item.admins, { memberKind: 'customer', memberId: actor.id, perms: [], promotedBySeatId: item.ownerSeatId, promotedAt: new Date().toISOString() }],
+    } : item),
+  })
+  assert.equal(current().queueChatMessage({ convId: conv.id, actor, text: '管理员第一条' }).ok, true)
+  assert.equal(current().queueChatMessage({ convId: conv.id, actor, text: '管理员第二条' }).ok, true)
+  const seatConv = current().conversations.find(item => item.chatGroupId === g.id)
+  assert.equal(current().queueChatMessage({ convId: seatConv.id, actor: seat, text: '坐席消息' }).ok, true)
+  assert.equal(current().queueChatMessage({ convId: seatConv.id, actor: seat, text: '坐席消息二' }).ok, true)
+})
+
+test('消息与群规则：关闭历史后只隐藏新成员入群前的消息，老成员不受影响，打开后恢复', () => {
+  const { g, conv, actor, other } = groupContext()
+  const old = current().messages.find(message => message.convId === conv.id)
+  assert.ok(old)
+  const joinedAt = new Date().toISOString()
+  store.setState({ chatGroups: current().chatGroups.map(item => item.id === g.id ? { ...item, settings: { ...item.settings, historyVisible: false }, customerJoinedAt: { ...item.customerJoinedAt, [actor.id]: joinedAt, [other.id]: item.createdAt } } : item) })
+  assert.equal(rules.messageVisibleFor(current(), old, actor), false)
+  assert.equal(rules.messageVisibleFor(current(), old, other), true)
+  store.setState({ chatGroups: current().chatGroups.map(item => item.id === g.id ? { ...item, settings: { ...item.settings, historyVisible: true } } : item) })
+  assert.equal(rules.messageVisibleFor(current(), old, actor), true)
+})
+
+test('消息与群规则：入群时间覆盖注册、拉人和重新入群', () => {
+  const registration = registrationGroup(['cg_strategy'])
+  const registered = current().registerCustomer({ nickname: '入群时间客户', inviteCode: registration.code })
+  assert.equal(registered.ok, true, registered.error)
+  const registeredGroup = current().chatGroups.find(item => item.id === 'cg_strategy')
+  assert.equal(registeredGroup.customerJoinedAt[registered.customerId], current().customers.find(item => item.id === registered.customerId).registeredAt)
+
+  const noGroup = registrationGroup()
+  const pulled = current().registerCustomer({ nickname: '拉人时间客户', inviteCode: noGroup.code })
+  assert.equal(pulled.ok, true, pulled.error)
+  const by = { seatId: 'seat_lin', staffId: 'st_lin' }
+  assert.equal(current().addGroupMembers('cg_community', [pulled.customerId], by).added, 1)
+  assert.ok(current().chatGroups.find(item => item.id === 'cg_community').customerJoinedAt[pulled.customerId])
+  current().kickGroupMember('cg_community', pulled.customerId, false, by)
+  assert.equal(current().chatGroups.find(item => item.id === 'cg_community').customerJoinedAt[pulled.customerId], undefined)
+  assert.equal(current().addGroupMembers('cg_community', [pulled.customerId], by).added, 1)
+  assert.ok(current().chatGroups.find(item => item.id === 'cg_community').customerJoinedAt[pulled.customerId])
+})
+
+test('消息与群规则：默认撤回与编辑时限按身份生效，客户删除开关保持关闭', () => {
+  assert.equal(rules.messageLimitSeconds(current(), 'seat', 'deleteAll'), 0)
+  assert.equal(rules.messageLimitSeconds(current(), 'seat', 'edit'), 0)
+  assert.equal(rules.messageLimitSeconds(current(), 'customer', 'deleteAll'), 120)
+  assert.equal(rules.messageLimitSeconds(current(), 'customer', 'edit'), 120)
+  const customerId = current().customers.find(customer => !customer.deletedAt).id
+  assert.equal(policy.customerCan(current(), customerId, 'dm.recall'), false)
+  const html = renderPage('src/apps/admin/pages/PoliciesPage.numbers.tsx', 'NumbersTab')
+  assert.doesNotMatch(html, /默认 120 秒/)
+})
+
+test('消息与群规则：注销客户从工作台会话、客户关系和搜索派生中消失', () => {
+  const conv = dm()
+  const customerId = conv.customerId
+  current().deleteCustomer(customerId, 'st_admin')
+  const selectors = loadSource('src/store/selectors.ts')
+  assert.equal(selectors.conversationsForSeat(current(), seat.id).some(row => row.conv.id === conv.id), false)
+  assert.equal(selectors.customersOfSeat(current(), seat.id).some(customer => customer.id === customerId), false)
+  assert.equal(selectors.activeCustomers(current()).some(customer => customer.id === customerId), false)
+  assert.ok(current().messages.some(message => message.convId === conv.id))
+})
+
+test('消息与群规则：客户自助注销记为客户本人并显示自助注销', () => {
+  const customer = current().customers.find(item => !item.deletedAt)
+  current().deleteCustomer(customer.id, 'customer_self')
+  const audit = current().audit.find(item => item.type === 'customer.delete')
+  assert.equal(audit.actorStaffId, 'customer_self')
+  assert.notEqual(audit.actorStaffId, 'st_admin')
+  assert.match(audit.detail, /客户自助注销/)
+})
+
+test('消息与群规则：拉黑坐席后坐席私聊被拒，解除后恢复，群发继续跳过', () => {
+  const conv = dm()
+  const customerId = conv.customerId
+  assert.equal(current().customerBlockSeat(customerId, seat.id, true).ok, true)
+  assert.match(current().queueChatMessage({ convId: conv.id, actor: seat, text: '拉黑后发送' }).reason ?? '', /对方已将你拉黑/)
+  const broadcast = current().sendBroadcast({ ...singleInput('拉黑后的群发'), customerIds: [customerId] })
+  assert.equal(broadcast.sent, 0)
+  assert.equal(current().broadcasts[0].skipReasons.blocked, 1)
+  assert.equal(current().customerBlockSeat(customerId, seat.id, false).ok, true)
+  assert.equal(current().queueChatMessage({ convId: conv.id, actor: seat, text: '解除后发送' }).ok, true)
+})
+
+test('消息与群规则：friend.block 关闭时动作层拒绝拉黑', () => {
+  const conv = dm()
+  const customerId = conv.customerId
+  store.setState({ policyMatrix: { ...current().policyMatrix, 'friend.block': { ...current().policyMatrix['friend.block'], customer: false } } })
+  const result = current().customerBlockSeat(customerId, seat.id, true)
+  assert.equal(result.ok, false)
+  assert.match(result.reason ?? '', /不允许拉黑/)
+  assert.equal(current().customers.find(customer => customer.id === customerId).blockedSeatIds.includes(seat.id), false)
+})
+
+test('消息与群规则：store 不再暴露旧的 customerSend 和 seatSend 动作', () => {
+  assert.equal(Object.hasOwn(current(), 'customerSend'), false)
+  assert.equal(Object.hasOwn(current(), 'seatSend'), false)
 })
 
 test('激活员工写入 staff.activate 审计类型', () => {

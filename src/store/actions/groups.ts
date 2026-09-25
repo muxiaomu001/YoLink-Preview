@@ -175,7 +175,7 @@ export function groupActions(set: Set, get: Get): GroupActions {
       const names = toAdd.map((cid) => s.customers.find((x) => x.id === cid)?.nickname).filter(Boolean)
       const sys: Message[] = conv ? [{ id: newId('msg'), convId: conv.id, senderKind: 'system', senderId: '', kind: 'system', text: `${names.slice(0, 3).join('、')}${names.length > 3 ? ` 等 ${names.length} 人` : ''} 加入了群聊`, at }] : []
       set({
-        chatGroups: patchGroup(groupId, (x) => ({ ...x, memberCustomerIds: [...x.memberCustomerIds, ...toAdd] }))(s.chatGroups),
+        chatGroups: patchGroup(groupId, (x) => ({ ...x, memberCustomerIds: [...x.memberCustomerIds, ...toAdd], customerJoinedAt: { ...(x.customerJoinedAt ?? {}), ...Object.fromEntries(toAdd.map((customerId) => [customerId, at])) } }))(s.chatGroups),
         messages: [...s.messages, ...sys, ...(conv?groupWelcomeMessages(g,conv.id,s.customers.filter((c)=>toAdd.includes(c.id)),at):[])],
         groupLogs: [log(groupId, by, 'member', `拉入 ${toAdd.length} 位客户${skipped.length ? `，跳过 ${skipped.length} 位（已在群、已满、被禁止再进或不满足头衔条件）` : ''}`), ...s.groupLogs],
         audit: withAudit(s.audit, 'group.member', `往群「${g.name}」拉入 ${toAdd.length} 位客户`, by.staffId),
@@ -191,7 +191,7 @@ export function groupActions(set: Set, get: Get): GroupActions {
         const conv = s.conversations.find((x) => x.chatGroupId === groupId)
         const at = now()
         return {
-          chatGroups: patchGroup(groupId, (x) => ({ ...x, memberCustomerIds: x.memberCustomerIds.filter((id) => id !== customerId), admins: x.admins.filter((a) => !(a.memberKind === 'customer' && a.memberId === customerId)) }))(s.chatGroups),
+          chatGroups: patchGroup(groupId, (x) => { const customerJoinedAt = { ...(x.customerJoinedAt ?? {}) }; delete customerJoinedAt[customerId]; return { ...x, memberCustomerIds: x.memberCustomerIds.filter((id) => id !== customerId), customerJoinedAt, admins: x.admins.filter((a) => !(a.memberKind === 'customer' && a.memberId === customerId)) } })(s.chatGroups),
           messages: deleteMessages && conv ? s.messages.map((m) => (m.convId === conv.id && m.senderKind === 'customer' && m.senderId === customerId && !m.deletedAt ? { ...m, deletedAt: at } : m)) : s.messages,
           groupLogs: [log(groupId, by, 'member', `移出客户「${c.nickname}」${deleteMessages ? '，并删除其全部消息' : ''}`), ...s.groupLogs],
           audit: withAudit(s.audit, 'group.member', `把「${c.nickname}」移出群「${g.name}」${deleteMessages ? '，删除其全部消息' : ''}`, by.staffId),
@@ -316,7 +316,7 @@ export function groupActions(set: Set, get: Get): GroupActions {
         const conv = s.conversations.find((x) => x.chatGroupId === groupId)
         const at = now()
         return {
-          chatGroups: patchGroup(groupId, (x) => ({ ...x, memberCustomerIds: x.memberCustomerIds.filter((id) => id !== customerId) }))(s.chatGroups),
+          chatGroups: patchGroup(groupId, (x) => { const customerJoinedAt = { ...(x.customerJoinedAt ?? {}) }; delete customerJoinedAt[customerId]; return { ...x, memberCustomerIds: x.memberCustomerIds.filter((id) => id !== customerId), customerJoinedAt } })(s.chatGroups),
           messages: conv ? [...s.messages, { id: newId('msg'), convId: conv.id, senderKind: 'system', senderId: '', kind: 'system', text: `${c.nickname} 退出了${g.kind === 'channel' ? '频道' : '群聊'}`, at }] : s.messages,
           groupLogs: [{ id: newId('glog'), groupId, at, actorKind: 'customer', actorId: customerId, action: 'member', detail: `客户「${c.nickname}」主动退出` }, ...s.groupLogs],
         }

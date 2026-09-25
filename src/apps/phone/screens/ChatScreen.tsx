@@ -22,6 +22,7 @@ import { groupKindLabel } from '../shared'
 import { AnnouncementLayer, Bubble, InputBar, PinnedBar } from './ChatScreen.parts'
 import { ForwardSheet } from './ChatScreen.actions'
 import { GroupInfoScreen } from './GroupInfoScreen'
+import { SeatProfileScreen } from './SeatProfileScreen'
 
 export function ChatScreen({ convId, customerId, onBack }: { convId: string; customerId: string; onBack: () => void }) {
   const s = useStore()
@@ -40,6 +41,7 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
   const [editing, setEditing] = useState<Message | null>(null)
   const [forwarding, setForwarding] = useState<Message | null>(null)
   const [showInfo, setShowInfo] = useState(false)
+  const [showSeatProfile, setShowSeatProfile] = useState(false)
   // 本次会话看过的公告（按公告时间记，公告更新会再弹）
   const [seenAnnouncementAt, setSeenAnnouncementAt] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
@@ -54,6 +56,7 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
   const gid = group?.id ?? null
 
   if (group && showInfo) return <GroupInfoScreen g={group} customerId={customerId} onBack={() => setShowInfo(false)} onLeft={onBack} />
+  if (seat && showSeatProfile) return <SeatProfileScreen seatId={seat.id} customerId={customerId} onBack={() => setShowSeatProfile(false)} />
 
   // 输入区能不能发
   const blockedReason = sendFailure(s, convId, actor)
@@ -73,7 +76,7 @@ export function ChatScreen({ convId, customerId, onBack }: { convId: string; cus
     <div className="relative flex h-full flex-col bg-zinc-50">
       <ScreenHeader
         onBack={onBack}
-        onTitleClick={group ? () => setShowInfo(true) : undefined}
+        onTitleClick={group ? () => setShowInfo(true) : seat ? () => setShowSeatProfile(true) : undefined}
         title={
           <span className="inline-flex items-center gap-1.5">
             {seat && <SeatAvatar seat={seat} size={24} />}

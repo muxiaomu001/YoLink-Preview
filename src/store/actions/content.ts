@@ -169,10 +169,17 @@ export function contentActions(set: Set, get: Get): ContentActions {
     deleteCustomer: (customerId, byStaffId) =>
       set((s) => {
         const c = s.customers.find((x) => x.id === customerId)
+        const detail = byStaffId === 'customer_self'
+          ? `客户「${c?.nickname}」（${c?.accountId}）客户自助注销，数据保留、不再出现在工作台`
+          : `注销客户「${c?.nickname}」（${c?.accountId}），数据保留、不再出现在工作台`
         return {
           customers: s.customers.map((x) => (x.id === customerId ? { ...x, deletedAt: now() } : x)),
-          chatGroups: s.chatGroups.map((g) => ({ ...g, memberCustomerIds: g.memberCustomerIds.filter((m) => m !== customerId) })),
-          audit: withAudit(s.audit, 'customer.delete', `注销客户「${c?.nickname}」（${c?.accountId}），数据保留、不再出现在工作台`, byStaffId),
+          chatGroups: s.chatGroups.map((g) => {
+            const customerJoinedAt = { ...(g.customerJoinedAt ?? {}) }
+            delete customerJoinedAt[customerId]
+            return { ...g, memberCustomerIds: g.memberCustomerIds.filter((m) => m !== customerId), customerJoinedAt }
+          }),
+          audit: withAudit(s.audit, 'customer.delete', detail, byStaffId),
         }
       }),
   }

@@ -412,6 +412,8 @@ export interface ChatGroup {
   /** 坐席成员（含群主）；是否管理员看 admins */
   memberSeatIds: string[]
   memberCustomerIds: string[]
+  /** 客户最近一次入群时间；退出或被移出后清掉，重新入群重新记录 */
+  customerJoinedAt: Record<string, ISODate>
   admins: GroupAdmin[]
   settings: GroupSettings
   announcement: GroupAnnouncement | null

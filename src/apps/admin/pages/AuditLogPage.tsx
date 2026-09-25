@@ -53,6 +53,7 @@ export function AuditLogPage() {
   const toggleType = (t: AuditType) => setTypes((list) => (list.includes(t) ? list.filter((x) => x !== t) : [...list, t]))
 
   const actorText = (e: AuditEvent) => {
+    if (e.actorStaffId === 'customer_self') return '客户本人'
     const st = staffById(s, e.actorStaffId)
     return st ? `${st.name}（${st.username}）` : '系统'
   }
@@ -88,6 +89,7 @@ export function AuditLogPage() {
       title: '操作人',
       width: '140px',
       render: (e) => {
+        if (e.actorStaffId === 'customer_self') return <span className="text-zinc-900">客户本人</span>
         const st = staffById(s, e.actorStaffId)
         if (!st) return <span className="text-zinc-400">系统</span>
         return (
